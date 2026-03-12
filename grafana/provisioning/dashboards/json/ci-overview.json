@@ -19,6 +19,13 @@
         "sort": 1
       },
       {
+        "name": "build_id",
+        "label": "Build ID",
+        "description": "Paste a build ID from the outlier tables to see its step timeline",
+        "type": "textbox",
+        "current": { "selected": false, "text": "", "value": "" }
+      },
+      {
         "name": "outcome",
         "label": "Outcome",
         "type": "custom",
@@ -231,15 +238,56 @@
       "options": { "tooltip": { "mode": "multi", "sort": "desc" }, "legend": { "displayMode": "list", "placement": "bottom" } }
     },
     {
-      "id": 400, "title": "Outliers", "type": "row",
+      "id": 350, "title": "Pipeline Anatomy (paste Build ID above)", "type": "row",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 }, "collapsed": false
+    },
+    {
+      "id": 9,
+      "title": "Step Timeline",
+      "description": "Gantt chart showing step execution for a specific build. Paste a Build ID from the outlier tables into the Build ID variable above.",
+      "type": "marcusolsson-gantt-panel",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 34 },
+      "targets": [
+        {
+          "expr": "ci_step_duration_seconds{build_id=\"$build_id\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "build_id": true, "author": true, "branch": true, "org": true, "repo": true, "pr_sha": true, "job_name": true, "pr_number": true, "timestamp": true, "Value": true },
+            "renameByName": { "source": "Step", "from": "Start", "to": "End", "level": "Level" }
+          }
+        }
+      ],
+      "options": {
+        "textField": "Step",
+        "startField": "Start",
+        "endField": "End",
+        "colorByField": "Level",
+        "sortBy": "Start",
+        "sortOrder": "asc",
+        "experiments": {}
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 400, "title": "Outliers", "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 }, "collapsed": false
     },
     {
       "id": 7,
       "title": "Longest Runs",
       "description": "Individual pipeline runs sorted by duration. Use to investigate outliers.",
       "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 34 },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 46 },
       "targets": [
         {
           "expr": "topk(20, max_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}[$__range]))",
@@ -295,7 +343,7 @@
       "title": "Shortest Runs",
       "description": "Runs that completed unusually fast. Often indicates infrastructure failures, scheduling issues, or early-exit errors.",
       "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 34 },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 46 },
       "targets": [
         {
           "expr": "bottomk(20, min_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}[$__range]))",
