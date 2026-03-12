@@ -5,10 +5,12 @@
 - `podman-compose.yml` -- service orchestration (VM, VL, Grafana, scraper-watch, scraper-backfill)
 - `Containerfile.scraper` -- scraper container image
 
-## Architecture
-- See ARCHITECTURE.md for system design and data flow
-- See docs/appendix/ci-operator-metrics.md for JSON field reference
-- See docs/appendix/gcs-bucket-layout.md for GCS path structure
+## Documentation
+- ARCHITECTURE.md -- system design, data flow, deduplication, operational modes
+- CONTRIBUTING.md -- local dev setup, testing, reset procedures. Use when building, debugging, or onboarding.
+- docs/appendix/ci-operator-metrics.md -- JSON field reference for ci-operator-metrics.json
+- docs/appendix/gcs-bucket-layout.md -- GCS path structure and XML API navigation
+- docs/appendix/grafana-visualizations.md -- visualization selection, design principles, data format gotchas. Use when building or modifying Grafana dashboards.
 
 ## Conventions
 - Single-file scraper -- all logic in scrape.py, no package structure
