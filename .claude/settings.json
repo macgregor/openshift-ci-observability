@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+        "Skill(document-reviewer)"
+    ],
+    "deny": [],
+    "ask": []
+  },
   "hooks": {
     "PreToolUse": [
       {
