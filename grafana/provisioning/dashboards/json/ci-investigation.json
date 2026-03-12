@@ -3,7 +3,10 @@
   "title": "CI Investigation",
   "timezone": "utc",
   "refresh": "",
-  "time": { "from": "now-7d", "to": "now" },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -14,7 +17,11 @@
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 1
       },
@@ -23,60 +30,132 @@
         "label": "PR Number",
         "description": "Filter to a specific PR. Leave empty for all.",
         "type": "textbox",
-        "current": { "selected": false, "text": "", "value": "" }
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        }
       },
       {
         "name": "build_id",
         "label": "Build ID",
         "description": "Filter to a specific build for log panels.",
         "type": "textbox",
-        "current": { "selected": false, "text": "", "value": "" }
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        }
       }
     ]
   },
   "panels": [
     {
-      "id": 100, "title": "Context", "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false
+      "id": 100,
+      "title": "Context",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": false
     },
     {
       "id": 1,
       "title": "PR Success Rate vs Global",
       "description": "Compare a specific PR's success rate to the overall system. If both are low, it's systemic. If only yours is low, investigate your code.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
       "targets": [
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
           "legendFormat": "Global",
-          "refId": "A",
-          "interval": "6h"
+          "refId": "A"
         },
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"${pr_number:regex}\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"${pr_number:regex}\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
           "legendFormat": "PR $pr_number",
-          "refId": "B",
-          "interval": "6h"
+          "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent", "min": 0, "max": 100,
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0, "pointSize": 5, "showPoints": "auto" }
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
         },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "Global" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
-          { "matcher": { "id": "byRegexp", "options": "PR.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }, { "id": "custom.lineWidth", "value": 3 }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Global"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "PR.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
         ]
       },
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } }
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
     },
     {
       "id": 2,
       "title": "PR Retry History",
       "description": "How many times each commit (SHA) was retested and the success rate. High retry count with mixed results = flaky.",
       "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 1 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
       "targets": [
         {
           "expr": "sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"${pr_number:regex}\",job_name=~\"$job_type\"}))[$__range:]))",
@@ -92,41 +171,169 @@
         }
       ],
       "transformations": [
-        { "id": "merge", "options": {} },
+        {
+          "id": "merge",
+          "options": {}
+        },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true },
-            "renameByName": { "pr_number": "PR", "pr_sha": "Commit", "Value #total": "Runs", "Value #pass": "Passed" }
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
+            },
+            "renameByName": {
+              "pr_number": "PR",
+              "pr_sha": "Commit",
+              "Value #total": "Runs",
+              "Value #pass": "Passed"
+            }
           }
         },
         {
           "id": "calculateField",
-          "options": { "alias": "Success %", "mode": "binary", "binary": { "left": "Passed", "operator": "/", "right": "Runs" }, "reduce": { "reducer": "sum" } }
+          "options": {
+            "alias": "Success %",
+            "mode": "binary",
+            "binary": {
+              "left": "Passed",
+              "operator": "/",
+              "right": "Runs"
+            },
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {},
         "overrides": [
-          { "matcher": { "id": "byName", "options": "PR" }, "properties": [{ "id": "custom.width", "value": 60 }] },
-          { "matcher": { "id": "byName", "options": "Commit" }, "properties": [{ "id": "custom.width", "value": 115 }] },
-          { "matcher": { "id": "byName", "options": "Runs" }, "properties": [{ "id": "custom.width", "value": 60 }] },
-          { "matcher": { "id": "byName", "options": "Passed" }, "properties": [{ "id": "custom.width", "value": 70 }] },
-          { "matcher": { "id": "byName", "options": "Success %" }, "properties": [{ "id": "unit", "value": "percentunit" }, { "id": "decimals", "value": 0 }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "green", "value": 0.8 }] } }, { "id": "custom.cellOptions", "value": { "type": "color-background" } }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PR"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Commit"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Runs"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Passed"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Success %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.5
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
         ]
       },
-      "options": { "sortBy": [{ "displayName": "Runs", "desc": true }] }
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "Runs",
+            "desc": true
+          }
+        ]
+      }
     },
     {
-      "id": 200, "title": "Failure Patterns", "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 }, "collapsed": false
+      "id": 200,
+      "title": "Failure Patterns",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "collapsed": false
     },
     {
       "id": 3,
       "title": "Step Failure Leaderboard",
       "description": "Which ci-operator steps fail most often. High counts indicate flaky steps or infrastructure issues at specific phases.",
       "type": "bargauge",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
       "targets": [
         {
           "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\"}))[$__range:])))",
@@ -136,20 +343,52 @@
         }
       ],
       "transformations": [
-        { "id": "merge", "options": {} },
-        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "source": "Step", "Value": "Failures" } } }
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "source": "Step",
+              "Value": "Failures"
+            }
+          }
+        }
       ],
       "fieldConfig": {
-        "defaults": { "color": { "mode": "continuous-reds" } }
+        "defaults": {
+          "color": {
+            "mode": "continuous-reds"
+          }
+        }
       },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient", "showUnfilled": true }
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      }
     },
     {
       "id": 4,
       "title": "Pod Phase Breakdown",
       "description": "Distribution of pod outcomes. High Failed ratio suggests infrastructure pressure.",
       "type": "piechart",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
       "targets": [
         {
           "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\"}))[$__range:]))",
@@ -161,35 +400,121 @@
       "fieldConfig": {
         "defaults": {},
         "overrides": [
-          { "matcher": { "id": "byName", "options": "Succeeded" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Succeeded"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
         ]
       },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "legend": { "displayMode": "table", "placement": "right", "calcs": ["percent"] }, "pieType": "donut" }
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "percent"
+          ]
+        },
+        "pieType": "donut"
+      }
     },
     {
-      "id": 300, "title": "Build Logs (set Build ID above)", "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }, "collapsed": true,
+      "id": 300,
+      "title": "Build Logs (set Build ID above)",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "collapsed": true,
       "panels": [
         {
           "id": 5,
           "title": "Error Events",
           "description": "All error-level events for the selected build.",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 12, "x": 0, "y": 23 },
-          "datasource": { "type": "victoriametrics-logs-datasource" },
-          "targets": [{ "expr": "build_id:$build_id AND level:Error", "refId": "A" }],
-          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+          "gridPos": {
+            "h": 12,
+            "w": 12,
+            "x": 0,
+            "y": 23
+          },
+          "datasource": {
+            "type": "victoriametrics-logs-datasource"
+          },
+          "targets": [
+            {
+              "expr": "build_id:$build_id AND level:Error",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          }
         },
         {
           "id": 6,
           "title": "Failed Pods",
           "description": "Pods that failed in the selected build. Look for OOMKilled, ImagePull errors, scheduling failures.",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 12, "x": 12, "y": 23 },
-          "datasource": { "type": "victoriametrics-logs-datasource" },
-          "targets": [{ "expr": "build_id:$build_id AND source:pod AND (pod_phase:Failed OR _msg:~\"Failed|Error\")", "refId": "A" }],
-          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+          "gridPos": {
+            "h": 12,
+            "w": 12,
+            "x": 12,
+            "y": 23
+          },
+          "datasource": {
+            "type": "victoriametrics-logs-datasource"
+          },
+          "targets": [
+            {
+              "expr": "build_id:$build_id AND source:pod AND (pod_phase:Failed OR _msg:~\"Failed|Error\")",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          }
         }
       ]
     }
