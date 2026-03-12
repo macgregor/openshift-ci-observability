@@ -78,7 +78,7 @@
       "gridPos": { "h": 10, "w": 12, "x": 12, "y": 1 },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
           "legendFormat": "Success %",
           "refId": "A",
           "interval": "6h"
