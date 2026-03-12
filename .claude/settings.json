@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__chrome-devtools__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/ensure-chrome-debug.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
