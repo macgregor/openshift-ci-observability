@@ -48,7 +48,7 @@ services:
       - VL_URL=http://victorialogs:9428
       - STATE_FILE=/state/scrape-state.json
       - REPO=${REPO:-opendatahub-io/opendatahub-operator}
-      - WATCH_WINDOW_HOURS=${WATCH_WINDOW_HOURS:-24}
+      - WINDOW=${WATCH_WINDOW:-24h}
       - POLL_INTERVAL=${POLL_INTERVAL:-300}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - WORKERS=${WATCH_WORKERS:-8}
@@ -70,7 +70,8 @@ services:
       - VL_URL=http://victorialogs:9428
       - STATE_FILE=/state/scrape-state.json
       - REPO=${REPO:-opendatahub-io/opendatahub-operator}
-      - BACKFILL_WINDOW=${BACKFILL_WINDOW:-90d}
+      - WINDOW=${BACKFILL_WINDOW:-90d}
+      - POLL_INTERVAL=${POLL_INTERVAL:-300}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - WORKERS=${BACKFILL_WORKERS:-16}
     command: ["backfill"]

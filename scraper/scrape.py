@@ -531,6 +531,8 @@ def parse_args():
                         help="State file path (env: STATE_FILE, default: .scrape-state.json)")
     parent.add_argument("--dry-run", action="store_true",
                         help="Log what would be ingested without pushing to VM/VL")
+    parent.add_argument("--window", default=os.environ.get("WINDOW", "24h"),
+                        help="Lookback window, e.g. 24h, 7d, 90d, 6m (env: WINDOW, default: 24h)")
     parent.add_argument("--workers", type=int,
                         default=int(os.environ.get("WORKERS", "8")),
                         help="Parallel fetch workers (env: WORKERS, default: 8)")
@@ -542,17 +544,11 @@ def parse_args():
     sub = parser.add_subparsers(dest="command", required=True)
 
     watch_p = sub.add_parser("watch", parents=[parent])
-    watch_p.add_argument("--window-hours", type=int,
-                         default=int(os.environ.get("WATCH_WINDOW_HOURS", "24")),
-                         help="Lookback window in hours (env: WATCH_WINDOW_HOURS, default: 24)")
     watch_p.add_argument("--poll-interval", type=int,
                          default=int(os.environ.get("POLL_INTERVAL", "300")),
                          help="Seconds between poll cycles (env: POLL_INTERVAL, default: 300)")
 
-    backfill_p = sub.add_parser("backfill", parents=[parent])
-    backfill_p.add_argument("--window",
-                            default=os.environ.get("BACKFILL_WINDOW", "90d"),
-                            help="How far back to backfill (env: BACKFILL_WINDOW, default: 90d)")
+    sub.add_parser("backfill", parents=[parent])
 
     return parser.parse_args()
 
@@ -570,11 +566,13 @@ def main():
              args.repo, args.vm_url, args.vl_url, args.state_file, args.dry_run, args.workers)
     state = load_state(args.state_file)
 
+    delta = _parse_duration(args.window)
+
     if args.command == "watch":
-        log.info("Watch mode: window=%dh, poll=%ds, repo=%s", args.window_hours, args.poll_interval, args.repo)
+        log.info("Watch mode: window=%s, poll=%ds, repo=%s", args.window, args.poll_interval, args.repo)
         while True:
             now = datetime.now(timezone.utc)
-            since_ts = int((now - timedelta(hours=args.window_hours)).timestamp())
+            since_ts = int((now - delta).timestamp())
             until_ts = int(now.timestamp())
             state = load_state(args.state_file)
             scrape_builds(base_path, since_ts, until_ts, state, args.state_file,
@@ -584,7 +582,6 @@ def main():
 
     elif args.command == "backfill":
         now = datetime.now(timezone.utc)
-        delta = _parse_duration(args.window)
         since_ts = int((now - delta).timestamp())
         until_ts = int(now.timestamp())
         log.info("Backfill mode: last %s, repo=%s", args.window, args.repo)
