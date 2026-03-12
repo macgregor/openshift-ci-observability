@@ -44,7 +44,7 @@ description: System architecture and data flow for the CI metrics scraper
 
 The scraper discovers CI builds via the GCS XML API:
 
-1. **PR Enumeration**: List objects under `gs://origin-ci-test/pr-logs/pull/` to find PR directories
+1. **PR Enumeration**: List objects under `gs://test-platform-results/pr-logs/pull/` to find PR directories
 2. **Job Enumeration**: Within each PR, list job directories
 3. **Build Enumeration**: Within each job, list build directories
 4. **Date Filtering**: Read `started.json` from each build to filter by date range
@@ -118,8 +118,8 @@ Build processing state is tracked via a JSON file:
 
 ```json
 {
-  "build_id_1": {"timestamp": "2024-01-01T00:00:00Z", "status": "processed"},
-  "build_id_2": {"timestamp": "2024-01-01T01:00:00Z", "status": "processed"}
+  "build_id_1": "2024-01-01T00:00:00Z",
+  "build_id_2": "2024-01-01T01:00:00Z"
 }
 ```
 

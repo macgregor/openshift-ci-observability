@@ -16,7 +16,7 @@ Install dependencies and run a dry-run backfill:
 
 ```bash
 pip install -r scraper/requirements.txt
-python scraper/scrape.py backfill --dry-run --since 2026-03-10 --until 2026-03-12
+python scraper/scrape.py backfill --dry-run --window 2d
 ```
 
 ## Running the Full Stack Locally

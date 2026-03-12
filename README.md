@@ -13,10 +13,10 @@ Open Grafana at http://localhost:3000 (credentials: `admin`/`admin`).
 
 ## Backfilling Historical Data
 
-To ingest metrics from past builds, edit the date range in `.env`:
+To ingest metrics from past builds, set a relative window in `.env`:
 
 ```bash
-# Edit .env to set BACKFILL_SINCE and BACKFILL_UNTIL
+# Edit .env to set BACKFILL_WINDOW (e.g. 90d, 6m, 1y)
 podman-compose --profile backfill up -d
 ```
 
@@ -27,8 +27,10 @@ Customize behavior by editing `.env`:
 - `REPO`: GitHub repository to monitor (e.g., `opendatahub-io/opendatahub-operator`)
 - `WATCH_WINDOW_HOURS`: How far back to look for recent builds (default: 24)
 - `POLL_INTERVAL`: Seconds between polling cycles (default: 300)
-- `BACKFILL_SINCE`: Start date for historical backfill (format: `YYYY-MM-DD`)
-- `BACKFILL_UNTIL`: End date for historical backfill (format: `YYYY-MM-DD`)
+- `BACKFILL_WINDOW`: Relative duration for historical backfill (e.g. `90d`, `6m`, `1y`)
+- `LOG_LEVEL`: Logging verbosity (default: `INFO`)
+- `WATCH_WORKERS`: Parallel workers for watch mode
+- `BACKFILL_WORKERS`: Parallel workers for backfill mode
 
 ## Service Endpoints
 

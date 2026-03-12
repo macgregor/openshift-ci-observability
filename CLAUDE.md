@@ -19,5 +19,5 @@
 - Known transforms and canonical aliases are opt-in enhancements
 
 ## Testing
-- Dry-run mode: `python scraper/scrape.py backfill --dry-run --since YYYY-MM-DD --until YYYY-MM-DD`
+- Dry-run mode: `python scraper/scrape.py backfill --dry-run --window 2d`
 - Full stack: `podman-compose up -d` then check Grafana at localhost:3000
