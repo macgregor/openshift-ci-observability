@@ -16,6 +16,10 @@
 ## Documentation quality
 - Run `/document-reviewer` after creating or substantially updating documentation. Skip for minor fixes (typos, single-line edits).
 
+## Dashboard verification
+- After creating or modifying Grafana dashboards, verify them visually in the browser using chrome-devtools MCP. Don't rely solely on JSON syntax validation -- panels can be syntactically valid but render "No data", "Configure your query", or display incorrect data.
+- Navigate to the dashboard URL, wait for panels to load, and screenshot to confirm panels render with actual data.
+
 ## Conventions
 - Single-file scraper -- all logic in scrape.py, no package structure
 - Prometheus text exposition format for metrics, JSON lines for logs
