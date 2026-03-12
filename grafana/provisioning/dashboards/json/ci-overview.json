@@ -256,13 +256,13 @@
       ],
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
+          "id": "joinByField",
+          "options": { "byField": "source", "mode": "outer" }
         },
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true },
+            "excludeByName": { "Time 1": true, "Time 2": true },
             "renameByName": { "source": "Step", "Value #A": "Start", "Value #B": "End" }
           }
         },
