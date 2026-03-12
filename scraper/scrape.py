@@ -293,6 +293,42 @@ def extract_metrics_from_entry(section, entry, job_labels):
 SECTIONS = ["events", "pods", "nodes", "openshift_builds", "images", "leases", "test_platform_insights"]
 
 
+def _parse_iso_seconds(val):
+    """Parse ISO timestamp string to Unix seconds."""
+    try:
+        return datetime.fromisoformat(val.replace("Z", "+00:00")).timestamp()
+    except (ValueError, AttributeError):
+        return None
+
+
+def _extract_step_offsets(events, job_labels):
+    """Emit step offset metrics relative to pipeline start."""
+    metrics = []
+    start_times = []
+    for event in events:
+        t = _parse_iso_seconds(event.get("from"))
+        if t is not None:
+            start_times.append(t)
+    if not start_times:
+        return metrics
+    pipeline_start = min(start_times)
+    pipeline_ts = int(pipeline_start)
+    for event in events:
+        ev_from = _parse_iso_seconds(event.get("from"))
+        ev_to = _parse_iso_seconds(event.get("to"))
+        if ev_from is None or ev_to is None:
+            continue
+        entry_labels = {**job_labels, **extract_string_fields(event)}
+        start_offset = ev_from - pipeline_start
+        end_offset = ev_to - pipeline_start
+        for name, value in [("ci_step_relative_start_seconds", start_offset),
+                            ("ci_step_relative_end_seconds", end_offset)]:
+            line = format_prometheus_line(name, entry_labels, round(value, 3), pipeline_ts)
+            if line:
+                metrics.append(line)
+    return metrics
+
+
 def convert_to_metrics(data, job_labels):
     all_metrics = []
     for section in SECTIONS:
@@ -304,6 +340,12 @@ def convert_to_metrics(data, job_labels):
                 all_metrics.extend(extract_metrics_from_entry(section, entry, job_labels))
             except Exception:
                 log.error("Failed to extract metrics from %s entry", section, exc_info=True)
+    events = data.get("events", [])
+    if isinstance(events, list):
+        try:
+            all_metrics.extend(_extract_step_offsets(events, job_labels))
+        except Exception:
+            log.error("Failed to extract step offsets", exc_info=True)
     return all_metrics
 
 
