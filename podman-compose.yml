@@ -1,0 +1,86 @@
+services:
+  victoriametrics:
+    image: docker.io/victoriametrics/victoria-metrics:v1.137.0
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/victoria-metrics-data
+    command:
+      - "-retentionPeriod=365d"
+      - "-search.disableCache"
+      - "-dedup.minScrapeInterval=1ms"
+
+  victorialogs:
+    image: docker.io/victoriametrics/victoria-logs:v1.48.0
+    ports:
+      - "9428:9428"
+    volumes:
+      - vl-data:/victoria-logs-data
+    command:
+      - "-retentionPeriod=365d"
+
+  grafana:
+    image: docker.io/grafana/grafana:12.3.5
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:z
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_NEWS_NEWS_ENABLED=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/json/ci-overview.json
+      - GF_INSTALL_PLUGINS=victoriametrics-logs-datasource
+    depends_on:
+      - victoriametrics
+      - victorialogs
+
+  scraper-watch:
+    build:
+      context: .
+      dockerfile: Containerfile.scraper
+    volumes:
+      - scraper-state:/state
+    environment:
+      - VM_URL=http://victoriametrics:8428
+      - VL_URL=http://victorialogs:9428
+      - STATE_FILE=/state/scrape-state.json
+      - REPO=${REPO:-opendatahub-io/opendatahub-operator}
+      - WATCH_WINDOW_HOURS=${WATCH_WINDOW_HOURS:-24}
+      - POLL_INTERVAL=${POLL_INTERVAL:-300}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - WORKERS=${WATCH_WORKERS:-8}
+    command: ["watch"]
+    depends_on:
+      - victoriametrics
+      - victorialogs
+
+  scraper-backfill:
+    build:
+      context: .
+      dockerfile: Containerfile.scraper
+    profiles:
+      - backfill
+    volumes:
+      - scraper-state:/state
+    environment:
+      - VM_URL=http://victoriametrics:8428
+      - VL_URL=http://victorialogs:9428
+      - STATE_FILE=/state/scrape-state.json
+      - REPO=${REPO:-opendatahub-io/opendatahub-operator}
+      - BACKFILL_SINCE=${BACKFILL_SINCE:-2025-09-01}
+      - BACKFILL_UNTIL=${BACKFILL_UNTIL:-2026-03-01}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - WORKERS=${BACKFILL_WORKERS:-16}
+    command: ["backfill"]
+    depends_on:
+      - victoriametrics
+      - victorialogs
+
+volumes:
+  vm-data:
+  vl-data:
+  grafana-data:
+  scraper-state:

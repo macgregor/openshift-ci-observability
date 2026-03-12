@@ -1,0 +1,14 @@
+# Ephemeral planning docs
+docs/plans/
+
+# Environment config
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Scraper state
+.scrape-state.json
+
+settings.local.json
