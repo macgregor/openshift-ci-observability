@@ -25,6 +25,25 @@ python scraper/scrape.py backfill --dry-run --window 2d
 podman-compose up -d
 ```
 
+## Resetting Data
+
+To start over with a clean database and re-ingest everything:
+
+```bash
+podman-compose --profile backfill down -v
+podman-compose --profile backfill up -d --build
+```
+
+The `-v` flag removes named volumes (VictoriaMetrics, VictoriaLogs, Grafana, and scraper state). The backfill will re-ingest from scratch on the next start.
+
+To reset only the scraper state (re-ingest without wiping metrics/logs):
+
+```bash
+podman exec aicp-ci-metrics-scraper_scraper-watch_1 rm /state/scrape-state.json
+```
+
+VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
+
 ## How to Add New Metric Transforms
 
 Edit the `apply_known_transforms()` function in `scraper/scrape.py`.
