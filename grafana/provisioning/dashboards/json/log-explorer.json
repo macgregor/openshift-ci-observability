@@ -20,7 +20,7 @@
       {
         "name": "logquery",
         "label": "LogsQL",
-        "description": "Free-form LogsQL filter. Examples: pr_number:3260 | build_id:2032076068386508800 | error | pr_number:3260 AND source:event",
+        "description": "Free-form LogsQL filter appended to the source filter",
         "type": "textbox",
         "current": { "selected": false, "text": "", "value": "" }
       }
@@ -28,10 +28,20 @@
   },
   "panels": [
     {
+      "id": 2,
+      "title": "",
+      "type": "text",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "### Example queries\n\n| Goal | LogsQL |\n|------|--------|\n| Logs for a PR | `pr_number:3260` |\n| Specific build | `build_id:2032076068386508800` |\n| Failed events | `source:event AND level:Error` |\n| Pod scheduling issues | `source:pod AND Pending` |\n| Build failures | `source:openshift_build AND Failed` |\n| Keyword search | `timeout` or `OOMKilled` |\n| Combine filters | `pr_number:3260 AND source:event AND level:Error` |\n| Regex match | `_msg:~\"duration.*[0-9]{4}\"` |\n\nUse the **Source** dropdown for quick filtering, and **LogsQL** box for additional filters. For complex multi-line queries, use [Explore](../explore) with the VictoriaLogs datasource.\n\n[LogsQL reference docs](https://docs.victoriametrics.com/victorialogs/logsql/)"
+      }
+    },
+    {
       "id": 1,
       "title": "",
       "type": "logs",
-      "gridPos": { "h": 28, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 28, "w": 24, "x": 0, "y": 7 },
       "datasource": { "type": "victoriametrics-logs-datasource" },
       "targets": [
         {
