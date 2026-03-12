@@ -1,0 +1,55 @@
+{
+  "uid": "log-explorer",
+  "title": "Log Explorer",
+  "timezone": "utc",
+  "refresh": "",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Source",
+        "type": "custom",
+        "query": "event,pod,openshift_build,node,insight,image,lease,raw",
+        "multi": false,
+        "includeAll": true,
+        "allValue": "*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "sort": 0
+      },
+      {
+        "name": "logquery",
+        "label": "LogsQL",
+        "description": "Free-form LogsQL filter. Examples: pr_number:3260 | build_id:2032076068386508800 | error | pr_number:3260 AND source:event",
+        "type": "textbox",
+        "current": { "selected": false, "text": "", "value": "" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "",
+      "type": "logs",
+      "gridPos": { "h": 28, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "victoriametrics-logs-datasource" },
+      "targets": [
+        {
+          "expr": "source:$source $logquery",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    }
+  ],
+  "schemaVersion": 39
+}
