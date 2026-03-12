@@ -252,15 +252,17 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "name": true, "org": true, "repo": true, "branch": true, "timestamp": true },
+            "excludeByName": { "Time": true, "__name__": true, "name": true, "branch": true, "timestamp": true },
             "renameByName": {
               "pr_number": "PR",
               "pr_sha": "Commit",
               "job_name": "Job",
               "build_id": "Build ID",
               "author": "Author",
-              "success": "Success",
-              "Value": "Duration (s)"
+              "success": "Outcome",
+              "Value": "Duration",
+              "org": "org",
+              "repo": "repo"
             },
             "indexByName": {
               "pr_number": 0,
@@ -269,7 +271,9 @@
               "job_name": 3,
               "success": 4,
               "Value": 5,
-              "build_id": 6
+              "build_id": 6,
+              "org": 7,
+              "repo": 8
             }
           }
         }
@@ -277,11 +281,57 @@
       "fieldConfig": {
         "defaults": {},
         "overrides": [
-          { "matcher": { "id": "byName", "options": "Duration (s)" }, "properties": [{ "id": "unit", "value": "s" }] },
-          { "matcher": { "id": "byName", "options": "Job" }, "properties": [{ "id": "custom.width", "value": 300 }] }
+          {
+            "matcher": { "id": "byName", "options": "Duration" },
+            "properties": [{ "id": "unit", "value": "s" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Job" },
+            "properties": [{ "id": "custom.width", "value": 300 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "org" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "repo" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "PR" },
+            "properties": [{
+              "id": "links",
+              "value": [{
+                "title": "GitHub PR",
+                "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
+                "targetBlank": true
+              }]
+            }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Build ID" },
+            "properties": [{
+              "id": "links",
+              "value": [{
+                "title": "Prow Job",
+                "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
+                "targetBlank": true
+              }]
+            }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Outcome" },
+            "properties": [{
+              "id": "mappings",
+              "value": [
+                { "type": "value", "options": { "true": { "text": "Success", "color": "green" } } },
+                { "type": "value", "options": { "false": { "text": "Failure", "color": "red" } } }
+              ]
+            }]
+          }
         ]
       },
-      "options": { "sortBy": [{ "displayName": "Duration (s)", "desc": true }] }
+      "options": { "sortBy": [{ "displayName": "Duration", "desc": true }] }
     }
   ],
   "schemaVersion": 39
