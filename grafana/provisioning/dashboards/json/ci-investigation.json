@@ -275,13 +275,15 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "s",
+          "custom": {
+            "separator": "/"
+          }
         },
         "overrides": []
       },
       "options": {
-        "tiling": "treemapSquarify",
-        "separator": "/"
+        "tiling": "treemapSquarify"
       }
     },
     {
