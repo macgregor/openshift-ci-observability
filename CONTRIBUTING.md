@@ -44,6 +44,24 @@ podman-compose exec scraper-watch rm /state/scrape-state.json
 
 VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
 
+## Chrome DevTools MCP (for Claude)
+
+The project includes a chrome-devtools MCP server that lets Claude interact with Grafana dashboards in a browser -- taking screenshots, inspecting panels, clicking elements, and verifying dashboard changes visually.
+
+**Prerequisites:**
+- Node.js / npx (for the MCP server)
+- Chromium or Google Chrome
+
+**Setup:**
+
+The MCP server and auto-launch hook are committed to the repo (`.mcp.json` and `.claude/hooks/ensure-chrome-debug.sh`). No manual setup is needed -- when Claude uses any chrome-devtools tool, the hook automatically launches Chromium with remote debugging on port 9222 if it isn't already running.
+
+If Chromium isn't in your PATH, set the browser binary path in the hook script or launch it manually:
+
+```bash
+chromium-browser --remote-debugging-port=9222 --user-data-dir=$HOME/.chrome-debug-profile
+```
+
 ## How to Add New Metric Transforms
 
 Edit the `apply_known_transforms()` function in `scraper/scrape.py`.
