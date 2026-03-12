@@ -12,3 +12,4 @@ __pycache__/
 .scrape-state.json
 
 settings.local.json
+.mcp.json
