@@ -110,7 +110,7 @@
           "interval": "3h"
         },
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"${pr_number:regex}\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"${pr_number:regex}\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\".*$pr_number.*\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\".*$pr_number.*\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
           "legendFormat": "PR $pr_number",
           "refId": "B",
           "interval": "3h"
@@ -180,7 +180,7 @@
       "id": 2,
       "title": "PR Retry History",
       "description": "How many times each commit (SHA) was retested and the success rate. High retry count with mixed results = flaky.",
-      "type": "table",
+      "type": "bargauge",
       "gridPos": {
         "h": 10,
         "w": 12,
@@ -189,157 +189,45 @@
       },
       "targets": [
         {
-          "expr": "sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"${pr_number:regex}\",job_name=~\"$job_type\"}))[$__range:]))",
-          "format": "table",
+          "expr": "topk(20, sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\".*$pr_number.*\",job_name=~\"$job_type\"}))[$__range:])))",
+          "legendFormat": "PR {{pr_number}} ({{pr_sha}})",
           "instant": true,
-          "refId": "total"
-        },
-        {
-          "expr": "sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"${pr_number:regex}\",job_name=~\"$job_type\"}))[$__range:]))",
-          "format": "table",
-          "instant": true,
-          "refId": "pass"
+          "refId": "A"
         }
       ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Time 1": true,
-              "Time 2": true
-            },
-            "renameByName": {
-              "pr_number": "PR",
-              "pr_sha": "Commit",
-              "Value #total": "Runs",
-              "Value #pass": "Passed"
-            }
-          }
-        },
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "Success %",
-            "mode": "binary",
-            "binary": {
-              "left": "Passed",
-              "operator": "/",
-              "right": "Runs"
-            },
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "PR"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 60
-              }
-            ]
+        "defaults": {
+          "color": {
+            "mode": "continuous-blues"
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Commit"
-            },
-            "properties": [
+          "thresholds": {
+            "steps": [
               {
-                "id": "custom.width",
-                "value": 115
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Runs"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 60
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Passed"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 70
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Success %"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "percentunit"
+                "color": "green",
+                "value": null
               },
               {
-                "id": "decimals",
-                "value": 0
+                "color": "yellow",
+                "value": 5
               },
               {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "red",
-                      "value": null
-                    },
-                    {
-                      "color": "yellow",
-                      "value": 0.5
-                    },
-                    {
-                      "color": "green",
-                      "value": 0.8
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background"
-                }
+                "color": "red",
+                "value": 10
               }
             ]
           }
-        ]
+        }
       },
       "options": {
-        "sortBy": [
-          {
-            "displayName": "Runs",
-            "desc": true
-          }
-        ]
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
       }
     },
     {
@@ -368,29 +256,12 @@
       "targets": [
         {
           "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\"}))[$__range:])))",
-          "format": "table",
+          "legendFormat": "{{source}}",
           "instant": true,
           "refId": "A"
         }
       ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "renameByName": {
-              "source": "Step",
-              "Value": "Failures"
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -422,10 +293,10 @@
       },
       "targets": [
         {
-          "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\"}))[$__range:]))",
+          "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name, pod_phase) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\"}))[$__range:]))",
           "legendFormat": "{{pod_phase}}",
-          "refId": "A",
-          "instant": true
+          "instant": true,
+          "refId": "A"
         }
       ],
       "fieldConfig": {
