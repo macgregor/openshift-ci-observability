@@ -505,6 +505,20 @@ def scrape_builds(base_path, since_ts, until_ts, state, state_file, vm_url, vl_u
     log.info("Scrape complete: %d ingested, %d skipped (already in state)", ingested, skipped)
 
 
+def _parse_duration(s):
+    """Parse a duration string like 90d, 6m, 1y, 24h into a timedelta."""
+    units = {"h": "hours", "d": "days", "w": "weeks"}
+    s = s.strip()
+    if s.endswith("m"):
+        return timedelta(days=int(s[:-1]) * 30)
+    if s.endswith("y"):
+        return timedelta(days=int(s[:-1]) * 365)
+    for suffix, kwarg in units.items():
+        if s.endswith(suffix):
+            return timedelta(**{kwarg: int(s[:-1])})
+    return timedelta(days=int(s))
+
+
 def parse_args():
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument("--repo", default=os.environ.get("REPO", "opendatahub-io/opendatahub-operator"))
@@ -527,10 +541,9 @@ def parse_args():
                          default=int(os.environ.get("POLL_INTERVAL", "300")))
 
     backfill_p = sub.add_parser("backfill", parents=[parent])
-    backfill_p.add_argument("--since",
-                            default=os.environ.get("BACKFILL_SINCE", "2025-09-01"))
-    backfill_p.add_argument("--until",
-                            default=os.environ.get("BACKFILL_UNTIL", "2026-03-01"))
+    backfill_p.add_argument("--window",
+                            default=os.environ.get("BACKFILL_WINDOW", "90d"),
+                            help="How far back to backfill, e.g. 90d, 6m, 1y")
 
     return parser.parse_args()
 
@@ -561,11 +574,11 @@ def main():
             time.sleep(args.poll_interval)
 
     elif args.command == "backfill":
-        since_dt = datetime.strptime(args.since, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        until_dt = datetime.strptime(args.until, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        since_ts = int(since_dt.timestamp())
-        until_ts = int(until_dt.timestamp())
-        log.info("Backfill mode: %s to %s, repo=%s", args.since, args.until, args.repo)
+        now = datetime.now(timezone.utc)
+        delta = _parse_duration(args.window)
+        since_ts = int((now - delta).timestamp())
+        until_ts = int(now.timestamp())
+        log.info("Backfill mode: last %s, repo=%s", args.window, args.repo)
         scrape_builds(base_path, since_ts, until_ts, state, args.state_file,
                       args.vm_url, args.vl_url, args.dry_run, args.workers)
         log.info("Backfill complete")

@@ -70,8 +70,7 @@ services:
       - VL_URL=http://victorialogs:9428
       - STATE_FILE=/state/scrape-state.json
       - REPO=${REPO:-opendatahub-io/opendatahub-operator}
-      - BACKFILL_SINCE=${BACKFILL_SINCE:-2025-09-01}
-      - BACKFILL_UNTIL=${BACKFILL_UNTIL:-2026-03-01}
+      - BACKFILL_WINDOW=${BACKFILL_WINDOW:-90d}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - WORKERS=${BACKFILL_WORKERS:-16}
     command: ["backfill"]
