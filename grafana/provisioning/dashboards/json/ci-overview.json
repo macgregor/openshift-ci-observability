@@ -239,7 +239,7 @@
       "title": "Longest Runs",
       "description": "Individual pipeline runs sorted by duration. Use to investigate outliers.",
       "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 34 },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 34 },
       "targets": [
         {
           "expr": "topk(20, max_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}[$__range]))",
@@ -332,6 +332,76 @@
         ]
       },
       "options": { "sortBy": [{ "displayName": "Duration", "desc": true }] }
+    },
+    {
+      "id": 8,
+      "title": "Shortest Runs",
+      "description": "Runs that completed unusually fast. Often indicates infrastructure failures, scheduling issues, or early-exit errors.",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 34 },
+      "targets": [
+        {
+          "expr": "bottomk(20, min_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "name": true, "branch": true, "timestamp": true },
+            "renameByName": {
+              "pr_number": "PR",
+              "pr_sha": "Commit",
+              "job_name": "Job",
+              "build_id": "Build ID",
+              "author": "Author",
+              "success": "Outcome",
+              "Value": "Duration",
+              "org": "org",
+              "repo": "repo"
+            },
+            "indexByName": {
+              "pr_number": 0,
+              "pr_sha": 1,
+              "author": 2,
+              "job_name": 3,
+              "success": 4,
+              "Value": 5,
+              "build_id": 6,
+              "org": 7,
+              "repo": 8
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Duration" }, "properties": [{ "id": "unit", "value": "s" }] },
+          { "matcher": { "id": "byName", "options": "Job" }, "properties": [{ "id": "custom.width", "value": 300 }] },
+          { "matcher": { "id": "byName", "options": "org" }, "properties": [{ "id": "custom.hidden", "value": true }] },
+          { "matcher": { "id": "byName", "options": "repo" }, "properties": [{ "id": "custom.hidden", "value": true }] },
+          {
+            "matcher": { "id": "byName", "options": "PR" },
+            "properties": [{ "id": "links", "value": [{ "title": "GitHub PR", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}", "targetBlank": true }] }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Build ID" },
+            "properties": [{ "id": "links", "value": [{ "title": "Prow Job", "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}", "targetBlank": true }] }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Outcome" },
+            "properties": [{ "id": "mappings", "value": [
+              { "type": "value", "options": { "true": { "text": "Success", "color": "green" } } },
+              { "type": "value", "options": { "false": { "text": "Failure", "color": "red" } } }
+            ] }]
+          }
+        ]
+      },
+      "options": { "sortBy": [{ "displayName": "Duration", "desc": false }] }
     }
   ],
   "schemaVersion": 39
