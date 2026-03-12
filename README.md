@@ -23,6 +23,16 @@ Backfills the last 90 days by default. Set `BACKFILL_WINDOW` in `.env` to adjust
 
 All parameters can be set via `.env` for compose or CLI flags for direct execution. The scraper uses env vars as defaults when CLI flags aren't provided. Run `python scraper/scrape.py backfill --help` or `watch --help` for the full list with env var names and defaults.
 
+## Dashboards
+
+Three dashboards are provisioned automatically:
+
+- **CI Overview** (home page) -- at-a-glance CI health: failure count, success rate, retests per commit, pipeline duration trends, step breakdown, infrastructure overhead, and outlier tables with links to GitHub PRs and Prow jobs.
+- **CI Investigation** -- drill into specific PRs and builds: compare a PR's success rate against the global baseline, view per-commit retry history, step failure leaderboard, pod phase breakdown, and build-level error logs.
+- **Log Explorer** -- freeform LogsQL search across all ingested CI events, pods, builds, and nodes.
+
+Each dashboard has a collapsible "Dashboard Guide" row at the top with usage instructions. Use the Job Type and Outcome filters to narrow scope across all panels.
+
 ## Service Endpoints
 
 - **Grafana**: http://localhost:3000

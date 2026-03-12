@@ -244,6 +244,35 @@
       }
     },
     {
+      "id": 50,
+      "title": "Dashboard Guide",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 51,
+          "title": "",
+          "type": "text",
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 5
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### How to use this dashboard\n\n**Summary stats** (top row) show at-a-glance health for the selected time range. Use the time picker and filters to adjust scope.\n\n**Filters:**\n- **Job Type** -- narrow to specific CI jobs (e.g. just e2e tests). Select individual jobs to see their metrics in isolation.\n- **Outcome** -- toggle between Success, Failure, or both to compare behavior across outcomes.\n\n**Activity** -- pipeline run volume and success rate over time. Look for drops in success rate or unusual spikes in activity. Correlate activity spikes with infrastructure pressure in the panels below.\n\n**Duration** -- pipeline execution time envelope (min/avg/max) and retests per commit. A widening envelope suggests inconsistent infrastructure. High retests per commit indicates flakiness.\n\n**Steps & Infrastructure** -- which ci-operator steps consume the most time (stacked bars) and pod scheduling/initialization overhead. High infrastructure overhead relative to step duration suggests cluster resource pressure.\n\n**Outliers** -- longest and shortest individual runs with links to GitHub PRs and Prow job pages. Shortest failed runs often indicate infrastructure failures (scheduling, image pull) rather than test failures."
+          }
+        }
+      ]
+    },
+    {
       "id": 100,
       "title": "Activity",
       "type": "row",

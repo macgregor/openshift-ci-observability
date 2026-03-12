@@ -51,6 +51,35 @@
   },
   "panels": [
     {
+      "id": 50,
+      "title": "Dashboard Guide",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 51,
+          "title": "",
+          "type": "text",
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 1
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### How to use this dashboard\n\nUse this dashboard to investigate CI failures for a specific PR or build.\n\n**Workflow:**\n1. Set **PR Number** to compare your PR's success rate against the global baseline. If both are low, the problem is systemic (infrastructure). If only yours is low, investigate your code.\n2. Check **PR Retry History** to see how many times each commit (SHA) was retested. High retry counts with mixed pass/fail on the same SHA = flaky tests or infrastructure.\n3. Look at **Step Failure Leaderboard** to see which ci-operator steps fail most often. Frequent failures in a specific step suggest a targeted fix.\n4. Check **Pod Phase Breakdown** for the ratio of succeeded vs failed pods. A high failure rate suggests cluster resource pressure.\n5. Set **Build ID** and expand **Build Logs** to see error events and failed pods for a specific run. Copy build IDs from the CI Overview outlier tables.\n\n**Filters:**\n- **Job Type** -- same as CI Overview, narrows to specific job types.\n- **PR Number** -- leave empty to see all PRs, or enter a number to focus on one.\n- **Build ID** -- required for the Build Logs panels. Paste from outlier tables or Prow."
+          }
+        }
+      ]
+    },
+    {
       "id": 100,
       "title": "Context",
       "type": "row",
