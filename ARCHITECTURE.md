@@ -42,12 +42,12 @@ description: System architecture and data flow for the CI metrics scraper
 
 ### Discovery
 
-The scraper discovers CI builds via the GCS XML API:
+The scraper discovers CI builds for a specific repo via the GCS XML API:
 
-1. **PR Enumeration**: List objects under `gs://test-platform-results/pr-logs/pull/` to find PR directories
+1. **PR Enumeration**: List prefixes under `gs://test-platform-results/pr-logs/pull/{org}_{repo}/` (derived from the `--repo` flag)
 2. **Job Enumeration**: Within each PR, list job directories
 3. **Build Enumeration**: Within each job, list build directories
-4. **Date Filtering**: Read `started.json` from each build to filter by date range
+4. **Date Filtering**: Read `started.json` from each build to filter by the `--window` range
 5. **Metric Extraction**: Parse `ci-operator-metrics.json` from qualifying builds
 
 ### Metric Conversion
@@ -67,7 +67,7 @@ Metrics are pushed to VictoriaMetrics via remote-write protocol.
 Logs are converted to JSON lines format with two layers:
 
 - **Layer 1 (Raw JSON)**: The entire `ci-operator-metrics.json` as a single log entry
-- **Layer 2 (Structured)**: Per-entry logs extracted from specific fields (e.g., test results, step logs)
+- **Layer 2 (Structured)**: Per-entry logs for each item in each section (events, pods, nodes, etc.) with scalar fields flattened
 
 Logs are pushed to VictoriaLogs via JSON lines ingestion.
 
@@ -88,15 +88,11 @@ VictoriaMetrics handles deduplication via `-dedup.minScrapeInterval=1ms` flag, w
 
 ### Logs
 
-The scraper maintains a state file tracking processed builds:
+Deduplication is handled at the scraper level via the state file -- builds already recorded are skipped entirely. See State Management below.
 
-- **State File**: JSON file with `build_id` keys
-- **Concurrent Access**: `fcntl.flock` ensures safe concurrent access
-- Builds already in the state file are skipped
+## Operational Modes
 
-## Two-Sidecar Design
-
-The system operates in two modes:
+The scraper runs as two compose services sharing a state volume:
 
 ### scraper-watch (Continuous Polling)
 
@@ -107,10 +103,10 @@ The system operates in two modes:
 
 ### scraper-backfill (One-Time)
 
-- Processes a specific date range
+- Processes builds within the configured `--window`
 - Exits when complete
 - Used for historical data ingestion
-- Supports Docker Compose profiles for optional execution
+- Activated via compose profiles: `podman-compose --profile backfill up -d`
 
 ## State Management
 

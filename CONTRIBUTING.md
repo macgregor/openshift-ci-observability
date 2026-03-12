@@ -39,7 +39,7 @@ The `-v` flag removes named volumes (VictoriaMetrics, VictoriaLogs, Grafana, and
 To reset only the scraper state (re-ingest without wiping metrics/logs):
 
 ```bash
-podman exec aicp-ci-metrics-scraper_scraper-watch_1 rm /state/scrape-state.json
+podman-compose exec scraper-watch rm /state/scrape-state.json
 ```
 
 VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
