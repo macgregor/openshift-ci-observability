@@ -231,59 +231,8 @@
       "options": { "tooltip": { "mode": "multi", "sort": "desc" }, "legend": { "displayMode": "list", "placement": "bottom" } }
     },
     {
-      "id": 350, "title": "Pipeline Anatomy", "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 }, "collapsed": false
-    },
-    {
-      "id": 9,
-      "title": "Pipeline Step Timeline (Aggregate)",
-      "description": "Average step start/end offsets from pipeline start, aggregated across all builds matching filters. Shows typical execution order and concurrency.",
-      "type": "marcusolsson-gantt-panel",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 34 },
-      "targets": [
-        {
-          "expr": "label_replace(avg by (source) (last_over_time(ci_step_relative_start_seconds{job_name=~\"$job_type\"}[365d])) / scalar(max(avg by (source) (last_over_time(ci_step_relative_end_seconds{job_name=~\"$job_type\"}[365d])))) * ($__to - $__from) + $__from, \"phase\", \"start\", \"\", \"\") or label_replace(avg by (source) (last_over_time(ci_step_relative_end_seconds{job_name=~\"$job_type\"}[365d])) / scalar(max(avg by (source) (last_over_time(ci_step_relative_end_seconds{job_name=~\"$job_type\"}[365d])))) * ($__to - $__from) + $__from, \"phase\", \"end\", \"\", \"\")",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "groupingToMatrix",
-          "options": { "columnField": "phase", "rowField": "source", "valueField": "Value" }
-        },
-        {
-          "id": "convertFieldType",
-          "options": {
-            "conversions": [
-              { "targetField": "start", "destinationType": "time" },
-              { "targetField": "end", "destinationType": "time" }
-            ]
-          }
-        }
-      ],
-      "options": {
-        "textField": "source\\phase",
-        "startField": "start",
-        "endField": "end",
-        "colorByField": "",
-        "sortBy": "Start",
-        "sortOrder": "asc",
-        "experiments": {}
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      }
-    },
-    {
       "id": 400, "title": "Outliers", "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 }, "collapsed": false
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 }, "collapsed": false
     },
     {
       "id": 7,

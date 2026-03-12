@@ -32,7 +32,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_NEWS_NEWS_ENABLED=false
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/json/ci-overview.json
-      - GF_INSTALL_PLUGINS=victoriametrics-logs-datasource,marcusolsson-gantt-panel
+      - GF_INSTALL_PLUGINS=victoriametrics-logs-datasource
     depends_on:
       - victoriametrics
       - victorialogs
