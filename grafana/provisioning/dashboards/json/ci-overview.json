@@ -240,10 +240,9 @@
       "description": "Average step start/end offsets from pipeline start, aggregated across all builds matching filters. Shows typical execution order and concurrency.",
       "type": "marcusolsson-gantt-panel",
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 34 },
-      "timeFrom": "2h",
       "targets": [
         {
-          "expr": "label_replace(avg by (source) (last_over_time(ci_step_relative_start_seconds{job_name=~\"$job_type\"}[$__range])) * 1000 + $__from, \"phase\", \"start\", \"\", \"\") or label_replace(avg by (source) (last_over_time(ci_step_relative_end_seconds{job_name=~\"$job_type\"}[$__range])) * 1000 + $__from, \"phase\", \"end\", \"\", \"\")",
+          "expr": "label_replace(avg by (source) (last_over_time(ci_step_relative_start_seconds{job_name=~\"$job_type\"}[365d])) / scalar(max(avg by (source) (last_over_time(ci_step_relative_end_seconds{job_name=~\"$job_type\"}[365d])))) * ($__to - $__from) + $__from, \"phase\", \"start\", \"\", \"\") or label_replace(avg by (source) (last_over_time(ci_step_relative_end_seconds{job_name=~\"$job_type\"}[365d])) / scalar(max(avg by (source) (last_over_time(ci_step_relative_end_seconds{job_name=~\"$job_type\"}[365d])))) * ($__to - $__from) + $__from, \"phase\", \"end\", \"\", \"\")",
           "format": "table",
           "instant": true,
           "refId": "A"
