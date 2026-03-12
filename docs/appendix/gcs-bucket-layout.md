@@ -1,5 +1,13 @@
 ---
-description: GCS bucket structure and navigation for CI build artifacts
+name: gcs-bucket-layout
+description: >
+  Load when working with GCS path construction, XML API listing,
+  or debugging scraper navigation of the test-platform-results bucket.
+categories: [reference, infrastructure]
+tags: [gcs, xml-api, bucket, ci-artifacts]
+related_docs:
+  - docs/appendix/ci-operator-metrics.md
+complexity: basic
 ---
 
 # GCS Bucket Layout

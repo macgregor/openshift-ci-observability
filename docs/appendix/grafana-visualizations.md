@@ -1,5 +1,14 @@
 ---
-description: Grafana visualization reference for dashboard design -- panel types, plugins, and data format gotchas
+name: grafana-visualizations
+description: >
+  Load when building or modifying Grafana dashboards. Covers visualization
+  selection, design principles, panel types, plugin configs, and data format
+  gotchas for Prometheus/VictoriaMetrics datasources.
+categories: [reference, grafana, dashboards]
+tags: [visualization, panels, plugins, promql, transforms]
+related_docs:
+  - docs/appendix/ci-operator-metrics.md
+complexity: intermediate
 ---
 
 # Grafana Visualization Reference

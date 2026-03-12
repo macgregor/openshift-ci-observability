@@ -1,5 +1,13 @@
 ---
-description: Reference for ci-operator-metrics.json structure and field meanings
+name: ci-operator-metrics
+description: >
+  Load when working with ci-operator-metrics.json parsing, metric extraction,
+  or understanding the data structure from OpenShift CI builds.
+categories: [reference, data-format]
+tags: [ci-operator, json, metrics, gcs-artifacts]
+related_docs:
+  - docs/appendix/gcs-bucket-layout.md
+complexity: intermediate
 ---
 
 # ci-operator-metrics.json Reference
