@@ -521,29 +521,38 @@ def _parse_duration(s):
 
 def parse_args():
     parent = argparse.ArgumentParser(add_help=False)
-    parent.add_argument("--repo", default=os.environ.get("REPO", "opendatahub-io/opendatahub-operator"))
-    parent.add_argument("--vm-url", default=os.environ.get("VM_URL", "http://localhost:8428"))
-    parent.add_argument("--vl-url", default=os.environ.get("VL_URL", "http://localhost:9428"))
-    parent.add_argument("--state-file", default=os.environ.get("STATE_FILE", ".scrape-state.json"))
-    parent.add_argument("--dry-run", action="store_true")
+    parent.add_argument("--repo", default=os.environ.get("REPO", "opendatahub-io/opendatahub-operator"),
+                        help="GitHub org/repo (env: REPO, default: opendatahub-io/opendatahub-operator)")
+    parent.add_argument("--vm-url", default=os.environ.get("VM_URL", "http://localhost:8428"),
+                        help="VictoriaMetrics URL (env: VM_URL, default: http://localhost:8428)")
+    parent.add_argument("--vl-url", default=os.environ.get("VL_URL", "http://localhost:9428"),
+                        help="VictoriaLogs URL (env: VL_URL, default: http://localhost:9428)")
+    parent.add_argument("--state-file", default=os.environ.get("STATE_FILE", ".scrape-state.json"),
+                        help="State file path (env: STATE_FILE, default: .scrape-state.json)")
+    parent.add_argument("--dry-run", action="store_true",
+                        help="Log what would be ingested without pushing to VM/VL")
     parent.add_argument("--workers", type=int,
-                        default=int(os.environ.get("WORKERS", "8")))
+                        default=int(os.environ.get("WORKERS", "8")),
+                        help="Parallel fetch workers (env: WORKERS, default: 8)")
     parent.add_argument("--log-level", default=os.environ.get("LOG_LEVEL", "INFO"),
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+                        help="Log verbosity (env: LOG_LEVEL, default: INFO)")
 
     parser = argparse.ArgumentParser(description="CI Operator Metrics Scraper")
     sub = parser.add_subparsers(dest="command", required=True)
 
     watch_p = sub.add_parser("watch", parents=[parent])
     watch_p.add_argument("--window-hours", type=int,
-                         default=int(os.environ.get("WATCH_WINDOW_HOURS", "24")))
+                         default=int(os.environ.get("WATCH_WINDOW_HOURS", "24")),
+                         help="Lookback window in hours (env: WATCH_WINDOW_HOURS, default: 24)")
     watch_p.add_argument("--poll-interval", type=int,
-                         default=int(os.environ.get("POLL_INTERVAL", "300")))
+                         default=int(os.environ.get("POLL_INTERVAL", "300")),
+                         help="Seconds between poll cycles (env: POLL_INTERVAL, default: 300)")
 
     backfill_p = sub.add_parser("backfill", parents=[parent])
     backfill_p.add_argument("--window",
                             default=os.environ.get("BACKFILL_WINDOW", "90d"),
-                            help="How far back to backfill, e.g. 90d, 6m, 1y")
+                            help="How far back to backfill (env: BACKFILL_WINDOW, default: 90d)")
 
     return parser.parse_args()
 
