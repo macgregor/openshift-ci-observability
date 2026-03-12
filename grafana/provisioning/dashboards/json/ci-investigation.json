@@ -87,7 +87,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 11
       },
       "collapsed": false
     },
@@ -100,7 +100,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 1
+        "y": 12
       },
       "targets": [
         {
@@ -185,7 +185,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 1
+        "y": 22
       },
       "targets": [
         {
@@ -231,134 +231,14 @@
       }
     },
     {
-      "id": 200,
-      "title": "Failure Patterns",
-      "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 11
-      },
-      "collapsed": false
-    },
-    {
-      "id": 3,
-      "title": "Step Failure Leaderboard",
-      "description": "Which ci-operator steps fail most often. High counts indicate flaky steps or infrastructure issues at specific phases.",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 12
-      },
-      "targets": [
-        {
-          "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\"}))[$__range:])))",
-          "legendFormat": "{{source}}",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "continuous-reds"
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "showUnfilled": true
-      }
-    },
-    {
-      "id": 4,
-      "title": "Pod Phase Breakdown",
-      "description": "Distribution of pod outcomes. High Failed ratio suggests infrastructure pressure.",
-      "type": "piechart",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 12
-      },
-      "targets": [
-        {
-          "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name, pod_phase) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\"}))[$__range:]))",
-          "legendFormat": "{{pod_phase}}",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Succeeded"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Failed"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "percent"
-          ]
-        },
-        "pieType": "donut"
-      }
-    },
-    {
       "id": 300,
-      "title": "Build Logs (set Build ID above)",
+      "title": "Build Logs (set PR Number or Build ID above)",
       "type": "row",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 32
       },
       "collapsed": true,
       "panels": [
@@ -371,14 +251,14 @@
             "h": 12,
             "w": 12,
             "x": 0,
-            "y": 23
+            "y": 33
           },
           "datasource": {
             "type": "victoriametrics-logs-datasource"
           },
           "targets": [
             {
-              "expr": "build_id:$build_id AND level:Error",
+              "expr": "(build_id:$build_id OR pr_number:$pr_number) AND level:Error",
               "refId": "A"
             }
           ],
@@ -399,14 +279,14 @@
             "h": 12,
             "w": 12,
             "x": 12,
-            "y": 23
+            "y": 45
           },
           "datasource": {
             "type": "victoriametrics-logs-datasource"
           },
           "targets": [
             {
-              "expr": "build_id:$build_id AND source:pod AND (pod_phase:Failed OR _msg:~\"Failed|Error\")",
+              "expr": "(build_id:$build_id OR pr_number:$pr_number) AND source:pod AND (pod_phase:Failed OR _msg:~\"Failed|Error\")",
               "refId": "A"
             }
           ],

@@ -847,6 +847,126 @@
       }
     },
     {
+      "id": 350,
+      "title": "Failure Patterns",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "collapsed": false
+    },
+    {
+      "id": 14,
+      "title": "Step Failure Leaderboard",
+      "description": "Which ci-operator steps fail most often. High counts indicate flaky steps or infrastructure issues at specific phases.",
+      "type": "bargauge",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "targets": [
+        {
+          "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\"}))[$__range:])))",
+          "legendFormat": "{{source}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-reds"
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 15,
+      "title": "Pod Phase Breakdown",
+      "description": "Distribution of pod outcomes. High Failed ratio suggests infrastructure pressure.",
+      "type": "piechart",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "targets": [
+        {
+          "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name, pod_phase) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\"}))[$__range:]))",
+          "legendFormat": "{{pod_phase}}",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Succeeded"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "percent"
+          ]
+        },
+        "pieType": "donut"
+      }
+    },
+    {
       "id": 400,
       "title": "Outliers",
       "type": "row",
@@ -854,7 +974,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 48
       },
       "collapsed": false
     },
@@ -867,7 +987,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 50
+        "y": 61
       },
       "targets": [
         {
@@ -1066,7 +1186,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 50
+        "y": 61
       },
       "targets": [
         {
