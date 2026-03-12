@@ -72,8 +72,9 @@
       "targets": [
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",job_name=~\"$job_type\"}))[$__range:]))",
-          "instant": true,
-          "refId": "A"
+          "instant": false,
+          "refId": "A",
+          "interval": "6h"
         }
       ],
       "fieldConfig": {
@@ -107,7 +108,7 @@
           ]
         },
         "colorMode": "value",
-        "graphMode": "none"
+        "graphMode": "area"
       }
     },
     {
@@ -124,8 +125,9 @@
       "targets": [
         {
           "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:])))",
-          "instant": true,
-          "refId": "A"
+          "instant": false,
+          "refId": "A",
+          "interval": "6h"
         }
       ],
       "fieldConfig": {
@@ -156,7 +158,7 @@
           ]
         },
         "colorMode": "value",
-        "graphMode": "none"
+        "graphMode": "area"
       }
     },
     {
@@ -172,8 +174,9 @@
       "targets": [
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__range:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:])) * 100",
-          "instant": true,
-          "refId": "A"
+          "instant": false,
+          "refId": "A",
+          "interval": "6h"
         }
       ],
       "fieldConfig": {
@@ -205,7 +208,7 @@
           ]
         },
         "colorMode": "value",
-        "graphMode": "none"
+        "graphMode": "area"
       }
     },
     {
@@ -221,8 +224,9 @@
       "targets": [
         {
           "expr": "count(count_over_time((group by (pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:]))",
-          "instant": true,
-          "refId": "A"
+          "instant": false,
+          "refId": "A",
+          "interval": "6h"
         }
       ],
       "fieldConfig": {
@@ -240,7 +244,7 @@
           ]
         },
         "colorMode": "value",
-        "graphMode": "none"
+        "graphMode": "area"
       }
     },
     {
