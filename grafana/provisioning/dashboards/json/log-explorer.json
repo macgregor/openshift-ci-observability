@@ -50,7 +50,7 @@
       "id": 1,
       "title": "",
       "type": "logs",
-      "gridPos": { "h": 28, "w": 24, "x": 0, "y": 1 },
+      "gridPos": { "h": 24, "w": 24, "x": 0, "y": 1 },
       "datasource": { "type": "victoriametrics-logs-datasource" },
       "targets": [
         {
