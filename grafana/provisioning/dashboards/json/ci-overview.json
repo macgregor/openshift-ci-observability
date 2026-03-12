@@ -270,12 +270,14 @@
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
           "legendFormat": "Pipeline Runs",
-          "refId": "A"
+          "refId": "A",
+          "interval": "3h"
         },
         {
           "expr": "count(count_over_time((group by (pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
           "legendFormat": "Active PRs",
-          "refId": "B"
+          "refId": "B",
+          "interval": "3h"
         }
       ],
       "fieldConfig": {
@@ -368,7 +370,8 @@
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
           "legendFormat": "Success %",
-          "refId": "A"
+          "refId": "A",
+          "interval": "3h"
         }
       ],
       "fieldConfig": {
@@ -442,17 +445,20 @@
         {
           "expr": "max(max_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
           "legendFormat": "Max",
-          "refId": "A"
+          "refId": "A",
+          "interval": "3h"
         },
         {
           "expr": "avg(avg_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
           "legendFormat": "Avg",
-          "refId": "B"
+          "refId": "B",
+          "interval": "3h"
         },
         {
           "expr": "min(min_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
           "legendFormat": "Min",
-          "refId": "C"
+          "refId": "C",
+          "interval": "3h"
         }
       ],
       "fieldConfig": {
@@ -564,12 +570,14 @@
         {
           "expr": "max(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])))",
           "legendFormat": "Max",
-          "refId": "A"
+          "refId": "A",
+          "interval": "3h"
         },
         {
           "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])))",
           "legendFormat": "Avg",
-          "refId": "B"
+          "refId": "B",
+          "interval": "3h"
         }
       ],
       "fieldConfig": {
@@ -668,7 +676,8 @@
         {
           "expr": "avg by (source) (avg_over_time(ci_step_duration_seconds{job_name=~\"$job_type\"}[$__interval:]))",
           "legendFormat": "{{source}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "3h"
         }
       ],
       "fieldConfig": {
@@ -713,22 +722,26 @@
         {
           "expr": "avg(avg_over_time(ci_pod_scheduling_latency_seconds{job_name=~\"$job_type\"}[$__interval:]))",
           "legendFormat": "Scheduling (avg)",
-          "refId": "A"
+          "refId": "A",
+          "interval": "3h"
         },
         {
           "expr": "max(max_over_time(ci_pod_scheduling_latency_seconds{job_name=~\"$job_type\"}[$__interval:]))",
           "legendFormat": "Scheduling (max)",
-          "refId": "B"
+          "refId": "B",
+          "interval": "3h"
         },
         {
           "expr": "avg(avg_over_time(ci_pods_initialization_latency{job_name=~\"$job_type\"}[$__interval:]))",
           "legendFormat": "Initialization (avg)",
-          "refId": "C"
+          "refId": "C",
+          "interval": "3h"
         },
         {
           "expr": "max(max_over_time(ci_pods_initialization_latency{job_name=~\"$job_type\"}[$__interval:]))",
           "legendFormat": "Initialization (max)",
-          "refId": "D"
+          "refId": "D",
+          "interval": "3h"
         }
       ],
       "fieldConfig": {
