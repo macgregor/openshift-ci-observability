@@ -27,25 +27,35 @@
       },
       {
         "name": "pr_number",
-        "label": "PR Number",
-        "description": "Filter to a specific PR. Leave empty for all.",
-        "type": "textbox",
+        "label": "PR",
+        "type": "query",
+        "query": "label_values(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}, pr_number)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
         "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
-        }
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "sort": 3
       },
       {
         "name": "build_id",
-        "label": "Build ID",
-        "description": "Filter to a specific build for log panels.",
-        "type": "textbox",
+        "label": "Build",
+        "type": "query",
+        "query": "label_values(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}, build_id)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
         "current": {
-          "selected": false,
-          "text": "",
-          "value": ""
-        }
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "sort": 3
       }
     ]
   },
@@ -110,8 +120,8 @@
           "interval": "3h"
         },
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\".*$pr_number.*\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\".*$pr_number.*\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
-          "legendFormat": "PR $pr_number",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
+          "legendFormat": "Selected PRs",
           "refId": "B",
           "interval": "3h"
         }
@@ -189,7 +199,7 @@
       },
       "targets": [
         {
-          "expr": "topk(20, sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\".*$pr_number.*\",job_name=~\"$job_type\"}))[$__range:])))",
+          "expr": "topk(20, sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}))[$__range:])))",
           "legendFormat": "PR {{pr_number}} ({{pr_sha}})",
           "instant": true,
           "refId": "A"
@@ -232,7 +242,7 @@
     },
     {
       "id": 300,
-      "title": "Build Logs (set PR Number or Build ID above)",
+      "title": "Build Logs",
       "type": "row",
       "gridPos": {
         "h": 1,
@@ -258,7 +268,7 @@
           },
           "targets": [
             {
-              "expr": "(build_id:$build_id OR pr_number:$pr_number) AND level:Error",
+              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND level:Error",
               "refId": "A"
             }
           ],
@@ -286,7 +296,7 @@
           },
           "targets": [
             {
-              "expr": "(build_id:$build_id OR pr_number:$pr_number) AND source:pod AND (pod_phase:Failed OR _msg:~\"Failed|Error\")",
+              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND source:pod AND (pod_phase:Failed OR _msg:~\"Failed|Error\")",
               "refId": "A"
             }
           ],
