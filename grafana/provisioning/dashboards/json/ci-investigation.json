@@ -108,7 +108,7 @@
       "type": "timeseries",
       "gridPos": {
         "h": 10,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 12
       },
@@ -193,8 +193,8 @@
       "type": "bargauge",
       "gridPos": {
         "h": 10,
-        "w": 8,
-        "x": 8,
+        "w": 6,
+        "x": 6,
         "y": 22
       },
       "targets": [
@@ -245,56 +245,43 @@
     },
     {
       "id": 7,
-      "title": "Builds",
-      "description": "Build IDs for the selected PR. Select a build in the Build dropdown above to filter logs.",
-      "type": "bargauge",
+      "title": "Pipeline Runs",
+      "description": "Each tile is a pipeline run. Grouped by PR and commit SHA. Size = duration, color = success (green) or failure (red).",
+      "type": "marcusolsson-treemap-panel",
       "gridPos": {
         "h": 10,
-        "w": 8,
-        "x": 16,
+        "w": 12,
+        "x": 12,
         "y": 12
       },
       "targets": [
         {
-          "expr": "sort_desc(max by (build_id, job_name, success) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}))",
-          "legendFormat": "{{build_id}} {{job_name}} {{success}}",
+          "expr": "last_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}[$__range])",
+          "legendFormat": "PR {{pr_number}}/{{pr_sha}}/{{build_id}}",
           "instant": true,
           "refId": "A"
         }
       ],
-      "transformations": [],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          },
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 7200
-              }
-            ]
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "labelsToFields": false
           }
         }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "orientation": "horizontal",
-        "displayMode": "basic",
-        "showUnfilled": true,
-        "minVizWidth": 0,
-        "minVizHeight": 10
+        "tiling": "treemapSquarify",
+        "separator": "/"
       }
     },
     {
