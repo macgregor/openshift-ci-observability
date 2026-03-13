@@ -6,36 +6,19 @@ description: System architecture and data flow for OpenShift CI Observability
 
 ## System Diagram
 
-```
-┌─────────────────┐
-│  Google Cloud   │
-│    Storage      │
-│  (GCS Buckets)  │
-└────────┬────────┘
-         │
-         │ GCS XML API
-         │
-         ▼
-┌─────────────────┐
-│     Scraper     │
-│                 │
-│  scraper-watch  │  (continuous polling)
-│ scraper-backfill│  (one-time, exits when done)
-└────────┬────────┘
-         │
-         │ Remote-write (Prometheus) + JSON lines
-         │
-         ▼
-┌─────────────────────────────────┐
-│  VictoriaMetrics + VictoriaLogs │
-└────────┬────────────────────────┘
-         │
-         │ PromQL / LogsQL queries
-         │
-         ▼
-┌─────────────────┐
-│     Grafana     │
-└─────────────────┘
+```mermaid
+graph TD
+    GCS["Google Cloud Storage\n(GCS Buckets)"]
+    Scraper["Scraper\nscraper-watch · scraper-backfill"]
+    VM["VictoriaMetrics"]
+    VL["VictoriaLogs"]
+    Grafana["Grafana"]
+
+    GCS -- "GCS XML API" --> Scraper
+    Scraper -- "Remote-write\n(Prometheus)" --> VM
+    Scraper -- "JSON lines" --> VL
+    VM -- "PromQL" --> Grafana
+    VL -- "LogsQL" --> Grafana
 ```
 
 ## Data Flow
