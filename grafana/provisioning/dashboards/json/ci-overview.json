@@ -77,6 +77,13 @@
       }
     },
     {
+      "id": 52,
+      "title": "Summary",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "collapsed": false
+    },
+    {
       "id": 10,
       "title": "Failed Runs",
       "type": "stat",
