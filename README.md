@@ -27,6 +27,19 @@ Three dashboards are provisioned automatically:
 
 Each dashboard has a collapsible "Dashboard Guide" row at the top with usage instructions.
 
+## CI Investigator (Claude Code)
+
+If you use [Claude Code](https://docs.anthropic.com/en/docs/claude-code), the `/ci-investigator` skill provides conversational CI failure analysis powered by the ingested data. Instead of manually writing PromQL or LogsQL queries, describe what you want to know:
+
+```
+/ci-investigator is CI healthy?
+/ci-investigator PR 1234 keeps failing
+/ci-investigator build 1789456300123456789
+/ci-investigator what's causing ipi-install failures this week?
+```
+
+The investigator queries VictoriaMetrics and VictoriaLogs, traces failure chains to root cause, classifies failures (infrastructure, flaky test, quota, etc.), and recommends next steps -- all without leaving your terminal.
+
 ## Service Endpoints
 
 - **Grafana**: http://localhost:3000
