@@ -2,7 +2,7 @@ COMPOSE := podman-compose --profile backfill
 CONTAINERS := ci-obs-victoriametrics ci-obs-victorialogs ci-obs-grafana ci-obs-scraper-watch ci-obs-scraper-backfill
 VOLUMES := ci-obs-vm-data ci-obs-vl-data ci-obs-grafana-data ci-obs-scraper-state
 
-.PHONY: check-deps up down restart wipe status help
+.PHONY: check-deps up down restart wipe logs status help
 
 check-deps:
 	@command -v podman >/dev/null || { echo "podman not found. Install: https://podman.io/docs/installation"; exit 1; }
@@ -31,6 +31,9 @@ wipe: check-deps ## Stop and delete all data
 	@$(MAKE) -s down
 	@podman volume rm -f $(VOLUMES) 2>/dev/null; true
 	@echo "All data wiped."
+
+logs: check-deps ## Tail logs (use SVC=scraper-watch to filter)
+	@$(COMPOSE) logs -f --tail=100 $(SVC)
 
 status: check-deps ## Show running containers
 	@$(COMPOSE) ps
