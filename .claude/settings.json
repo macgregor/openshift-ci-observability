@@ -13,6 +13,8 @@
       "WebFetch(domain:docs.victoriametrics.com)",
       "WebFetch(domain:storage.googleapis.com)",
       "WebFetch(domain:code.claude.com)",
+      "WebFetch(domain:docs.prow.k8s.io)",
+      "WebFetch(domain:docs.ci.openshift.org)",
       "Bash(make up)",
       "Bash(make down)",
       "Bash(make build)",

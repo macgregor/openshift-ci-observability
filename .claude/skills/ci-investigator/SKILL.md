@@ -35,6 +35,7 @@ Investigate OpenShift CI failures by querying VictoriaMetrics (metrics) and Vict
 - GitHub PR: `https://github.com/{org}/{repo}/pull/{pr_number}`
 
 **References:**
+- CI infrastructure context (job lifecycle, cluster provisioning, resource contention, external tools): @docs/appendix/openshift-ci-infrastructure.md
 - Raw JSON field structure: `docs/appendix/ci-operator-metrics.md`
 - System architecture: `ARCHITECTURE.md`
 
