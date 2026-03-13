@@ -1,0 +1,15 @@
+<testsuites>
+  <testsuite name="step graph" tests="10" skipped="0" failures="0" time="3431.188966264">
+    <properties></properties>
+    <testcase name="Build image opendatahub-operator from the repository" time="282.380795137"></testcase>
+    <testcase name="Build image opendatahub-operator-bundle from the repository" time="209.640874692"></testcase>
+    <testcase name="Build image opendatahub-operator-rhoai from the repository" time="332.381376608"></testcase>
+    <testcase name="Build image src-bundle from the repository" time="348.770515989"></testcase>
+    <testcase name="Clone the correct source code into an image and tag it as src" time="224.125097445"></testcase>
+    <testcase name="Find the input image operator-sdk and tag it into the pipeline" time="8.844511541"></testcase>
+    <testcase name="Find the input image root and tag it into the pipeline" time="8.84345078"></testcase>
+    <testcase name="Find the input image ubi and tag it into the pipeline" time="8.844219966"></testcase>
+    <testcase name="Import the release payload &quot;latest-opendatahub-operator-e2e&quot; from an external source" time="233.481962789"></testcase>
+    <testcase name="Run multi-stage test opendatahub-operator-e2e" time="2307.426551638"></testcase>
+  </testsuite>
+</testsuites>

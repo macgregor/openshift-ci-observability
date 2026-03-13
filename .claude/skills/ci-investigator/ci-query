@@ -512,6 +512,48 @@ def cmd_step_errors(args):
             })
 
 
+# --- JUnit ---
+
+def cmd_junit_steps(args):
+    """Step results with failure messages from JUnit XML."""
+    bid = require_arg(args, "build_id")
+    limit = int(args[1]) if len(args) > 1 else 50
+    for e in vl_query(f"source:junit_step AND build_id:{bid}", limit):
+        emit({
+            "step_name": e.get("step_name"),
+            "status": e.get("status"),
+            "duration_seconds": e.get("duration_seconds"),
+            "_msg": e.get("_msg"),
+        })
+
+
+def cmd_junit_tests(args):
+    """Test case results from JUnit XML."""
+    bid = require_arg(args, "build_id")
+    limit = int(args[1]) if len(args) > 1 else 100
+    for e in vl_query(f"source:junit_test AND build_id:{bid}", limit):
+        emit({
+            "test_name": e.get("test_name"),
+            "status": e.get("status"),
+            "duration_seconds": e.get("duration_seconds"),
+            "test_variant": e.get("test_variant"),
+            "_msg": e.get("_msg"),
+        })
+
+
+def cmd_top_failing_tests(args):
+    """Most frequently failing test cases (leaf tests only)."""
+    window = args[0] if args else "7d"
+    limit = int(args[1]) if len(args) > 1 else 10
+    results = vm_query(
+        f"topk({limit}, count by (test_name) (count_over_time("
+        f'(group by (build_id, test_name) (ci_junit_test_duration_seconds{{leaf="true",status="failed"}}))'
+        f"[{window}:])))"
+    )
+    for r in results:
+        emit({"test_name": r["metric"]["test_name"], "failure_count": int(val(r))})
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -538,6 +580,9 @@ COMMANDS = {
     "step-errors":        (cmd_step_errors,         "<step> [window] [max_builds]",  "Error logs across builds where step failed"),
     "build-latency":      (cmd_build_latency,       "[window]",                      "Scheduling latency: build cluster vs ephemeral"),
     "error-impact":       (cmd_error_impact,         "<pattern> [window] [limit]",    "Count builds/PRs affected by a log pattern"),
+    "junit-steps":        (cmd_junit_steps,          "<build_id> [limit]",            "Step results with failure messages (JUnit)"),
+    "junit-tests":        (cmd_junit_tests,          "<build_id> [limit]",            "Test case results (JUnit)"),
+    "top-failing-tests":  (cmd_top_failing_tests,    "[window] [limit]",              "Most frequently failing test cases"),
 }
 
 

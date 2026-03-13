@@ -1,6 +1,6 @@
 # OpenShift CI Observability
 
-Scrapes CI build artifacts (`ci-operator-metrics.json` and `ci-operator.log`) from GCS for OpenShift CI builds and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured logs) for exploration via Grafana.
+Scrapes CI build artifacts (`ci-operator-metrics.json`, `ci-operator.log`, and JUnit XML) from GCS for OpenShift CI builds and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured logs) for exploration via Grafana.
 
 ## Quickstart
 
@@ -19,10 +19,11 @@ All parameters can be set via `.env` for compose or CLI flags for direct executi
 
 ## Dashboards
 
-Three dashboards are provisioned automatically:
+Four dashboards are provisioned automatically:
 
 - **CI Overview** (home page) -- at-a-glance CI health: failure count, success rate, retests per commit, pipeline duration trends, step breakdown, infrastructure overhead, and outlier tables with links to GitHub PRs and Prow jobs.
 - **CI Investigation** -- drill into CI failures: identify top failing PRs, compare PR success rate against global baseline, scoped step failure analysis, outlier builds with links to GitHub and Prow, and build-level error logs.
+- **CI Tests** -- test-case-level results from JUnit XML: test pass rate, top failing tests, slowest tests, suite duration trends, and per-build test results with failure messages.
 - **CI Logs** -- browse ci-operator logs by level, PR, build, and source. Each log source gets its own panel to preserve ordering. Use the Level filter to surface errors across all builds.
 
 Each dashboard has a collapsible "Dashboard Guide" row at the top with usage instructions.

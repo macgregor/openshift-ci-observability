@@ -52,10 +52,10 @@ See `query-recipes.md` for detailed usage of each subcommand with interpretation
 
 | Phase | Commands |
 |-------|----------|
-| Health check | `health`, `top-failing-steps`, `top-failing-prs` |
+| Health check | `health`, `top-failing-steps`, `top-failing-prs`, `top-failing-tests` |
 | Discovery | `list-jobs`, `list-prs` |
 | Scope to PR | `builds-for-pr`, `pr-success-rate`, `flakiness` |
-| Scope to build | `build-info`, `step-failures`, `step-timeline` |
+| Scope to build | `build-info`, `step-failures`, `step-timeline`, `junit-steps`, `junit-tests` |
 | Root cause | `error-logs`, `warning-logs`, `search-logs`, `step-offsets`, `pod-outcomes`, `scheduling-latency` |
 | Cross-build | `cross-pr-errors`, `step-consistency`, `error-impact` |
 | Infrastructure | `build-latency` |
@@ -71,6 +71,8 @@ The scraper extracts all numeric fields from `ci-operator-metrics.json` as Prome
 | `ci_step_relative_start_seconds{source}` | Step start relative to pipeline start (for timeline reconstruction). |
 | `ci_pod_scheduling_latency_seconds` | Time from pod creation to scheduled. High values = cluster pressure. |
 | `ci_pods_completion_latency{pod_phase}` | Pod completion time. `pod_phase` = Succeeded/Failed. |
+| `ci_junit_step_duration_seconds{step_name, status}` | Per-step duration from JUnit XML. `status` = passed/failed/skipped. `step_name` = human-readable step description. |
+| `ci_junit_test_duration_seconds{test_name, suite, status, test_variant, leaf}` | Per-test-case duration from JUnit XML. `test_name` = Go test path. `test_variant` = e2e variant. `leaf="true"` for leaf tests (no children). |
 | `ci_build_scraped` | Sentinel: value=1 for each processed build. Use to check data exists. |
 
 **Common labels** (on all metrics): `org`, `repo`, `branch`, `job_name`, `build_id`, `pr_number`, `pr_sha`, `author`
@@ -85,6 +87,10 @@ VictoriaLogs stores parsed `ci-operator.log` entries with:
 - `component`, `source`: log metadata
 - Job labels merged into each entry: `job_name`, `build_id`, `pr_number`, `org`, `repo`, etc.
 - Stream fields: `job_name`, `build_id`
+
+JUnit entries use `source` to distinguish record types:
+- `source:junit_step` -- step-level results from `junit_operator.xml`. Fields: `step_name`, `status`, `duration_seconds`, `_msg` (failure message)
+- `source:junit_test` -- test-case results from `junit_report.xml`. Fields: `test_name`, `status`, `duration_seconds`, `test_variant`, `_msg` (failure message)
 
 ## Investigation Workflow
 

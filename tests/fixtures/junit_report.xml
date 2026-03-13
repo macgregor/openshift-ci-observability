@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite name="e2e-test" tests="20" failures="2" skipped="1">
+  <testcase name="TestOdhOperator" time="1859.850"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests" time="121.600"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Ensure_required_operators_are_installed" time="0.000"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Ensure_required_operators_are_installed/Ensure_openshift-cert-manager-operator_is_installed" time="30.730"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Ensure_required_operators_are_installed/Ensure_rhcl-operator_is_installed" time="71.090"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Ensure_required_operators_are_installed/Ensure_leader-worker-set_is_installed" time="20.650"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Ensure_required_operators_are_installed/Ensure_job-set_is_installed" time="30.710"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Ensure_required_resources_are_created" time="30.200"></testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Validate_creation_of_DSCInitialization_instance" time="10.100">
+    <failure message="timeout waiting for DSCInitialization">Expected DSCInitialization to be ready within 60s but it was not</failure>
+  </testcase>
+  <testcase name="TestOdhOperator/DSCInitialization_and_DataScienceCluster_management_E2E_Tests/Validate_creation_of_DataScienceCluster_instance" time="10.180"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests" time="0.240"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator" time="0.000"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_Datascience_Cluster_CRD" time="0.150"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_DataScienceCluster_Initialization_CRD" time="0.040">
+    <failure message="CRD not found">DataScienceCluster Initialization CRD was not found in the cluster</failure>
+  </testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_FeatureTracker_CRD" time="0.040"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_Dashboard_CRD" time="0.040">
+    <skipped message="Dashboard component not enabled"></skipped>
+  </testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_Ray_CRD" time="0.040"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_ModelRegistry_CRD" time="0.040"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_TrustyAI_CRD" time="0.040"></testcase>
+  <testcase name="TestOdhOperator/Operator_Manager_E2E_Tests/Validate_CRDs_owned_by_the_operator/Validate_Kueue_CRD" time="0.050"></testcase>
+</testsuite>

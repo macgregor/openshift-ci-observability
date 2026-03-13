@@ -41,6 +41,8 @@ make up
 
 Scraper state is stored in VictoriaMetrics itself (via a sentinel metric), so wiping the database automatically resets state. VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
 
+**When to wipe:** Changes to scraping logic (new pipelines, modified metric extraction, new artifact parsing) require a DB wipe to reprocess existing builds with the updated code. The scraper skips builds already present in VictoriaMetrics, so existing builds won't pick up new data without a wipe.
+
 ## Chrome DevTools MCP (for Claude)
 
 The project includes a chrome-devtools MCP server that lets Claude interact with Grafana dashboards in a browser -- taking screenshots, inspecting panels, clicking elements, and verifying dashboard changes visually.

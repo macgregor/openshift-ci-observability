@@ -1,0 +1,17 @@
+<testsuites>
+  <testsuite name="step graph" tests="10" skipped="0" failures="1" time="2361.497627453">
+    <properties></properties>
+    <testcase name="Build image opendatahub-operator from the repository" time="233.03056048"></testcase>
+    <testcase name="Build image opendatahub-operator-bundle from the repository" time="226.028137521"></testcase>
+    <testcase name="Build image opendatahub-operator-rhoai from the repository" time="369.676672271"></testcase>
+    <testcase name="Build image src-bundle from the repository" time="92.380329076"></testcase>
+    <testcase name="Clone the correct source code into an image and tag it as src" time="96.909063726"></testcase>
+    <testcase name="Find the input image operator-sdk and tag it into the pipeline" time="4.128945176"></testcase>
+    <testcase name="Find the input image root and tag it into the pipeline" time="4.128950906"></testcase>
+    <testcase name="Find the input image ubi and tag it into the pipeline" time="4.128866756"></testcase>
+    <testcase name="Import the release payload &quot;latest-opendatahub-operator-e2e&quot; from an external source" time="210.291404214"></testcase>
+    <testcase name="Run multi-stage test opendatahub-operator-e2e" time="1572.373379873">
+      <failure message="">failed to wait for the created cluster claim to become ready: timed out waiting for the condition</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

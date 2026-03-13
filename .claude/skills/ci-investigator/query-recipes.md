@@ -332,3 +332,55 @@ ci-query step-consistency 3221
 - One step with count == builds_with_failures = deterministic failure in that step
 - Multiple steps with low counts = inconsistent/flaky failures
 - Same step failing across many builds = root cause is in that step
+
+---
+
+## JUnit
+
+### `junit-steps <build_id> [limit]`
+
+Step results with failure messages from JUnit XML. Shows each ci-operator step's pass/fail status with the exact failure message from `junit_operator.xml`.
+
+```
+ci-query junit-steps 2031710585065836544
+```
+
+**Output fields:** `step_name`, `status`, `duration_seconds`, `_msg` (failure message, only for failed steps)
+
+**Interpretation:**
+- Provides cleaner failure messages than ci-operator error logs
+- `_msg` is the one-line failure reason from JUnit XML -- more concise than log messages
+- Use alongside `step-failures` for a complete picture: `step-failures` gives timing, `junit-steps` gives the reason
+
+### `junit-tests <build_id> [limit]`
+
+Individual test case results from JUnit XML. Shows each e2e test case's pass/fail status with duration.
+
+```
+ci-query junit-tests 2030989391509327872
+ci-query junit-tests 2030989391509327872 200
+```
+
+**Output fields:** `test_name`, `status`, `duration_seconds`, `test_variant`, `_msg` (failure message, only for failed tests)
+
+**Interpretation:**
+- `test_name` is the full Go test path (e.g., `TestOdhOperator/Operator_Manager_E2E_Tests/...`)
+- `test_variant` identifies which e2e suite the test belongs to
+- Failed tests include `_msg` with the assertion failure message
+- Use to identify specific test failures within the e2e step
+
+### `top-failing-tests [window] [limit]`
+
+Most frequently failing test cases across all builds.
+
+```
+ci-query top-failing-tests         # 7d, top 10
+ci-query top-failing-tests 30d 20  # 30 days, top 20
+```
+
+**Output fields:** `test_name`, `failure_count`
+
+**Interpretation:**
+- High failure count on a specific test = likely flaky or broken test
+- Compare against `top-failing-steps` -- if the e2e step is the top failing step and specific tests dominate, those tests are the root cause
+- Use `junit-tests` on specific builds to see the failure messages for top-failing tests
