@@ -1,7 +1,7 @@
 {
   "uid": "ci-overview",
   "title": "CI Overview",
-  "timezone": "utc",
+  "timezone": "browser",
   "refresh": "5m",
   "time": {
     "from": "now-7d",
