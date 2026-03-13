@@ -27,10 +27,13 @@
 - Generic metric extraction: every numeric field becomes a metric
 - Known transforms and canonical aliases are opt-in enhancements
 
+## Stack management
+**Always use Makefile targets** (`make up`, `make down`, `make restart`, `make test`, `make build`, `make status`, `make logs`) instead of calling podman/podman-compose directly. The Makefile handles image rebuilds, profile selection, and container naming. Only fall back to direct podman commands when a specific operation has no make target (e.g. `podman exec`, `podman logs` for a specific container).
+
 ## Testing
 - Unit tests: `make test`
 - Dry-run mode: `python -m scraper backfill --dry-run --window 2d`
-- Full stack: `podman-compose up -d` then check Grafana at localhost:3000
+- Full stack: `make up` then check Grafana at localhost:3000
 
 ## YAML Frontmatter Template
 
