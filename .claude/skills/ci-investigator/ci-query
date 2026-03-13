@@ -1,0 +1,477 @@
+#!/usr/bin/env python3
+"""CI query tool for the ci-investigator skill.
+
+Queries VictoriaMetrics (metrics) and VictoriaLogs (logs) for CI investigation.
+Each subcommand outputs JSON lines (one JSON object per line).
+
+Usage: ci-query <command> [args...]
+Run 'ci-query help' for the full command list.
+
+To add a new subcommand:
+1. Define a function cmd_<name>(args)
+2. Register it in the COMMANDS dict at the bottom
+3. Use emit() for each output record, emit_error() for errors
+"""
+
+import json
+import os
+import sys
+import urllib.request
+import urllib.parse
+from collections import Counter
+
+VM_URL = os.environ.get("VM_URL", "http://localhost:8428")
+VL_URL = os.environ.get("VL_URL", "http://localhost:9428")
+LOOKBACK = "90d"
+
+# Shorthand for the long metric name used in most build-outcome queries
+_OUTCOME = "ci_test_platform_insights_additional_context_duration_seconds"
+
+
+# --- Helpers ---
+
+def vm_query(query):
+    """Run a PromQL instant query. Returns list of result dicts."""
+    url = f"{VM_URL}/api/v1/query"
+    data = urllib.parse.urlencode({"query": query}).encode()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data), timeout=30) as resp:
+            body = json.loads(resp.read())
+    except urllib.error.URLError as e:
+        emit_error(f"VictoriaMetrics not reachable at {VM_URL}: {e}")
+        sys.exit(1)
+    if body.get("status") != "success":
+        emit_error(f"Query failed: {body.get('error', 'unknown')}")
+        sys.exit(1)
+    return body["data"]["result"]
+
+
+def vm_scalar(query):
+    """Run a query expecting a single scalar. Returns float or 0."""
+    r = vm_query(query)
+    return float(r[0]["value"][1]) if r else 0
+
+
+def vl_query(query, limit=50):
+    """Run a LogsQL query. Returns list of dicts."""
+    params = urllib.parse.urlencode({"query": query, "limit": limit})
+    url = f"{VL_URL}/select/logsql/query?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            text = resp.read().decode()
+    except urllib.error.URLError as e:
+        emit_error(f"VictoriaLogs not reachable at {VL_URL}: {e}")
+        sys.exit(1)
+    return [json.loads(line) for line in text.strip().split("\n") if line.strip()]
+
+
+def emit(obj):
+    """Print one JSON object per line."""
+    json.dump(obj, sys.stdout, separators=(",", ":"))
+    print()
+
+
+def emit_error(msg):
+    json.dump({"error": msg}, sys.stderr, separators=(",", ":"))
+    print(file=sys.stderr)
+
+
+def require_arg(args, name):
+    if not args:
+        emit_error(f"Missing required argument: {name}")
+        sys.exit(1)
+    return args[0]
+
+
+def val(r):
+    """Extract float value from a VM result entry."""
+    return float(r["value"][1])
+
+
+# --- Phase 1: Triage ---
+
+def cmd_health(args):
+    """Combined health snapshot: success rate, build counts, infra latency."""
+    window = args[0] if args else "24h"
+    total = vm_scalar(
+        f'count(last_over_time({_OUTCOME}{{name="execution_completed"}}[{window}]))'
+    )
+    passed = vm_scalar(
+        f'count(last_over_time({_OUTCOME}{{name="execution_completed",success="true"}}[{window}]))'
+    )
+    avg_lat = vm_scalar(
+        f"avg(last_over_time(ci_pod_scheduling_latency_seconds[{window}]))"
+    )
+    max_lat = vm_scalar(
+        f"max(last_over_time(ci_pod_scheduling_latency_seconds[{window}]))"
+    )
+    builds = vm_scalar(f"count(last_over_time(ci_build_scraped[{window}]))")
+    emit({
+        "window": window,
+        "builds_ingested": int(builds),
+        "total_builds": int(total),
+        "passed_builds": int(passed),
+        "failed_builds": int(total - passed),
+        "success_rate_pct": round(passed / total * 100, 1) if total else 0,
+        "avg_scheduling_latency_s": round(avg_lat, 1),
+        "max_scheduling_latency_s": round(max_lat, 1),
+    })
+
+
+def cmd_top_failing_steps(args):
+    """Top steps by failure count (distinct builds)."""
+    window = args[0] if args else "24h"
+    limit = int(args[1]) if len(args) > 1 else 10
+    results = vm_query(
+        f"topk({limit}, count by (source) (count_over_time("
+        f'(group by (build_id, source) (ci_step_duration_seconds{{level="Error"}}))'
+        f"[{window}:])))"
+    )
+    for r in results:
+        emit({"source": r["metric"]["source"], "failure_count": int(val(r))})
+
+
+def cmd_top_failing_prs(args):
+    """Top PRs by failure count (distinct builds)."""
+    window = args[0] if args else "24h"
+    limit = int(args[1]) if len(args) > 1 else 10
+    results = vm_query(
+        f"topk({limit}, count by (pr_number) (count_over_time("
+        f"(group by (build_id, pr_number) ("
+        f'{_OUTCOME}{{name="execution_completed",success="false",pr_number=~".+"}}))'
+        f"[{window}:])))"
+    )
+    for r in results:
+        emit({"pr_number": r["metric"]["pr_number"], "failure_count": int(val(r))})
+
+
+# --- Discovery ---
+
+def cmd_list_jobs(args):
+    """List job names with build counts."""
+    results = vm_query(
+        f"count by (job_name) (last_over_time(ci_build_scraped[{LOOKBACK}]))"
+    )
+    for r in sorted(results, key=lambda x: -val(x)):
+        emit({"job_name": r["metric"]["job_name"], "build_count": int(val(r))})
+
+
+def cmd_list_prs(args):
+    """List PR numbers with build counts."""
+    limit = int(args[0]) if args else 20
+    results = vm_query(
+        f"topk({limit}, count by (pr_number) ("
+        f'last_over_time(ci_build_scraped{{pr_number=~".+"}}[{LOOKBACK}])))'
+    )
+    for r in results:
+        emit({"pr_number": r["metric"]["pr_number"], "build_count": int(val(r))})
+
+
+# --- Phase 2: Scope ---
+
+def cmd_builds_for_pr(args):
+    """All builds for a PR with outcome and duration."""
+    pr = require_arg(args, "pr_number")
+    results = vm_query(
+        f'last_over_time({_OUTCOME}{{name="execution_completed",pr_number="{pr}"}}[{LOOKBACK}])'
+    )
+    for r in results:
+        m = r["metric"]
+        emit({
+            "build_id": m.get("build_id"),
+            "job_name": m.get("job_name"),
+            "success": m.get("success"),
+            "duration_s": round(val(r), 1),
+            "pr_sha": m.get("pr_sha"),
+            "author": m.get("author"),
+        })
+
+
+def cmd_build_info(args):
+    """Single build details."""
+    bid = require_arg(args, "build_id")
+    results = vm_query(
+        f'last_over_time({_OUTCOME}{{name="execution_completed",build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    if not results:
+        emit({"error": f"Build {bid} not found"})
+        return
+    m = results[0]["metric"]
+    emit({
+        "build_id": m.get("build_id"),
+        "job_name": m.get("job_name"),
+        "pr_number": m.get("pr_number"),
+        "pr_sha": m.get("pr_sha"),
+        "success": m.get("success"),
+        "duration_s": round(val(results[0]), 1),
+        "author": m.get("author"),
+        "org": m.get("org"),
+        "repo": m.get("repo"),
+        "branch": m.get("branch"),
+    })
+
+
+def cmd_pr_success_rate(args):
+    """Success rate for a specific PR."""
+    pr = require_arg(args, "pr_number")
+    total = vm_scalar(
+        f'count(last_over_time({_OUTCOME}{{name="execution_completed",pr_number="{pr}"}}[{LOOKBACK}]))'
+    )
+    passed = vm_scalar(
+        f'count(last_over_time({_OUTCOME}{{name="execution_completed",success="true",pr_number="{pr}"}}[{LOOKBACK}]))'
+    )
+    emit({
+        "pr_number": pr,
+        "total_builds": int(total),
+        "passed_builds": int(passed),
+        "failed_builds": int(total - passed),
+        "success_rate_pct": round(passed / total * 100, 1) if total else 0,
+    })
+
+
+# --- Phase 3: Investigate ---
+
+def cmd_step_failures(args):
+    """Failed steps for a build."""
+    bid = require_arg(args, "build_id")
+    results = vm_query(
+        f'last_over_time(ci_step_duration_seconds{{level="Error",build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    for r in results:
+        emit({
+            "source": r["metric"].get("source"),
+            "duration_s": round(val(r), 1),
+        })
+
+
+def cmd_step_timeline(args):
+    """All steps for a build, sorted by duration descending."""
+    bid = require_arg(args, "build_id")
+    results = vm_query(
+        f'last_over_time(ci_step_duration_seconds{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    for r in sorted(results, key=lambda x: -val(x)):
+        m = r["metric"]
+        emit({
+            "source": m.get("source"),
+            "duration_s": round(val(r), 1),
+            "level": m.get("level"),
+            "failed": m.get("level") == "Error",
+        })
+
+
+def cmd_step_offsets(args):
+    """Step start times relative to pipeline start, sorted chronologically."""
+    bid = require_arg(args, "build_id")
+    results = vm_query(
+        f'last_over_time(ci_step_relative_start_seconds{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    for r in sorted(results, key=lambda x: val(x)):
+        emit({
+            "source": r["metric"].get("source"),
+            "offset_s": round(val(r), 1),
+        })
+
+
+def cmd_pod_outcomes(args):
+    """Pod phase outcomes for a build."""
+    bid = require_arg(args, "build_id")
+    results = vm_query(
+        f'last_over_time(ci_pods_completion_latency{{build_id="{bid}",pod_phase=~".+"}}[{LOOKBACK}])'
+    )
+    for r in results:
+        m = r["metric"]
+        emit({
+            "pod_name": m.get("pod_name"),
+            "pod_phase": m.get("pod_phase"),
+            "completion_latency_s": round(val(r), 1),
+        })
+
+
+def cmd_scheduling_latency(args):
+    """Pod scheduling latency for a build."""
+    bid = require_arg(args, "build_id")
+    results = vm_query(
+        f'last_over_time(ci_pod_scheduling_latency_seconds{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    for r in results:
+        emit({
+            "pod_name": r["metric"].get("pod_name"),
+            "latency_s": round(val(r), 1),
+        })
+
+
+def cmd_error_logs(args):
+    """Error-level logs for a build."""
+    bid = require_arg(args, "build_id")
+    limit = int(args[1]) if len(args) > 1 else 50
+    for e in vl_query(f'build_id:{bid} AND level:~"(?i)error"', limit):
+        emit({
+            "_time": e.get("_time"),
+            "_msg": e.get("_msg"),
+            "source": e.get("source"),
+            "component": e.get("component"),
+        })
+
+
+def cmd_warning_logs(args):
+    """Warning-level logs for a build."""
+    bid = require_arg(args, "build_id")
+    limit = int(args[1]) if len(args) > 1 else 50
+    for e in vl_query(f'build_id:{bid} AND level:~"(?i)warning"', limit):
+        emit({
+            "_time": e.get("_time"),
+            "_msg": e.get("_msg"),
+            "source": e.get("source"),
+            "component": e.get("component"),
+        })
+
+
+def cmd_all_logs(args):
+    """All logs for a build (context expansion)."""
+    bid = require_arg(args, "build_id")
+    limit = int(args[1]) if len(args) > 1 else 200
+    for e in vl_query(f"build_id:{bid}", limit):
+        emit({
+            "_time": e.get("_time"),
+            "_msg": e.get("_msg"),
+            "level": e.get("level"),
+            "source": e.get("source"),
+            "component": e.get("component"),
+        })
+
+
+def cmd_search_logs(args):
+    """Search logs by regex pattern within a build."""
+    bid = require_arg(args, "build_id")
+    if len(args) < 2:
+        emit_error("Missing required argument: pattern")
+        sys.exit(1)
+    pattern = args[1]
+    limit = int(args[2]) if len(args) > 2 else 30
+    for e in vl_query(f'build_id:{bid} AND _msg:~"{pattern}"', limit):
+        emit({
+            "_time": e.get("_time"),
+            "_msg": e.get("_msg"),
+            "level": e.get("level"),
+            "source": e.get("source"),
+        })
+
+
+def cmd_cross_pr_errors(args):
+    """Find an error pattern across all builds (one result per build)."""
+    pattern = require_arg(args, "pattern")
+    limit = int(args[1]) if len(args) > 1 else 50
+    seen = {}
+    for e in vl_query(f'level:error AND _msg:~"{pattern}"', limit):
+        bid = e.get("build_id", "?")
+        if bid not in seen:
+            seen[bid] = True
+            emit({
+                "build_id": bid,
+                "pr_number": e.get("pr_number"),
+                "job_name": e.get("job_name"),
+                "_msg": e.get("_msg"),
+            })
+
+
+def cmd_flakiness(args):
+    """Detect flaky outcomes for a PR (mix of pass and fail)."""
+    pr = require_arg(args, "pr_number")
+    results = vm_query(
+        f'last_over_time({_OUTCOME}{{name="execution_completed",pr_number="{pr}"}}[{LOOKBACK}])'
+    )
+    if not results:
+        emit({"error": f"No builds found for PR #{pr}"})
+        return
+    outcomes = [r["metric"]["success"] for r in results]
+    total = len(outcomes)
+    passed = outcomes.count("true")
+    is_flaky = 0 < passed < total
+    emit({
+        "pr_number": pr,
+        "total_builds": total,
+        "passed": passed,
+        "failed": total - passed,
+        "success_rate_pct": round(passed / total * 100, 1),
+        "flaky": is_flaky,
+    })
+    if is_flaky:
+        for r in results:
+            m = r["metric"]
+            emit({
+                "build_id": m.get("build_id"),
+                "success": m.get("success"),
+                "pr_sha": m.get("pr_sha"),
+                "duration_s": round(val(r), 1),
+            })
+
+
+def cmd_step_consistency(args):
+    """Step failure consistency across builds for a PR."""
+    pr = require_arg(args, "pr_number")
+    results = vm_query(
+        f'last_over_time(ci_step_duration_seconds{{level="Error",pr_number="{pr}"}}[{LOOKBACK}])'
+    )
+    if not results:
+        emit({"pr_number": pr, "total_failures": 0, "builds_with_failures": 0, "steps": []})
+        return
+    step_counts = Counter(r["metric"]["source"] for r in results)
+    build_ids = set(r["metric"]["build_id"] for r in results)
+    emit({
+        "pr_number": pr,
+        "total_failures": len(results),
+        "builds_with_failures": len(build_ids),
+        "steps": [
+            {"source": step, "count": count}
+            for step, count in step_counts.most_common()
+        ],
+    })
+
+
+# --- Command registry ---
+
+COMMANDS = {
+    "health":             (cmd_health,            "[window]",                       "Health snapshot: success rate, counts, latency"),
+    "top-failing-steps":  (cmd_top_failing_steps, "[window] [limit]",               "Top steps by failure count"),
+    "top-failing-prs":    (cmd_top_failing_prs,   "[window] [limit]",               "Top PRs by failure count"),
+    "list-jobs":          (cmd_list_jobs,          "",                               "List job names with build counts"),
+    "list-prs":           (cmd_list_prs,           "[limit]",                        "List PR numbers with build counts"),
+    "builds-for-pr":      (cmd_builds_for_pr,     "<pr_number>",                    "All builds for a PR"),
+    "build-info":         (cmd_build_info,         "<build_id>",                     "Single build details"),
+    "pr-success-rate":    (cmd_pr_success_rate,    "<pr_number>",                    "Success rate for a PR"),
+    "step-failures":      (cmd_step_failures,      "<build_id>",                     "Failed steps for a build"),
+    "step-timeline":      (cmd_step_timeline,      "<build_id>",                     "All steps sorted by duration"),
+    "step-offsets":       (cmd_step_offsets,        "<build_id>",                     "Step start times (chronological)"),
+    "pod-outcomes":       (cmd_pod_outcomes,        "<build_id>",                     "Pod phase outcomes"),
+    "scheduling-latency": (cmd_scheduling_latency, "<build_id>",                     "Pod scheduling latency"),
+    "error-logs":         (cmd_error_logs,          "<build_id> [limit]",            "Error logs from VictoriaLogs"),
+    "warning-logs":       (cmd_warning_logs,        "<build_id> [limit]",            "Warning logs from VictoriaLogs"),
+    "all-logs":           (cmd_all_logs,            "<build_id> [limit]",            "All logs (context expansion)"),
+    "search-logs":        (cmd_search_logs,         "<build_id> <pattern> [limit]",  "Search logs by regex"),
+    "cross-pr-errors":    (cmd_cross_pr_errors,     "<pattern> [limit]",             "Find error across all builds"),
+    "flakiness":          (cmd_flakiness,           "<pr_number>",                   "Detect flaky pass/fail mix"),
+    "step-consistency":   (cmd_step_consistency,    "<pr_number>",                   "Step failure consistency"),
+}
+
+
+def cmd_help(_args):
+    print("Usage: ci-query <command> [args...]")
+    print()
+    max_name = max(len(n) for n in COMMANDS)
+    max_usage = max(len(u) for _, u, _ in COMMANDS.values())
+    for name in sorted(COMMANDS):
+        _, usage, desc = COMMANDS[name]
+        print(f"  {name:<{max_name}}  {usage:<{max_usage}}  {desc}")
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    if cmd in ("help", "--help", "-h"):
+        cmd_help([])
+        sys.exit(0)
+    if cmd not in COMMANDS:
+        emit_error(f"Unknown command: {cmd}")
+        cmd_help([])
+        sys.exit(1)
+    COMMANDS[cmd][0](sys.argv[2:])
