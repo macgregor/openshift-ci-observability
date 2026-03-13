@@ -282,6 +282,30 @@ transform: groupingToMatrix (columnField: "metric", rowField: "source", valueFie
 ```
 Combines two metrics into one query with a `metric` label, then pivots into columns.
 
+### Variable Queries: label_values vs query_result
+
+`label_values(metric{filters}, label)` is the standard way to populate variable dropdowns, but it does not reliably scope results to the dashboard time range in VictoriaMetrics. The dropdown may show values from outside the visible window, leading to "No data" when users select them.
+
+**Fix:** Use `query_result()` with `[$__range:]` to force time-range scoping:
+
+```
+query_result(group by (pr_number) (count_over_time(metric{filters}[$__range:])))
+```
+
+Add a `regex` field to extract the label value: `/pr_number="([^"]+)"/`
+
+This ensures the dropdown only shows values with data in the visible time range. All dashboards in this project use this pattern.
+
+**Multi-select in LogsQL:** Use `${var:pipe}` formatting to produce `val1|val2` for regex matching: `level:~"${level:pipe}"`. The `:pipe` format also works correctly when "All" is selected (outputs the `allValue`).
+
+### VictoriaLogs Datasource Limitations
+
+The `victoriametrics-logs-datasource` Grafana plugin only supports log queries. It does NOT route `| stats` pipe queries to VL's `stats_query` or `stats_query_range` endpoints. A query like `level:error | stats count() as errors` returns a single log entry with `errors: "38"` as a field, instead of a numeric value usable in stat/timeseries/bar panels.
+
+**Implication:** Stat, timeseries, bar gauge, and table panels cannot use VL stats aggregations. Use the built-in log volume histogram in logs panels for volume-over-time visualization. For stats-based analytics, use VL's HTTP API directly or Grafana Explore.
+
+The VL stats API endpoints work correctly and return Prometheus-compatible formats (`stats_query` returns `vector`, `stats_query_range` returns `matrix`), so this is a plugin limitation rather than a VL limitation.
+
 ### Grafana Variables in PromQL
 
 | Variable | Value | Use |

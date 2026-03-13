@@ -59,3 +59,19 @@ If Chromium isn't in your PATH, set the browser binary path in the hook script o
 chromium-browser --remote-debugging-port=9222 --user-data-dir=$HOME/.chrome-debug-profile
 ```
 
+## Documentation Frontmatter
+
+Appendix docs use YAML frontmatter so AI tools can decide when to load them. Use this template:
+
+```yaml
+---
+name: document-name  # required: lowercase-with-hyphens, max 64 chars
+description: >  # required: when should AI load this? max 1024 chars
+  Clear statement of when AI should load this document.
+categories: [category1, category2]  # optional: broad classification
+tags: [tag1, tag2]  # optional: specific concepts
+related_docs:  # optional: relative paths from project root
+  - path/to/doc.md
+complexity: basic  # optional: basic|intermediate|advanced
+---
+```
