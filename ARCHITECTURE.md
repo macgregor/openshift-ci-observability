@@ -86,7 +86,7 @@ VictoriaMetrics handles deduplication via `-dedup.minScrapeInterval=1ms` flag, w
 
 ### Logs
 
-At the start of each scrape cycle, the scraper queries VictoriaMetrics for all known `build_id` values and skips builds already ingested. A lightweight sentinel metric (`ci_build_scraped`) is pushed after each build is processed, ensuring the build is recognized on subsequent cycles. This eliminates the need for an external state file.
+The scraper skips builds already present in VictoriaMetrics (see State Management below). Metrics deduplication handles any rare duplicate processing from concurrent scraper instances.
 
 ## Operational Modes
 

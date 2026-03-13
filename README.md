@@ -1,6 +1,6 @@
 # OpenShift CI Observability
 
-Scrapes `ci-operator-metrics.json` artifacts from GCS for OpenShift CI builds and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured events) for exploration via Grafana.
+Scrapes CI build artifacts (`ci-operator-metrics.json` and `ci-operator.log`) from GCS for OpenShift CI builds and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured logs) for exploration via Grafana.
 
 ## Quickstart
 
@@ -11,11 +11,11 @@ make up
 
 Open Grafana at http://localhost:3000 (anonymous access, no login required). Historical data (last 90 days) is backfilled automatically. Set `BACKFILL_WINDOW` in `.env` to adjust (e.g. `6m`, `1y`).
 
-Run `make` to see all available commands (`up`, `down`, `restart`, `wipe`, `status`).
+Run `make` to see all available commands.
 
 ## Configuration
 
-All parameters can be set via `.env` for compose or CLI flags for direct execution. The scraper uses env vars as defaults when CLI flags aren't provided. Run `python scraper/scrape.py backfill --help` or `watch --help` for the full list with env var names and defaults.
+All parameters can be set via `.env` for compose or CLI flags for direct execution. The scraper uses env vars as defaults when CLI flags aren't provided. Run `python -m scraper backfill --help` or `watch --help` for the full list with env var names and defaults.
 
 ## Dashboards
 
@@ -25,7 +25,7 @@ Three dashboards are provisioned automatically:
 - **CI Investigation** -- drill into CI failures: identify top failing PRs, compare PR success rate against global baseline, scoped step failure analysis, outlier builds with links to GitHub and Prow, and build-level error logs.
 - **CI Logs** -- browse ci-operator logs by level, PR, build, and source. Each log source gets its own panel to preserve ordering. Use the Level filter to surface errors across all builds.
 
-Each dashboard has a collapsible "Dashboard Guide" row at the top with usage instructions. Use the Job Type and Outcome filters to narrow scope across all panels.
+Each dashboard has a collapsible "Dashboard Guide" row at the top with usage instructions.
 
 ## Service Endpoints
 

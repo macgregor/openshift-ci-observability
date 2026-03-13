@@ -28,7 +28,7 @@ This installs both runtime and test dependencies. Run `make test` to run the tes
 make up
 ```
 
-Run `make` to see all available commands (`up`, `down`, `restart`, `wipe`, `status`).
+Run `make` to see all available commands.
 
 ## Resetting Data
 
