@@ -150,7 +150,8 @@ def cmd_top_failing_prs(args):
 def cmd_list_jobs(args):
     """List job names with build counts."""
     results = vm_query(
-        f"count by (job_name) (last_over_time(ci_build_scraped[{LOOKBACK}]))"
+        f"count by (job_name) (last_over_time("
+        f'{_OUTCOME}{{name="execution_completed"}}[{LOOKBACK}]))'
     )
     for r in sorted(results, key=lambda x: -val(x)):
         emit({"job_name": r["metric"]["job_name"], "build_count": int(val(r))})
@@ -161,7 +162,7 @@ def cmd_list_prs(args):
     limit = int(args[0]) if args else 20
     results = vm_query(
         f"topk({limit}, count by (pr_number) ("
-        f'last_over_time(ci_build_scraped{{pr_number=~".+"}}[{LOOKBACK}])))'
+        f'last_over_time({_OUTCOME}{{name="execution_completed",pr_number=~".+"}}[{LOOKBACK}])))'
     )
     for r in results:
         emit({"pr_number": r["metric"]["pr_number"], "build_count": int(val(r))})
@@ -429,6 +430,38 @@ def cmd_step_consistency(args):
     })
 
 
+def cmd_step_errors(args):
+    """Error logs across builds where a specific step failed."""
+    step = require_arg(args, "step_source")
+    window = args[1] if len(args) > 1 else "24h"
+    max_builds = int(args[2]) if len(args) > 2 else 20
+    # Find builds where this step failed
+    results = vm_query(
+        f'last_over_time(ci_step_duration_seconds{{level="Error",source="{step}"}}[{window}])'
+    )
+    if not results:
+        emit({"error": f"No failures found for step {step} in {window}"})
+        return
+    build_ids = [r["metric"]["build_id"] for r in results]
+    emit({
+        "step": step,
+        "window": window,
+        "builds_with_failure": len(build_ids),
+        "sampling": min(max_builds, len(build_ids)),
+    })
+    # Fetch error logs from a sample of failing builds
+    for bid in build_ids[:max_builds]:
+        entries = vl_query(f'build_id:{bid} AND level:~"(?i)error"', 10)
+        for e in entries:
+            emit({
+                "build_id": bid,
+                "pr_number": e.get("pr_number"),
+                "_time": e.get("_time"),
+                "_msg": e.get("_msg"),
+                "source": e.get("source"),
+            })
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -452,6 +485,7 @@ COMMANDS = {
     "cross-pr-errors":    (cmd_cross_pr_errors,     "<pattern> [limit]",             "Find error across all builds"),
     "flakiness":          (cmd_flakiness,           "<pr_number>",                   "Detect flaky pass/fail mix"),
     "step-consistency":   (cmd_step_consistency,    "<pr_number>",                   "Step failure consistency"),
+    "step-errors":        (cmd_step_errors,         "<step> [window] [max_builds]",  "Error logs across builds where step failed"),
 }
 
 

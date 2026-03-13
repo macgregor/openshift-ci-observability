@@ -265,6 +265,22 @@ ci-query flakiness 3221
 - `flaky: true` with same `pr_sha` = non-deterministic failure (infra or flaky test)
 - `flaky: true` with different `pr_sha` values = author pushed a fix
 
+### `step-errors <step_source> [window] [max_builds]`
+
+Error logs across builds where a specific step failed. First line is a summary, followed by error log entries from a sample of failing builds.
+
+```
+ci-query step-errors steps.projectDirectoryImageBuildStep 7d
+ci-query step-errors steps.clusterClaimStep 24h 10
+```
+
+**Output:** First line: `step`, `window`, `builds_with_failure`, `sampling`. Subsequent lines: `build_id`, `pr_number`, `_time`, `_msg`, `source`.
+
+**Interpretation:**
+- Look for recurring `_msg` patterns across builds to categorize failure modes
+- Error-level logs are often lifecycle events ("event: X Finished"). For root-cause details, follow up with `search-logs <build_id> <pattern>` on specific builds to find diagnostic messages at info/warning level.
+- If all sampled builds show the same error, it's systemic. Mixed errors suggest multiple causes.
+
 ### `step-consistency <pr_number>`
 
 Which steps fail across builds for a PR, and how consistently.
