@@ -35,9 +35,12 @@ Investigate OpenShift CI failures by querying VictoriaMetrics (metrics) and Vict
 - GitHub PR: `https://github.com/{org}/{repo}/pull/{pr_number}`
 
 **References:**
-- CI infrastructure context (job lifecycle, cluster provisioning, resource contention, external tools): @docs/appendix/openshift-ci-infrastructure.md
 - Raw JSON field structure: `docs/appendix/ci-operator-metrics.md`
 - System architecture: `ARCHITECTURE.md`
+
+## CI Infrastructure Context
+
+!`cat docs/appendix/openshift-ci-infrastructure.md`
 
 ## Query Tool
 
@@ -54,7 +57,8 @@ See `query-recipes.md` for detailed usage of each subcommand with interpretation
 | Scope to PR | `builds-for-pr`, `pr-success-rate`, `flakiness` |
 | Scope to build | `build-info`, `step-failures`, `step-timeline` |
 | Root cause | `error-logs`, `warning-logs`, `search-logs`, `step-offsets`, `pod-outcomes`, `scheduling-latency` |
-| Cross-build | `cross-pr-errors`, `step-consistency` |
+| Cross-build | `cross-pr-errors`, `step-consistency`, `error-impact` |
+| Infrastructure | `build-latency` |
 
 ## Key Metrics
 

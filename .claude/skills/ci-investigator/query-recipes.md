@@ -281,6 +281,43 @@ ci-query step-errors steps.clusterClaimStep 24h 10
 - Error-level logs are often lifecycle events ("event: X Finished"). For root-cause details, follow up with `search-logs <build_id> <pattern>` on specific builds to find diagnostic messages at info/warning level.
 - If all sampled builds show the same error, it's systemic. Mixed errors suggest multiple causes.
 
+### `build-latency [window]`
+
+Scheduling latency aggregated by pod location: build cluster (shared CI infrastructure where images are compiled) vs ephemeral cluster (claimed test clusters). Answers "is the build cluster or the test cluster the bottleneck?"
+
+```
+ci-query build-latency
+ci-query build-latency 7d
+```
+
+**Output:** Two JSON lines, one per location (`build_cluster`, `ephemeral_cluster`).
+
+**Output fields:** `location`, `total_pods`, `pods_gt_60s`, `pods_gt_120s`, `avg_latency_s`, `max_latency_s`
+
+**Interpretation:**
+- High `build_cluster` latency with low `ephemeral_cluster` latency = shared CI build infrastructure under pressure (not actionable by the team)
+- High `ephemeral_cluster` latency = claimed clusters are under-resourced or unhealthy
+- `pods_gt_60s / total_pods` gives the fraction of builds paying a significant scheduling tax
+
+### `error-impact <pattern> [window] [limit]`
+
+Count unique builds and PRs affected by a log search pattern. Answers "how widespread is this specific error?" without showing full log messages.
+
+```
+ci-query error-impact 'serviceaccount.*not found' 7d
+ci-query error-impact 'quota exceeded' 24h
+```
+
+**Output:** First line is summary (`pattern`, `window`, `unique_builds`, `unique_prs`). Subsequent lines break down affected builds per PR.
+
+**Output fields (summary):** `pattern`, `window`, `unique_builds`, `unique_prs`
+**Output fields (per-PR):** `pr_number`, `affected_builds`
+
+**Interpretation:**
+- High `unique_prs` relative to total active PRs = systemic issue
+- Most builds concentrated in one PR = likely PR-specific
+- Use `cross-pr-errors` to see the actual error messages once impact is confirmed
+
 ### `step-consistency <pr_number>`
 
 Which steps fail across builds for a PR, and how consistently.

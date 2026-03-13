@@ -430,6 +430,56 @@ def cmd_step_consistency(args):
     })
 
 
+def cmd_build_latency(args):
+    """Scheduling latency aggregated by pod type (build cluster vs ephemeral)."""
+    window = args[0] if args else "7d"
+    # Build pods run on the shared CI build cluster; everything else runs on the ephemeral claimed cluster
+    for label, filter_expr in [
+        ("build_cluster", 'pod_name=~".*-build"'),
+        ("ephemeral_cluster", 'pod_name!~".*-build"'),
+    ]:
+        results = vm_query(
+            f"last_over_time(ci_pod_scheduling_latency_seconds{{{filter_expr}}}[{window}])"
+        )
+        if not results:
+            emit({"location": label, "total_pods": 0})
+            continue
+        latencies = [val(r) for r in results]
+        emit({
+            "location": label,
+            "total_pods": len(latencies),
+            "pods_gt_60s": sum(1 for l in latencies if l > 60),
+            "pods_gt_120s": sum(1 for l in latencies if l > 120),
+            "avg_latency_s": round(sum(latencies) / len(latencies), 1),
+            "max_latency_s": round(max(latencies), 1),
+        })
+
+
+def cmd_error_impact(args):
+    """Count unique builds and PRs affected by a log search pattern."""
+    pattern = require_arg(args, "pattern")
+    window = args[1] if len(args) > 1 else "7d"
+    limit = int(args[2]) if len(args) > 2 else 500
+    entries = vl_query(f'_time:{window} AND _msg:~"{pattern}"', limit)
+    builds = {}
+    for e in entries:
+        bid = e.get("build_id", "")
+        if bid and bid not in builds:
+            builds[bid] = e.get("pr_number", "")
+    prs = set(pr for pr in builds.values() if pr)
+    emit({
+        "pattern": pattern,
+        "window": window,
+        "unique_builds": len(builds),
+        "unique_prs": len(prs),
+    })
+    # Group by PR for summary
+    pr_counts = Counter(builds.values())
+    for pr, count in pr_counts.most_common():
+        if pr:
+            emit({"pr_number": pr, "affected_builds": count})
+
+
 def cmd_step_errors(args):
     """Error logs across builds where a specific step failed."""
     step = require_arg(args, "step_source")
@@ -486,6 +536,8 @@ COMMANDS = {
     "flakiness":          (cmd_flakiness,           "<pr_number>",                   "Detect flaky pass/fail mix"),
     "step-consistency":   (cmd_step_consistency,    "<pr_number>",                   "Step failure consistency"),
     "step-errors":        (cmd_step_errors,         "<step> [window] [max_builds]",  "Error logs across builds where step failed"),
+    "build-latency":      (cmd_build_latency,       "[window]",                      "Scheduling latency: build cluster vs ephemeral"),
+    "error-impact":       (cmd_error_impact,         "<pattern> [window] [limit]",    "Count builds/PRs affected by a log pattern"),
 }
 
 

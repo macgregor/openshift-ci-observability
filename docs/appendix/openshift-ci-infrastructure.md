@@ -9,7 +9,6 @@ tags: [openshift-ci, prow, ci-operator, cluster-pools, hive, boskos]
 related_docs:
   - docs/appendix/ci-operator-metrics.md
   - docs/appendix/gcs-bucket-layout.md
-  - docs/plans/strategic-initiative.md
 complexity: intermediate
 ---
 
@@ -17,7 +16,7 @@ complexity: intermediate
 
 Context for interpreting CI metrics and logs within the OpenShift CI platform. This document covers the structural elements of the CI system that produce the data we observe -- job lifecycle, cluster provisioning, resource management, and where to look for more information.
 
-Source: distilled from [docs/plans/strategic-initiative.md](../plans/strategic-initiative.md) and OpenShift CI documentation. The strategic initiative contains ODH-operator-specific analysis; this appendix captures the general CI infrastructure knowledge useful for any investigation.
+Source: distilled from OpenShift CI documentation.
 
 ## CI Platform Overview
 
