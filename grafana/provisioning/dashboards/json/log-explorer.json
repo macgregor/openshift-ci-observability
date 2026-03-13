@@ -3,7 +3,7 @@
   "title": "CI Logs",
   "timezone": "utc",
   "refresh": "",
-  "time": { "from": "now-24h", "to": "now" },
+  "time": { "from": "now-7d", "to": "now" },
   "templating": {
     "list": [
       {
