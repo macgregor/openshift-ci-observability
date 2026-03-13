@@ -41,27 +41,89 @@ pr-logs/pull/{org}_{repo}/{pr_number}/{job_name}/{build_id}/
 pr-logs/pull/opendatahub-io_opendatahub-operator/3260/pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e/2032076068386508800/artifacts/ci-operator-metrics.json
 ```
 
-## Key Files at Build Level
+## Build Directory Contents
 
-Each build directory contains the following key files:
+Each build directory (`{build_path}/`) contains Prow-produced metadata and an `artifacts/` subdirectory with ci-operator output.
 
-### started.json
+### Build-level files
 
-Small JSON file containing build start information, including a Unix timestamp. Used for date filtering.
+```
+{build_path}/
+├── started.json            # start timestamp, PR info, repo refs
+├── finished.json           # end timestamp, pass/fail, metadata
+├── build-log.txt           # raw ci-operator stdout/stderr (text)
+├── podinfo.json            # full Prow pod spec (K8s Pod JSON)
+├── prowjob.json            # full ProwJob custom resource (K8s JSON)
+├── prowjob_junit.xml       # overall job timeout test result (JUnit)
+├── sidecar-logs.json       # Prow sidecar logs: artifact censoring and upload (JSON lines)
+└── artifacts/              # ci-operator produced artifacts (see below)
+```
 
-**Location:** `{build_path}/started.json`
+- **`started.json`** — contains a Unix `timestamp` used for date-range filtering, plus PR number and repo commit refs. This is the first file fetched per build.
+- **`finished.json`** — contains a `passed` boolean, end `timestamp`, and metadata including the work namespace and pod name.
+- **`build-log.txt`** — unstructured text log of the entire ci-operator run. Typically 10-50KB.
+- **`podinfo.json`** — full K8s Pod JSON for the Prow job pod, including labels, resource requests, and container specs. Typically 50-100KB.
+- **`prowjob.json`** — full ProwJob custom resource with job config, refs, and status. Typically 5-15KB.
+- **`prowjob_junit.xml`** — single-testcase JUnit XML recording whether the job completed before its timeout.
+- **`sidecar-logs.json`** — JSON lines from the Prow sidecar process that handles artifact upload and secret censoring. Small.
 
-### finished.json
+### Artifact directory
 
-Contains build completion status and metadata.
+```
+{build_path}/artifacts/
+├── ci-operator.log                  # structured JSON log (scraped)
+├── ci-operator-metrics.json         # structured metrics (scraped)
+├── ci-operator-step-graph.json      # step execution DAG (JSON)
+├── junit_operator.xml               # JUnit results from ci-operator
+├── metadata.json                    # repo/commit metadata
+├── build-logs/                      # per-image container build logs
+│   └── {image-name}.log            #   one text log per built image
+├── build-resources/                 # K8s resource snapshots (JSON)
+│   ├── builds.json
+│   ├── events.json
+│   ├── imagestreams.json
+│   ├── pods.json
+│   └── ...                         #   also: clusterClaim, clusterDeployment, templateinstances
+├── release/                         # release image import step
+│   ├── build-log.txt
+│   ├── finished.json
+│   ├── sidecar-logs.json
+│   └── artifacts/
+│       └── release-images-*         #   imported release image metadata
+└── {test-name}/                     # one per test container (e.g. opendatahub-operator-e2e)
+    ├── {step}/                      #   each step (e2e, install, ipi-install-rbac, ...)
+    │   ├── build-log.txt            #     step execution log (text)
+    │   ├── finished.json            #     step completion status
+    │   ├── sidecar-logs.json        #     sidecar logs for this step
+    │   └── artifacts/               #     step-produced artifacts (optional)
+    │       └── junit_report.xml     #       JUnit results from this step
+    ├── gather-extra/                #   cluster state dump post-test
+    │   ├── build-log.txt
+    │   ├── finished.json
+    │   ├── sidecar-logs.json
+    │   └── artifacts/               #     K8s resource dumps + diagnostics
+    │       ├── *.json               #       events, pods, nodes, configmaps, etc.
+    │       ├── audit_logs/
+    │       ├── inspect/
+    │       ├── network/
+    │       ├── nodes/
+    │       └── oc_cmds/
+    ├── gather-audit-logs/           #   audit log collection step
+    └── gather-must-gather/          #   must-gather collection step
+```
 
-**Location:** `{build_path}/finished.json`
+**Currently scraped:**
+- **`ci-operator-metrics.json`** — JSON with sections for events, pods, nodes, openshift_builds, images, leases, and test_platform_insights. Each section is an array of entries with numeric metrics and string labels. Typically 5-100KB. See [ci-operator-metrics.md](ci-operator-metrics.md) for the field reference.
+- **`ci-operator.log`** — JSON lines, one entry per log statement from ci-operator. Fields include `time`, `msg`, `level` (info/debug/error/warning/trace), and `component`. Typically 40-600KB.
 
-### ci-operator-metrics.json
-
-Rich structured metrics file containing detailed information about the CI run. This is the primary file ingested by this scraper.
-
-**Location:** `{build_path}/artifacts/ci-operator-metrics.json`
+**Available for future use:**
+- **`ci-operator-step-graph.json`** — DAG of step dependencies with execution status. Typically 50-150KB. Useful for visualizing pipeline structure and step ordering.
+- **`junit_operator.xml`** — JUnit XML aggregating test results from ci-operator-managed steps. Typically 2-10KB.
+- **`metadata.json`** — repo, commit, work namespace, and pod name. Small.
+- **`build-logs/{image}.log`** — text build output for each container image built by ci-operator. One file per image (e.g., `src-amd64.log`, `opendatahub-operator-bundle.log`).
+- **`build-resources/`** — JSON snapshots of K8s resources in the ci-operator work namespace at completion: builds, events, imagestreams, pods, clusterClaim, clusterDeployment, templateinstances. Useful for debugging resource-level failures.
+- **`{test-name}/{step}/artifacts/junit_report.xml`** — per-step JUnit results. The `e2e` step's JUnit is typically the richest, containing individual test case pass/fail.
+- **`{test-name}/gather-extra/artifacts/`** — post-test cluster diagnostics. Contains JSON dumps of cluster resources (events, pods, nodes, configmaps, CSVs, etc.), audit logs, and `oc` command output. Can be very large (10-30MB for the full gather).
 
 ## XML API Navigation
 

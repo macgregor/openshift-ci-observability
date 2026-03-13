@@ -1,7 +1,7 @@
 # OpenShift CI Observability
 
 ## Key files
-- `scraper/scrape.py` -- single-file scraper: GCS navigation, metric/log conversion, VM/VL ingestion
+- `scraper/` -- scraper package (see ARCHITECTURE.md for domain model)
 - `podman-compose.yml` -- service orchestration (VM, VL, Grafana, scraper-watch, scraper-backfill)
 - `Containerfile.scraper` -- scraper container image
 
@@ -21,15 +21,15 @@
 - Navigate to the dashboard URL, wait for panels to load, and screenshot to confirm panels render with actual data.
 
 ## Conventions
-- Single-file scraper -- all logic in scrape.py, no package structure
 - Prometheus text exposition format for metrics, JSON lines for logs
 - GCS XML API (not JSON API) for bucket listing
-- State file tracks ingested build_ids to prevent duplicates
+- VictoriaMetrics tracks ingested build_ids via sentinel metric (no state file)
 - Generic metric extraction: every numeric field becomes a metric
 - Known transforms and canonical aliases are opt-in enhancements
 
 ## Testing
-- Dry-run mode: `python scraper/scrape.py backfill --dry-run --window 2d`
+- Unit tests: `make test`
+- Dry-run mode: `python -m scraper backfill --dry-run --window 2d`
 - Full stack: `podman-compose up -d` then check Grafana at localhost:3000
 
 ## YAML Frontmatter Template

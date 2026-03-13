@@ -31,7 +31,7 @@ The scraper discovers CI builds for a specific repo via the GCS XML API:
 2. **Job Enumeration**: Within each PR, list job directories
 3. **Build Enumeration**: Within each job, list build directories
 4. **Date Filtering**: Read `started.json` from each build to filter by the `--window` range
-5. **Metric Extraction**: Parse `ci-operator-metrics.json` from qualifying builds
+5. **Artifact Processing**: For each qualifying build, run registered pipelines (metrics, logs) against the build's artifacts
 
 ### Metric Conversion
 
@@ -45,14 +45,29 @@ Metrics are converted to Prometheus text exposition format:
 
 Metrics are pushed to VictoriaMetrics via remote-write protocol.
 
-### Log Conversion
+### Log Ingestion
 
-Logs are converted to JSON lines format with two layers:
+The scraper fetches `ci-operator.log` from each build's artifact directory. This file contains structured JSON lines emitted by the ci-operator process during execution. Each line is parsed independently:
 
-- **Layer 1 (Raw JSON)**: The entire `ci-operator-metrics.json` as a single log entry
-- **Layer 2 (Structured)**: Per-entry logs for each item in each section (events, pods, nodes, etc.) with scalar fields flattened
+- **Time and message** are extracted as `_time` and `_msg` fields
+- **Scalar fields** (level, component, and other string/numeric/bool values) are flattened into the log entry
+- **Job labels** from the build's `ci-operator-metrics.json` are merged into each log entry, providing consistent queryability across metrics and logs. Labels take precedence over log fields with the same name.
 
-Logs are pushed to VictoriaLogs via JSON lines ingestion.
+Logs are pushed to VictoriaLogs as JSON lines with `_stream_fields=job_name,build_id`.
+
+## Domain Model
+
+The scraper is built around a pipeline architecture with four core entities:
+
+- **Pipeline**: A named processor that takes a `BuildContext` and produces records for a sink. Each pipeline targets a specific artifact (e.g., `MetricsPipeline` processes `ci-operator-metrics.json`, `LogPipeline` processes `ci-operator.log`). Adding a new scrape target means writing a new Pipeline and registering it in the CLI wiring.
+
+- **Sink**: A destination for records. Sinks handle batching and HTTP transport. `VictoriaMetricsSink` pushes Prometheus text format to VictoriaMetrics. `VictoriaLogsSink` pushes JSON lines to VictoriaLogs.
+
+- **BuildContext**: A per-build facade that provides lazy artifact fetching (with caching) and label extraction. Pipelines access build artifacts and job labels through the context without needing to know about GCS paths or label parsing.
+
+- **Scraper**: The orchestrator that discovers builds via GCS, filters by date range, skips builds already in VictoriaMetrics, creates a `BuildContext` for each qualifying build, and runs all registered pipelines. Pipeline failures are caught per-pipeline so all pipelines get a chance to run.
+
+Components are composed at startup: the CLI creates a session, GCS client, sinks, pipelines, and scraper, then calls `scraper.scrape()`.
 
 ## Portability Design
 
@@ -71,11 +86,11 @@ VictoriaMetrics handles deduplication via `-dedup.minScrapeInterval=1ms` flag, w
 
 ### Logs
 
-Deduplication is handled at the scraper level via the state file -- builds already recorded are skipped entirely. See State Management below.
+At the start of each scrape cycle, the scraper queries VictoriaMetrics for all known `build_id` values and skips builds already ingested. A lightweight sentinel metric (`ci_build_scraped`) is pushed after each build is processed, ensuring the build is recognized on subsequent cycles. This eliminates the need for an external state file.
 
 ## Operational Modes
 
-The scraper runs as two compose services sharing a state volume:
+The scraper runs as two compose services:
 
 ### scraper-watch (Continuous Polling)
 
@@ -93,15 +108,8 @@ The scraper runs as two compose services sharing a state volume:
 
 ## State Management
 
-Build processing state is tracked via a JSON file:
+Build processing state is stored in VictoriaMetrics itself. The scraper queries for known `build_id` values at the start of each cycle and pushes a `ci_build_scraped` sentinel metric after processing each build. This means:
 
-```json
-{
-  "build_id_1": "2024-01-01T00:00:00Z",
-  "build_id_2": "2024-01-01T01:00:00Z"
-}
-```
-
-- **Concurrent Access**: `fcntl.flock` provides file-level locking
-- **Atomic Updates**: State is written atomically to prevent corruption
-- **Idempotency**: Builds can be reprocessed safely; deduplication occurs at the storage layer
+- **No external state**: no state file, no shared volume between scraper instances
+- **Self-healing**: if VictoriaMetrics data is wiped, builds are automatically re-ingested
+- **Idempotency**: builds can be reprocessed safely; VictoriaMetrics deduplicates identical data points

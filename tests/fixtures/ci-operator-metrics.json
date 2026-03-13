@@ -1,0 +1,1680 @@
+{
+  "events": [
+    {
+      "level": "Info",
+      "source": "steps.inputImageTagStep",
+      "locator": {
+        "type": "Step",
+        "name": "[input:root]",
+        "keys": {
+          "objects": [
+            {
+              "kind": "ImageStreamTag",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline:operator-sdk",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            },
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "release",
+              "uid": "5176ffe9-a9c5-4f98-a556-0d8e91c566e5"
+            },
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "stable-latest-opendatahub-operator-e2e",
+              "uid": "bdd3ca23-eb1c-4cf4-b409-8bf442b630b4"
+            },
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            },
+            {
+              "kind": "Role",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "ci-operator-image",
+              "uid": "980e9916-9223-4203-9d5b-7a9c49481f38"
+            },
+            {
+              "kind": "RoleBinding",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "ci-operator-image",
+              "uid": "e0e74316-8f64-433f-8e2f-e9d2d62554a4"
+            },
+            {
+              "kind": "ImageStreamImport",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "release",
+              "uid": "832f9dad-78f9-4eea-b658-1f7f6ef4c4e7"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "release-images-latest-opendatahub-operator-e2e-cli",
+              "uid": "fff87023-2c14-4206-a690-d2a88f469179"
+            },
+            {
+              "kind": "ServiceAccount",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "ci-operator",
+              "uid": "ca27d60b-e842-4758-97b8-970d2f412219"
+            }
+          ],
+          "stepName": "[input:root]"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Find the input image root and tag it into the pipeline",
+        "annotations": {
+          "duration_seconds": 4.137730189,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:51:28.231885892Z",
+      "to": "2026-03-11T23:51:32.369616081Z",
+      "timestamp": "2026-03-11T23:51:32.369639539Z"
+    },
+    {
+      "level": "Info",
+      "source": "steps.inputImageTagStep",
+      "locator": {
+        "type": "Step",
+        "name": "[input:operator-sdk]",
+        "keys": {
+          "objects": [
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            }
+          ],
+          "stepName": "[input:operator-sdk]"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Find the input image operator-sdk and tag it into the pipeline",
+        "annotations": {
+          "duration_seconds": 4.138912558,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:51:28.231855392Z",
+      "to": "2026-03-11T23:51:32.37076795Z",
+      "timestamp": "2026-03-11T23:51:32.370782021Z"
+    },
+    {
+      "level": "Info",
+      "source": "steps.inputImageTagStep",
+      "locator": {
+        "type": "Step",
+        "name": "[input:ubi]",
+        "keys": {
+          "objects": [
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            }
+          ],
+          "stepName": "[input:ubi]"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Find the input image ubi and tag it into the pipeline",
+        "annotations": {
+          "duration_seconds": 4.139334247,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:51:28.23191944Z",
+      "to": "2026-03-11T23:51:32.371253687Z",
+      "timestamp": "2026-03-11T23:51:32.371260934Z"
+    },
+    {
+      "level": "Info",
+      "source": "steps.sourceStep",
+      "locator": {
+        "type": "Step",
+        "name": "src",
+        "keys": {
+          "objects": [
+            {
+              "kind": "ImageStreamTag",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline:root",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            },
+            {
+              "kind": "ImageStreamTag",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "stable-latest-opendatahub-operator-e2e:cli",
+              "uid": "bdd3ca23-eb1c-4cf4-b409-8bf442b630b4"
+            },
+            {
+              "kind": "Build",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "src-amd64",
+              "uid": "4ff31b51-5cda-4262-a1ea-bcf4b0ce99ff"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "release-images-latest-opendatahub-operator-e2e-cli",
+              "uid": "fff87023-2c14-4206-a690-d2a88f469179"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "src-amd64-build",
+              "uid": "25f04c9d-759c-4087-8708-e620bc578701"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "release-images-latest-opendatahub-operator-e2e",
+              "uid": "abea5fee-aed4-4de5-b8d3-991f8006e4cb"
+            },
+            {
+              "kind": "ConfigMap",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "release-release-images-latest-opendatahub-operator-e2e",
+              "uid": "6ce000c5-6f77-4cff-ac6f-ca88f0e61711"
+            },
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "stable-latest-opendatahub-operator-e2e",
+              "uid": "bdd3ca23-eb1c-4cf4-b409-8bf442b630b4"
+            }
+          ],
+          "stepName": "src"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Clone the correct source code into an image and tag it as src",
+        "annotations": {
+          "duration_seconds": 116.496953477,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:51:32.369650185Z",
+      "to": "2026-03-11T23:53:28.866603662Z",
+      "timestamp": "2026-03-11T23:53:28.866646729Z"
+    },
+    {
+      "level": "Info",
+      "source": "release.importReleaseStep",
+      "locator": {
+        "type": "Step",
+        "name": "[release:latest-opendatahub-operator-e2e]",
+        "keys": {
+          "objects": [
+            {
+              "kind": "Image",
+              "namespace": "",
+              "name": "sha256:6db79723cb56945fec99f0e1cf4438a3487296940655be1cefb2620d291aea59",
+              "uid": "95a3c219-162e-4c87-9e1e-dd76d6b4f70c"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-amd64-build",
+              "uid": "83ffaa89-3fe6-4a80-a51a-04b7e0548ac7"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-rhoai-amd64-build",
+              "uid": "c4713746-114a-4bb1-b5c5-d9784ad40b4f"
+            },
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "stable-latest-opendatahub-operator-e2e",
+              "uid": "bdd3ca23-eb1c-4cf4-b409-8bf442b630b4"
+            },
+            {
+              "kind": "ImageStreamTag",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline:src",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            }
+          ],
+          "stepName": "[release:latest-opendatahub-operator-e2e]"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Import the release payload \"latest-opendatahub-operator-e2e\" from an external source",
+        "annotations": {
+          "duration_seconds": 212.24904947,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:51:28.231700524Z",
+      "to": "2026-03-11T23:55:00.480749994Z",
+      "timestamp": "2026-03-11T23:55:00.480803861Z"
+    },
+    {
+      "level": "Info",
+      "source": "steps.projectDirectoryImageBuildStep",
+      "locator": {
+        "type": "Step",
+        "name": "opendatahub-operator-rhoai",
+        "keys": {
+          "objects": [
+            {
+              "kind": "Build",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-rhoai-amd64",
+              "uid": "c568233c-49da-445e-a765-772d552ecb91"
+            }
+          ],
+          "stepName": "opendatahub-operator-rhoai"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Build image opendatahub-operator-rhoai from the repository",
+        "annotations": {
+          "duration_seconds": 241.477563223,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:53:28.866728584Z",
+      "to": "2026-03-11T23:57:30.344291807Z",
+      "timestamp": "2026-03-11T23:57:30.344318357Z"
+    },
+    {
+      "level": "Info",
+      "source": "steps.projectDirectoryImageBuildStep",
+      "locator": {
+        "type": "Step",
+        "name": "opendatahub-operator",
+        "keys": {
+          "objects": [
+            {
+              "kind": "Build",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-amd64",
+              "uid": "0afe9403-e2a6-4873-b794-4f5b85ed1bb1"
+            }
+          ],
+          "stepName": "opendatahub-operator"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Build image opendatahub-operator from the repository",
+        "annotations": {
+          "duration_seconds": 260.306221837,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:53:28.866746179Z",
+      "to": "2026-03-11T23:57:49.172968016Z",
+      "timestamp": "2026-03-11T23:57:49.172990232Z"
+    },
+    {
+      "level": "Info",
+      "source": "steps.bundleSourceStep",
+      "locator": {
+        "type": "Step",
+        "name": "src-bundle",
+        "keys": {
+          "objects": [
+            {
+              "kind": "Build",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "src-bundle",
+              "uid": "8600264d-fee7-4609-81f2-4e0cb09eb2e1"
+            },
+            {
+              "kind": "ImageStreamTag",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline:src",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            },
+            {
+              "kind": "Image",
+              "namespace": "",
+              "name": "sha256:6db79723cb56945fec99f0e1cf4438a3487296940655be1cefb2620d291aea59",
+              "uid": "95a3c219-162e-4c87-9e1e-dd76d6b4f70c"
+            },
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "src-bundle-build",
+              "uid": "aed253ba-bb60-4ea8-be91-ee2d7f0355f2"
+            }
+          ],
+          "stepName": "src-bundle"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Build image src-bundle from the repository",
+        "annotations": {
+          "duration_seconds": 69.074075916,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:57:49.173059467Z",
+      "to": "2026-03-11T23:58:58.247135383Z",
+      "timestamp": "2026-03-11T23:58:58.24717675Z"
+    },
+    {
+      "level": "Info",
+      "source": "steps.projectDirectoryImageBuildStep",
+      "locator": {
+        "type": "Step",
+        "name": "opendatahub-operator-bundle",
+        "keys": {
+          "objects": [
+            {
+              "kind": "ImageStreamTag",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline:src-bundle",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            },
+            {
+              "kind": "Pod",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-bundle-build",
+              "uid": "80040a20-4d7c-45af-aea4-abf5cc76a1bc"
+            },
+            {
+              "kind": "Build",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-bundle",
+              "uid": "b652521b-acbd-4d39-98ac-7b47be8a8928"
+            }
+          ],
+          "stepName": "opendatahub-operator-bundle"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "",
+        "humanMessage": "Build image opendatahub-operator-bundle from the repository",
+        "annotations": {
+          "duration_seconds": 181.847786821,
+          "success": true
+        }
+      },
+      "from": "2026-03-11T23:58:58.247254152Z",
+      "to": "2026-03-12T00:02:00.095040973Z",
+      "timestamp": "2026-03-12T00:02:00.09508163Z"
+    },
+    {
+      "level": "Error",
+      "source": "steps.clusterClaimStep",
+      "locator": {
+        "type": "Step",
+        "name": "opendatahub-operator-e2e",
+        "keys": {
+          "objects": [
+            {
+              "kind": "ConfigMap",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e-commands",
+              "uid": "0ed27b1c-d1fb-4ec1-9523-d10d8c8074fd"
+            },
+            {
+              "kind": "ServiceAccount",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e",
+              "uid": "a689e240-ed7e-478a-b5ae-af7084e9f77b"
+            },
+            {
+              "kind": "Role",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e",
+              "uid": "db1430b5-aac8-4ad3-a80a-f8febbd65f2f"
+            },
+            {
+              "kind": "RoleBinding",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e-view",
+              "uid": "6cd15ef6-6f64-4c40-86c1-c14451825f9b"
+            },
+            {
+              "kind": "RoleBinding",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e",
+              "uid": "2dbe1589-438d-4f64-b71f-fb1436792b2d"
+            },
+            {
+              "kind": "ImageStream",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "pipeline",
+              "uid": "0fe28bda-5acf-4989-a2c9-9b762708edd9"
+            },
+            {
+              "kind": "Secret",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e-hive-admin-kubeconfig",
+              "uid": "a4999f42-6a89-4eba-9b4e-ae43f7fe8084"
+            },
+            {
+              "kind": "Secret",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e-hive-admin-password",
+              "uid": "21c47362-aae4-4d13-9d85-17eaacc410d1"
+            },
+            {
+              "kind": "Secret",
+              "namespace": "ci-op-vn1stn6b",
+              "name": "opendatahub-operator-e2e",
+              "uid": "fae1b2fb-5532-4b09-953d-eff27736552d"
+            }
+          ],
+          "stepName": "opendatahub-operator-e2e"
+        }
+      },
+      "message": {
+        "reason": "Finished",
+        "cause": "\"opendatahub-operator-e2e\" test steps failed: \"opendatahub-operator-e2e\" pod \"opendatahub-operator-e2e-e2e\" failed: could not watch pod: the pod ci-op-vn1stn6b/opendatahub-operator-e2e-e2e failed after 39m56s (failed containers: test): ContainerFailed one or more containers exited\n\nContainer test exited with code 2, reason Error\n---\nls\": \u003cmap[string]interface {} | len:4\u003e{\n                                            \".\": \u003cmap[string]interface {} | len:0\u003e{},\n                                            \"f:kubernetes.io/metadata.name\": \u003cmap[string]interface {} | len:0\u003e{},\n                                            \"f:opendatahub.io/generated-namespace\": \u003cmap[string]interface {} | len:0\u003e{},\n                                            \"f:pod-security.kubernetes.io/enforce\": \u003cmap[string]interface {} | len:0\u003e{},\n                                        },\n                                    },\n                                },\n                            },\n                        ],\n                        \"name\": \u003cstring\u003e\"opendatahub\",\n                        \"uid\": \u003cstring\u003e\"75bdcff9-bd51-4276-bb21-4c8b4a405c46\",\n                        \"resourceVersion\": \u003cstring\u003e\"72123\",\n                        \"creationTimestamp\": \u003cstring\u003e\"2026-03-12T00:30:24Z\",\n                    },\n                    \"spec\": \u003cmap[string]interface {} | len:1\u003e{\n                        \"finalizers\": \u003c[]interface {} | len:1, cap:1\u003e[\u003cstring\u003e\"kubernetes\"],\n                    },\n                    \"status\": \u003cmap[string]interface {} | len:1\u003e{\n                        \"phase\": \u003cstring\u003e\"Terminating\",\n                    },\n                },\n            }\n        to be nil\n--- FAIL: TestOdhOperator (300.58s)\nFAIL\nFAIL\tgithub.com/opendatahub-io/opendatahub-operator/v2/tests/e2e\t300.637s\nRetry 3: 0 passed, 1 failed, 0 skipped\nJUnit XML exported to /logs/artifacts/junit_report.xml\n❌ Final result: 1 tests still failing after 3 retries\n  - TestOdhOperator\nError: 1 tests failed after retries\nexit status 1\nmake: *** [Makefile:666: e2e-test] Error 1\n{\"component\":\"entrypoint\",\"error\":\"wrapped process failed: exit status 2\",\"file\":\"sigs.k8s.io/prow/pkg/entrypoint/run.go:84\",\"func\":\"sigs.k8s.io/prow/pkg/entrypoint.Options.internalRun\",\"level\":\"error\",\"msg\":\"Error executing test process\",\"severity\":\"error\",\"time\":\"2026-03-12T01:07:11Z\"}\nerror: failed to execute wrapped command: exit status 2\n---\nLink to step on registry info site: https://steps.ci.openshift.org/reference/e2e\nLink to job on registry info site: https://steps.ci.openshift.org/job?org=opendatahub-io\u0026repo=opendatahub-operator\u0026branch=main\u0026test=opendatahub-operator-e2e",
+        "humanMessage": "Run multi-stage test opendatahub-operator-e2e",
+        "annotations": {
+          "duration_seconds": 4472.525887124,
+          "success": false
+        }
+      },
+      "from": "2026-03-12T00:02:00.095228609Z",
+      "to": "2026-03-12T01:16:32.621115733Z",
+      "timestamp": "2026-03-12T01:16:32.621266648Z"
+    }
+  ],
+  "images": [
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "pipeline",
+      "full_name": "ci-op-vn1stn6b/pipeline",
+      "success": true,
+      "additional_context": {
+        "created": false
+      },
+      "timestamp": "2026-03-11T23:51:28.196429472Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "release",
+      "full_name": "ci-op-vn1stn6b/release",
+      "success": true,
+      "additional_context": {
+        "created": true
+      },
+      "timestamp": "2026-03-11T23:51:28.474946219Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "stable-latest-opendatahub-operator-e2e",
+      "full_name": "ci-op-vn1stn6b/stable-latest-opendatahub-operator-e2e",
+      "success": true,
+      "additional_context": {
+        "created": true
+      },
+      "timestamp": "2026-03-11T23:51:28.481868332Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "release",
+      "tag_name": "latest-opendatahub-operator-e2e",
+      "full_tag_name": "ci-op-vn1stn6b/release:latest-opendatahub-operator-e2e",
+      "source_image": "quay.io/openshift-release-dev/ocp-release:4.19.25-multi",
+      "source_image_kind": "DockerImage",
+      "start_time": "2026-03-11T23:51:28.772225238Z",
+      "completion_time": "2026-03-11T23:51:29.859392189Z",
+      "duration_seconds": 1.087166948,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:51:29.859393414Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "pipeline",
+      "tag_name": "root",
+      "full_tag_name": "ci-op-vn1stn6b/pipeline:root",
+      "source_image": "",
+      "source_image_kind": "",
+      "start_time": "2026-03-11T23:51:28.26567367Z",
+      "completion_time": "2026-03-11T23:51:32.369545116Z",
+      "duration_seconds": 4.103871633,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:51:32.369546746Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "pipeline",
+      "tag_name": "root",
+      "full_tag_name": "ci-op-vn1stn6b/pipeline:root",
+      "source_image": "quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.21",
+      "source_image_kind": "DockerImage",
+      "start_time": "2026-03-11T23:51:28.265672088Z",
+      "completion_time": "2026-03-11T23:51:32.369612627Z",
+      "duration_seconds": 0,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:51:32.369613187Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "pipeline",
+      "tag_name": "operator-sdk",
+      "full_tag_name": "ci-op-vn1stn6b/pipeline:operator-sdk",
+      "source_image": "",
+      "source_image_kind": "",
+      "start_time": "2026-03-11T23:51:28.275075058Z",
+      "completion_time": "2026-03-11T23:51:32.370680119Z",
+      "duration_seconds": 4.095605087,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:51:32.370681108Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "pipeline",
+      "tag_name": "operator-sdk",
+      "full_tag_name": "ci-op-vn1stn6b/pipeline:operator-sdk",
+      "source_image": "quay-proxy.ci.openshift.org/openshift/ci:origin_4.19_operator-sdk",
+      "source_image_kind": "DockerImage",
+      "start_time": "2026-03-11T23:51:28.275073496Z",
+      "completion_time": "2026-03-11T23:51:32.370765403Z",
+      "duration_seconds": 0,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:51:32.370766167Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "pipeline",
+      "tag_name": "ubi",
+      "full_tag_name": "ci-op-vn1stn6b/pipeline:ubi",
+      "source_image": "",
+      "source_image_kind": "",
+      "start_time": "2026-03-11T23:51:28.263884253Z",
+      "completion_time": "2026-03-11T23:51:32.371204307Z",
+      "duration_seconds": 4.10732007,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:51:32.371206687Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "pipeline",
+      "tag_name": "ubi",
+      "full_tag_name": "ci-op-vn1stn6b/pipeline:ubi",
+      "source_image": "quay-proxy.ci.openshift.org/openshift/ci:ocp_ubi-minimal_9",
+      "source_image_kind": "DockerImage",
+      "start_time": "2026-03-11T23:51:28.263881898Z",
+      "completion_time": "2026-03-11T23:51:32.371251707Z",
+      "duration_seconds": 0,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:51:32.37125223Z"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "image_stream_name": "stable-latest-opendatahub-operator-e2e",
+      "tag_name": "latest-opendatahub-operator-e2e",
+      "full_tag_name": "ci-op-vn1stn6b/stable-latest-opendatahub-operator-e2e:latest-opendatahub-operator-e2e",
+      "source_image": "quay.io/openshift-release-dev/ocp-release:4.19.25-multi",
+      "source_image_kind": "DockerImage",
+      "start_time": "2026-03-11T23:51:28.475048848Z",
+      "completion_time": "2026-03-11T23:55:00.480697687Z",
+      "duration_seconds": 0,
+      "retry_count": 0,
+      "success": true,
+      "timestamp": "2026-03-11T23:55:00.480699645Z"
+    }
+  ],
+  "leases": [],
+  "nodes": [
+    {
+      "node": "build04-g4f6n-ci-longtests-worker-a-v6jt2",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "32efe95ccc527ae66d323b6c750aa957",
+      "age_seconds": 4766,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32856988Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608860Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 328,
+        "max_cpu_milli": 328,
+        "avg_cpu_milli": 328,
+        "min_memory_bytes": 5490298880,
+        "max_memory_bytes": 5490298880,
+        "avg_memory_bytes": 5490298880
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "longtests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-a",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-longtests-worker-a-v6jt2",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-a",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-a"
+      },
+      "timestamp": "2026-03-11T23:51:36.162712166Z",
+      "poll_started": "2026-03-11T23:51:34.906689694Z",
+      "workloads": [
+        "release-images-latest-opendatahub-operator-e2e-cli"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-11T23:51:34.906689694Z",
+          "end_time": "2026-03-11T23:51:36.162712228Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-longtests-worker-a-v6jt2",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "32efe95ccc527ae66d323b6c750aa957",
+      "age_seconds": 4779,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32856988Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608860Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 1578,
+        "max_cpu_milli": 1578,
+        "avg_cpu_milli": 1578,
+        "min_memory_bytes": 5753995264,
+        "max_memory_bytes": 5753995264,
+        "avg_memory_bytes": 5753995264
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "longtests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-a",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-longtests-worker-a-v6jt2",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-a",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-a"
+      },
+      "timestamp": "2026-03-11T23:51:49.114023602Z",
+      "poll_started": "2026-03-11T23:51:46.253066413Z",
+      "workloads": [
+        "release-images-latest-opendatahub-operator-e2e"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-11T23:51:46.253066413Z",
+          "end_time": "2026-03-11T23:51:49.114023694Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-builds-worker-a-zcxd9",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "01ab9a5dfbaaac798659aea663abb792",
+      "age_seconds": 164,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32857000Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608872Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 1238,
+        "max_cpu_milli": 3561,
+        "avg_cpu_milli": 2349,
+        "min_memory_bytes": 2006974464,
+        "max_memory_bytes": 2292760576,
+        "avg_memory_bytes": 2191131741
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "builds",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-a",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-builds-worker-a-zcxd9",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-a",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-a"
+      },
+      "timestamp": "2026-03-11T23:53:21.250542394Z",
+      "poll_started": "2026-03-11T23:51:37.386631844Z",
+      "workloads": [
+        "src-amd64"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-11T23:51:37.386631844Z",
+          "end_time": "2026-03-11T23:53:21.250542462Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-builds-worker-a-zcxd9",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "01ab9a5dfbaaac798659aea663abb792",
+      "age_seconds": 406,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32857000Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608872Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 239,
+        "max_cpu_milli": 13083,
+        "avg_cpu_milli": 5387,
+        "min_memory_bytes": 2007433216,
+        "max_memory_bytes": 2577936384,
+        "avg_memory_bytes": 2231177386
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "builds",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-a",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-builds-worker-a-zcxd9",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-a",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-a"
+      },
+      "timestamp": "2026-03-11T23:57:23.076462009Z",
+      "poll_started": "2026-03-11T23:53:28.900833919Z",
+      "workloads": [
+        "opendatahub-operator-rhoai-amd64"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-11T23:53:28.900833919Z",
+          "end_time": "2026-03-11T23:57:23.076462076Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-builds-worker-c-dz8zm",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "0dfe157f19b9629fdcff6f37988ae690",
+      "age_seconds": 959,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32857000Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608872Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 1388,
+        "max_cpu_milli": 11677,
+        "avg_cpu_milli": 4311,
+        "min_memory_bytes": 2062569472,
+        "max_memory_bytes": 3303649280,
+        "avg_memory_bytes": 2319262483
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "builds",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-c",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-builds-worker-c-dz8zm",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-c",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-c"
+      },
+      "timestamp": "2026-03-11T23:57:41.382888576Z",
+      "poll_started": "2026-03-11T23:53:28.90051338Z",
+      "workloads": [
+        "opendatahub-operator-amd64"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-11T23:53:28.90051338Z",
+          "end_time": "2026-03-11T23:57:41.382888637Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-tests-worker-c-kl4cf",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "fc95ca375f33abfd16a12bebafff253c",
+      "age_seconds": 96834,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32856996Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608868Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 5438,
+        "max_cpu_milli": 5438,
+        "avg_cpu_milli": 5438,
+        "min_memory_bytes": 8737210368,
+        "max_memory_bytes": 8737210368,
+        "avg_memory_bytes": 8737210368
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "tests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-c",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-tests-worker-c-kl4cf",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-c",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-c"
+      },
+      "timestamp": "2026-03-12T00:25:48.142304544Z",
+      "poll_started": "2026-03-12T00:25:45.056736594Z",
+      "workloads": [
+        "opendatahub-operator-e2e-ipi-install-rbac"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-12T00:25:45.056736594Z",
+          "end_time": "2026-03-12T00:25:48.1423047Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-tests-worker-c-wlkfk",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "83619bfa1ddafe67d5151563751b1f08",
+      "age_seconds": 155199,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32857000Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608872Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 4542,
+        "max_cpu_milli": 5976,
+        "avg_cpu_milli": 5071,
+        "min_memory_bytes": 12008792064,
+        "max_memory_bytes": 12395716608,
+        "avg_memory_bytes": 12227986318
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "tests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-c",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-tests-worker-c-wlkfk",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-c",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-c"
+      },
+      "timestamp": "2026-03-12T00:27:15.491811517Z",
+      "poll_started": "2026-03-12T00:25:53.228157475Z",
+      "workloads": [
+        "opendatahub-operator-e2e-install"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-12T00:25:53.228157475Z",
+          "end_time": "2026-03-12T00:27:15.491811679Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-tests-worker-c-kl4cf",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "fc95ca375f33abfd16a12bebafff253c",
+      "age_seconds": 99317,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32856996Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608868Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 1245,
+        "max_cpu_milli": 14730,
+        "avg_cpu_milli": 5030,
+        "min_memory_bytes": 8941326336,
+        "max_memory_bytes": 19270914048,
+        "avg_memory_bytes": 12028270711
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "tests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-c",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-tests-worker-c-kl4cf",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-c",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-c"
+      },
+      "timestamp": "2026-03-12T01:07:11.888338836Z",
+      "poll_started": "2026-03-12T00:27:20.586625664Z",
+      "workloads": [
+        "opendatahub-operator-e2e-e2e"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-12T00:27:20.586625664Z",
+          "end_time": "2026-03-12T01:07:11.888338987Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-tests-worker-a-fhzcx",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "e4ea70840e0bd79cdcea5d4fdb52de55",
+      "age_seconds": 65001,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32856996Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608868Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 7286,
+        "max_cpu_milli": 15701,
+        "avg_cpu_milli": 11099,
+        "min_memory_bytes": 10183675904,
+        "max_memory_bytes": 12684779520,
+        "avg_memory_bytes": 11546772650
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "tests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-a",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-tests-worker-a-fhzcx",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-a",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-a"
+      },
+      "timestamp": "2026-03-12T01:11:13.168402555Z",
+      "poll_started": "2026-03-12T01:07:16.97961054Z",
+      "workloads": [
+        "opendatahub-operator-e2e-gather-must-gather"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-12T01:07:16.97961054Z",
+          "end_time": "2026-03-12T01:11:13.168402618Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-tests-worker-b-hkpgf",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "1420ef35348a9e5645cef5ab6365be00",
+      "age_seconds": 104279,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32857000Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608872Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 5386,
+        "max_cpu_milli": 15867,
+        "avg_cpu_milli": 12877,
+        "min_memory_bytes": 8731860992,
+        "max_memory_bytes": 10763935744,
+        "avg_memory_bytes": 9401503347
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "tests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-b",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-tests-worker-b-hkpgf",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-b",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-b"
+      },
+      "timestamp": "2026-03-12T01:16:23.691101493Z",
+      "poll_started": "2026-03-12T01:11:18.335661458Z",
+      "workloads": [
+        "opendatahub-operator-e2e-gather-extra"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-12T01:11:18.335661458Z",
+          "end_time": "2026-03-12T01:16:23.691101553Z"
+        }
+      ]
+    },
+    {
+      "node": "build04-g4f6n-ci-tests-worker-a-fhzcx",
+      "arch": "amd64",
+      "machine_type": "e2-custom-16-32768",
+      "machine_id": "e4ea70840e0bd79cdcea5d4fdb52de55",
+      "age_seconds": 65320,
+      "resources": {
+        "capacity": {
+          "cpu": "16",
+          "memory": "32856996Ki",
+          "ephemeral-storage": "209124332Ki",
+          "pods": "250"
+        },
+        "allocatable": {
+          "cpu": "15",
+          "memory": "29608868Ki",
+          "ephemeral-storage": "191655242229",
+          "pods": "250"
+        }
+      },
+      "usage_stats": {
+        "min_cpu_milli": 11045,
+        "max_cpu_milli": 11045,
+        "avg_cpu_milli": 11045,
+        "min_memory_bytes": 12214112256,
+        "max_memory_bytes": 12214112256,
+        "avg_memory_bytes": 12214112256
+      },
+      "labels": {
+        "beta.kubernetes.io/arch": "amd64",
+        "beta.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "beta.kubernetes.io/os": "linux",
+        "ci-workload": "tests",
+        "failure-domain.beta.kubernetes.io/region": "us-central1",
+        "failure-domain.beta.kubernetes.io/zone": "us-central1-a",
+        "kubernetes.io/arch": "amd64",
+        "kubernetes.io/hostname": "build04-g4f6n-ci-tests-worker-a-fhzcx",
+        "kubernetes.io/os": "linux",
+        "node-role.kubernetes.io/worker": "",
+        "node.kubernetes.io/instance-type": "e2-custom-16-32768",
+        "node.openshift.io/os_id": "rhel",
+        "topology.gke.io/zone": "us-central1-a",
+        "topology.kubernetes.io/region": "us-central1",
+        "topology.kubernetes.io/zone": "us-central1-a"
+      },
+      "timestamp": "2026-03-12T01:16:32.371842957Z",
+      "poll_started": "2026-03-12T01:16:28.765466535Z",
+      "workloads": [
+        "opendatahub-operator-e2e-gather-audit-logs"
+      ],
+      "watch_history": [
+        {
+          "start_time": "2026-03-12T01:16:28.765466535Z",
+          "end_time": "2026-03-12T01:16:32.371843024Z"
+        }
+      ]
+    }
+  ],
+  "openshift_builds": [
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "name": "src-amd64",
+      "start_time": "2026-03-11T23:51:32Z",
+      "completion_time": "2026-03-11T23:53:21Z",
+      "duration_seconds": 109,
+      "status": "Complete",
+      "output_image": "pipeline:src-amd64",
+      "timestamp": "2026-03-11T23:53:21.247028016Z",
+      "for_image": "pipeline:src"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "name": "opendatahub-operator-rhoai-amd64",
+      "start_time": "2026-03-11T23:53:22Z",
+      "completion_time": "2026-03-11T23:57:22Z",
+      "duration_seconds": 240,
+      "status": "Complete",
+      "output_image": "pipeline:opendatahub-operator-rhoai-amd64",
+      "timestamp": "2026-03-11T23:57:23.070962889Z",
+      "for_image": "pipeline:opendatahub-operator-rhoai"
+    },
+    {
+      "namespace": "ci-op-vn1stn6b",
+      "name": "opendatahub-operator-amd64",
+      "start_time": "2026-03-11T23:53:22Z",
+      "completion_time": "2026-03-11T23:57:41Z",
+      "duration_seconds": 259,
+      "status": "Complete",
+      "output_image": "pipeline:opendatahub-operator-amd64",
+      "timestamp": "2026-03-11T23:57:41.377224825Z",
+      "for_image": "pipeline:opendatahub-operator"
+    }
+  ],
+  "pods": [
+    {
+      "pod_name": "release-images-latest-opendatahub-operator-e2e-cli",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-11T23:51:29Z",
+      "start_time": "2026-03-11T23:51:29Z",
+      "completion_time": "2026-03-11T23:51:34Z",
+      "ci_workload": "longtests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-11T23:51:29Z",
+        "Initialized": "2026-03-11T23:51:33Z",
+        "PodReadyToStartContainers": "2026-03-11T23:51:36Z",
+        "PodScheduled": "2026-03-11T23:51:29Z",
+        "Ready": "2026-03-11T23:51:29Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 4000000000,
+      "ready_latency": 0,
+      "completion_latency": 5000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-11T23:51:36.151372043Z"
+    },
+    {
+      "pod_name": "release-images-latest-opendatahub-operator-e2e",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-11T23:51:41Z",
+      "start_time": "2026-03-11T23:51:41Z",
+      "completion_time": "2026-03-11T23:51:48Z",
+      "ci_workload": "longtests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-11T23:51:48Z",
+        "Initialized": "2026-03-11T23:51:46Z",
+        "PodReadyToStartContainers": "2026-03-11T23:51:43Z",
+        "PodScheduled": "2026-03-11T23:51:41Z",
+        "Ready": "2026-03-11T23:51:48Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 5000000000,
+      "ready_latency": 7000000000,
+      "completion_latency": 7000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-11T23:51:49.104973335Z"
+    },
+    {
+      "pod_name": "src-amd64-build",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-11T23:51:32Z",
+      "start_time": "2026-03-11T23:51:32Z",
+      "completion_time": "2026-03-11T23:53:19Z",
+      "ci_workload": "builds",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-11T23:53:19Z",
+        "Initialized": "2026-03-11T23:52:01Z",
+        "PodReadyToStartContainers": "2026-03-11T23:53:21Z",
+        "PodScheduled": "2026-03-11T23:51:32Z",
+        "Ready": "2026-03-11T23:53:19Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 29000000000,
+      "ready_latency": 107000000000,
+      "completion_latency": 107000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-11T23:53:21.187714569Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-rhoai-amd64-build",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-11T23:53:22Z",
+      "start_time": "2026-03-11T23:53:22Z",
+      "completion_time": "2026-03-11T23:57:21Z",
+      "ci_workload": "builds",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-11T23:57:21Z",
+        "Initialized": "2026-03-11T23:54:11Z",
+        "PodReadyToStartContainers": "2026-03-11T23:57:22Z",
+        "PodScheduled": "2026-03-11T23:53:22Z",
+        "Ready": "2026-03-11T23:57:21Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 49000000000,
+      "ready_latency": 239000000000,
+      "completion_latency": 239000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-11T23:57:23.011706372Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-amd64-build",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-11T23:53:22Z",
+      "start_time": "2026-03-11T23:53:22Z",
+      "completion_time": "2026-03-11T23:57:39Z",
+      "ci_workload": "builds",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-11T23:57:40Z",
+        "Initialized": "2026-03-11T23:54:15Z",
+        "PodReadyToStartContainers": "2026-03-11T23:57:41Z",
+        "PodScheduled": "2026-03-11T23:53:22Z",
+        "Ready": "2026-03-11T23:57:40Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 53000000000,
+      "ready_latency": 258000000000,
+      "completion_latency": 257000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-11T23:57:41.31677916Z"
+    },
+    {
+      "pod_name": "src-bundle-build",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-11T23:57:42Z",
+      "start_time": "2026-03-11T23:57:42Z",
+      "completion_time": "2026-03-11T23:58:56Z",
+      "ci_workload": "builds",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-11T23:58:56Z",
+        "Initialized": "2026-03-11T23:58:30Z",
+        "PodReadyToStartContainers": "2026-03-11T23:58:58Z",
+        "PodScheduled": "2026-03-11T23:57:42Z",
+        "Ready": "2026-03-11T23:58:56Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 48000000000,
+      "ready_latency": 74000000000,
+      "completion_latency": 74000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-11T23:58:58.181826987Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-bundle-build",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-11T23:58:58Z",
+      "start_time": "2026-03-11T23:58:58Z",
+      "completion_time": "2026-03-12T00:01:58Z",
+      "ci_workload": "builds",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-12T00:01:58Z",
+        "Initialized": "2026-03-11T23:59:46Z",
+        "PodReadyToStartContainers": "2026-03-12T00:01:59Z",
+        "PodScheduled": "2026-03-11T23:58:58Z",
+        "Ready": "2026-03-12T00:01:58Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 48000000000,
+      "ready_latency": 180000000000,
+      "completion_latency": 180000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-12T00:02:00.03483126Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-e2e-ipi-install-rbac",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-12T00:25:40Z",
+      "start_time": "2026-03-12T00:25:40Z",
+      "completion_time": "2026-03-12T00:25:47Z",
+      "ci_workload": "tests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-12T00:25:40Z",
+        "Initialized": "2026-03-12T00:25:46Z",
+        "PodReadyToStartContainers": "2026-03-12T00:25:42Z",
+        "PodScheduled": "2026-03-12T00:25:40Z",
+        "Ready": "2026-03-12T00:25:40Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 6000000000,
+      "ready_latency": 0,
+      "completion_latency": 7000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-12T00:25:48.131686526Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-e2e-install",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-12T00:25:48Z",
+      "start_time": "2026-03-12T00:25:48Z",
+      "completion_time": "2026-03-12T00:27:15Z",
+      "ci_workload": "tests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-12T00:27:15Z",
+        "Initialized": "2026-03-12T00:25:55Z",
+        "PodReadyToStartContainers": "2026-03-12T00:25:51Z",
+        "PodScheduled": "2026-03-12T00:25:48Z",
+        "Ready": "2026-03-12T00:27:15Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 7000000000,
+      "ready_latency": 87000000000,
+      "completion_latency": 87000000000,
+      "pod_phase": "Succeeded",
+      "timestamp": "2026-03-12T00:27:15.482502154Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-e2e-e2e",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-12T00:27:15Z",
+      "start_time": "2026-03-12T00:27:15Z",
+      "completion_time": "2026-03-12T01:07:11Z",
+      "ci_workload": "tests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-12T01:07:11Z",
+        "Initialized": "2026-03-12T00:27:22Z",
+        "PodReadyToStartContainers": "2026-03-12T00:27:18Z",
+        "PodScheduled": "2026-03-12T00:27:15Z",
+        "Ready": "2026-03-12T01:07:11Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 7000000000,
+      "ready_latency": 2396000000000,
+      "completion_latency": 2396000000000,
+      "pod_phase": "Failed",
+      "timestamp": "2026-03-12T01:07:11.876137329Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-e2e-gather-must-gather",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-12T01:07:11Z",
+      "start_time": "2026-03-12T01:07:11Z",
+      "completion_time": "2026-03-12T01:11:12Z",
+      "ci_workload": "tests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-12T01:11:13Z",
+        "Initialized": "2026-03-12T01:07:17Z",
+        "PodReadyToStartContainers": "2026-03-12T01:07:14Z",
+        "PodScheduled": "2026-03-12T01:07:11Z",
+        "Ready": "2026-03-12T01:11:13Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 6000000000,
+      "ready_latency": 242000000000,
+      "completion_latency": 241000000000,
+      "pod_phase": "Failed",
+      "timestamp": "2026-03-12T01:11:13.158286198Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-e2e-gather-extra",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-12T01:11:13Z",
+      "start_time": "2026-03-12T01:11:13Z",
+      "completion_time": "2026-03-12T01:16:22Z",
+      "ci_workload": "tests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-12T01:16:23Z",
+        "Initialized": "2026-03-12T01:11:18Z",
+        "PodReadyToStartContainers": "2026-03-12T01:11:15Z",
+        "PodScheduled": "2026-03-12T01:11:13Z",
+        "Ready": "2026-03-12T01:16:23Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 5000000000,
+      "ready_latency": 310000000000,
+      "completion_latency": 309000000000,
+      "pod_phase": "Failed",
+      "timestamp": "2026-03-12T01:16:23.678454244Z"
+    },
+    {
+      "pod_name": "opendatahub-operator-e2e-gather-audit-logs",
+      "namespace": "ci-op-vn1stn6b",
+      "creation_time": "2026-03-12T01:16:23Z",
+      "start_time": "2026-03-12T01:16:23Z",
+      "completion_time": "2026-03-12T01:16:31Z",
+      "ci_workload": "tests",
+      "condition_transition_times": {
+        "ContainersReady": "2026-03-12T01:16:32Z",
+        "Initialized": "2026-03-12T01:16:29Z",
+        "PodReadyToStartContainers": "2026-03-12T01:16:26Z",
+        "PodScheduled": "2026-03-12T01:16:23Z",
+        "Ready": "2026-03-12T01:16:32Z"
+      },
+      "scheduling_latency": 0,
+      "initialization_latency": 6000000000,
+      "ready_latency": 9000000000,
+      "completion_latency": 8000000000,
+      "pod_phase": "Failed",
+      "timestamp": "2026-03-12T01:16:32.362917255Z"
+    }
+  ],
+  "test_platform_insights": [
+    {
+      "name": "started",
+      "additional_context": {
+        "job_spec": {
+          "branch": "main",
+          "buildid": "2031880686163464192",
+          "job": "pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e",
+          "org": "opendatahub-io",
+          "prowjobid": "6707042b-751c-4a5c-8abc-45faf53a9e7e",
+          "pulls": [
+            {
+              "author": "carlkyrillos",
+              "number": 3260,
+              "sha": "d26c6146301de17545a5b5feec37b54d9c9b2c18"
+            }
+          ],
+          "repo": "opendatahub-operator",
+          "target": "opendatahub-operator-e2e",
+          "type": "presubmit"
+        }
+      },
+      "timestamp": "2026-03-11T23:51:27.426843246Z"
+    },
+    {
+      "name": "namespace_initialized",
+      "additional_context": {
+        "duration_seconds": 0.321309426,
+        "namespace": "ci-op-vn1stn6b"
+      },
+      "timestamp": "2026-03-11T23:51:28.209462056Z"
+    },
+    {
+      "name": "namespace_created",
+      "additional_context": {
+        "namespace": "ci-op-vn1stn6b"
+      },
+      "timestamp": "2026-03-11T23:51:28.209479457Z"
+    },
+    {
+      "name": "configuration",
+      "additional_context": {
+        "base_namespace": "stable",
+        "branch": "main",
+        "cluster_info": {
+          "cluster_id": "62d8c8f3-f4fe-49d0-9354-6a2e19ebbf99",
+          "cluster_profiles": null,
+          "console_host": "console.build04.ci.openshift.org",
+          "node_name": ""
+        },
+        "org": "opendatahub-io",
+        "promote": false,
+        "repo": "opendatahub-operator",
+        "targets": [
+          "opendatahub-operator-e2e"
+        ],
+        "variant": ""
+      },
+      "timestamp": "2026-03-11T23:51:28.228788461Z"
+    },
+    {
+      "name": "execution_started",
+      "additional_context": {
+        "started_after": 0.804842668
+      },
+      "timestamp": "2026-03-11T23:51:28.231688968Z"
+    },
+    {
+      "name": "execution_completed",
+      "additional_context": {
+        "duration_seconds": 5105.195117692,
+        "error_count": 1,
+        "success": false
+      },
+      "timestamp": "2026-03-12T01:16:32.621963533Z"
+    },
+    {
+      "name": "namespace_artifacts",
+      "additional_context": {
+        "namespace": "ci-op-vn1stn6b"
+      },
+      "timestamp": "2026-03-12T01:16:32.785938597Z"
+    }
+  ]
+}

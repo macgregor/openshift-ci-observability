@@ -17,7 +17,7 @@ Install dependencies and run a dry-run backfill:
 
 ```bash
 pip install -r scraper/requirements.txt
-python scraper/scrape.py backfill --dry-run --window 2d
+python -m scraper backfill --dry-run --window 2d
 ```
 
 ## Running the Full Stack Locally
@@ -37,13 +37,7 @@ make wipe
 make up
 ```
 
-To reset only the scraper state (re-ingest without wiping metrics/logs):
-
-```bash
-podman-compose exec scraper-watch rm /state/scrape-state.json
-```
-
-VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
+Scraper state is stored in VictoriaMetrics itself (via a sentinel metric), so wiping the database automatically resets state. VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
 
 ## Chrome DevTools MCP (for Claude)
 
@@ -63,17 +57,3 @@ If Chromium isn't in your PATH, set the browser binary path in the hook script o
 chromium-browser --remote-debugging-port=9222 --user-data-dir=$HOME/.chrome-debug-profile
 ```
 
-## How to Add New Metric Transforms
-
-Edit the `apply_known_transforms()` function in `scraper/scrape.py`.
-
-## How to Add Canonical Aliases
-
-Add entries to the `CANONICAL_ALIASES` dictionary in `scraper/scrape.py`.
-
-## Project Structure
-
-- `scraper/scrape.py` - Main scraper implementation with CLI, transform logic, and canonical aliases
-- `scraper/requirements.txt` - Python dependencies
-- `podman-compose.yml` - Container orchestration configuration for the full stack
-- `Makefile` - Stack management commands (up, down, restart, wipe, status)

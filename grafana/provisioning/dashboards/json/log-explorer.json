@@ -7,17 +7,6 @@
   "templating": {
     "list": [
       {
-        "name": "source",
-        "label": "Source",
-        "type": "custom",
-        "query": "event,pod,openshift_build,node,insight,image,lease,raw",
-        "multi": false,
-        "includeAll": true,
-        "allValue": "*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
-        "sort": 0
-      },
-      {
         "name": "logquery",
         "label": "LogsQL",
         "description": "Free-form LogsQL filter appended to the source filter",
@@ -41,7 +30,7 @@
           "gridPos": { "h": 11, "w": 24, "x": 0, "y": 1 },
           "options": {
             "mode": "markdown",
-            "content": "| Goal | LogsQL |\n|------|--------|\n| Logs for a PR | `pr_number:3260` |\n| Specific build | `build_id:2032076068386508800` |\n| Failed events | `source:event AND level:Error` |\n| Pod scheduling issues | `source:pod AND Pending` |\n| Build failures | `source:openshift_build AND Failed` |\n| Keyword search | `timeout` or `OOMKilled` |\n| Combine filters | `pr_number:3260 AND source:event AND level:Error` |\n| Regex match | `_msg:~\"duration.*[0-9]{4}\"` |\n\nUse the **Source** dropdown for quick filtering, and **LogsQL** box for additional filters. For complex multi-line queries, use [Explore](../explore) with the VictoriaLogs datasource.\n\n[LogsQL reference docs](https://docs.victoriametrics.com/victorialogs/logsql/)"
+            "content": "| Goal | LogsQL |\n|------|--------|\n| Specific build | `build_id:1969142006726791168` |\n| Error logs | `level:error` |\n| Errors with keyword | `level:error AND _msg:~\"failed\"` |\n| By component | `component:metricsAgent` |\n| Step failures | `_msg:~\"step.*failed\"` |\n| PR errors | `pr_number:2490 AND level:error` |\n\nType queries in the **LogsQL** box above. For complex multi-line queries, use [Explore](../explore) with the VictoriaLogs datasource.\n\n[LogsQL reference docs](https://docs.victoriametrics.com/victorialogs/logsql/)"
           }
         }
       ]
@@ -54,7 +43,7 @@
       "datasource": { "type": "victoriametrics-logs-datasource" },
       "targets": [
         {
-          "expr": "source:$source $logquery",
+          "expr": "$logquery",
           "refId": "A"
         }
       ],

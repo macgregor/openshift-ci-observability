@@ -555,14 +555,14 @@
         },
         {
           "id": 5,
-          "title": "Error Events",
-          "description": "All error-level events for the selected scope.",
+          "title": "Errors & Warnings",
+          "description": "Pipeline-level errors and warnings from ci-operator logs for the selected scope.",
           "type": "logs",
           "gridPos": { "h": 12, "w": 12, "x": 0, "y": 54 },
           "datasource": { "type": "victoriametrics-logs-datasource" },
           "targets": [
             {
-              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND level:Error",
+              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND (level:error OR level:warning)",
               "refId": "A"
             }
           ],
@@ -576,14 +576,14 @@
         },
         {
           "id": 6,
-          "title": "Failed Pods",
-          "description": "Pods that failed in the selected scope. Look for OOMKilled, ImagePull errors, scheduling failures.",
+          "title": "Step Failures",
+          "description": "Step-level failures from ci-operator logs for the selected scope.",
           "type": "logs",
           "gridPos": { "h": 12, "w": 12, "x": 12, "y": 54 },
           "datasource": { "type": "victoriametrics-logs-datasource" },
           "targets": [
             {
-              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND source:pod AND (pod_phase:Failed OR _msg:~\"Failed|Error\")",
+              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND level:error AND _msg:~\"failed|Failed\"",
               "refId": "A"
             }
           ],
