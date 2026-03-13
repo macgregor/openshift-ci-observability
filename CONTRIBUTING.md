@@ -8,6 +8,7 @@ description: Developer guide for contributing to OpenShift CI Observability
 
 - podman
 - podman-compose
+- make
 - python3
 
 ## Local Development Setup
@@ -22,19 +23,19 @@ python scraper/scrape.py backfill --dry-run --window 2d
 ## Running the Full Stack Locally
 
 ```bash
-podman-compose up -d
+make up
 ```
+
+Run `make` to see all available commands (`up`, `down`, `restart`, `wipe`, `status`).
 
 ## Resetting Data
 
 To start over with a clean database and re-ingest everything:
 
 ```bash
-podman-compose --profile backfill down -v
-podman-compose --profile backfill up -d --build
+make wipe
+make up
 ```
-
-The `-v` flag removes named volumes (VictoriaMetrics, VictoriaLogs, Grafana, and scraper state). The backfill will re-ingest from scratch on the next start.
 
 To reset only the scraper state (re-ingest without wiping metrics/logs):
 
@@ -75,3 +76,4 @@ Add entries to the `CANONICAL_ALIASES` dictionary in `scraper/scrape.py`.
 - `scraper/scrape.py` - Main scraper implementation with CLI, transform logic, and canonical aliases
 - `scraper/requirements.txt` - Python dependencies
 - `podman-compose.yml` - Container orchestration configuration for the full stack
+- `Makefile` - Stack management commands (up, down, restart, wipe, status)

@@ -1,5 +1,6 @@
 services:
   victoriametrics:
+    container_name: ci-obs-victoriametrics
     image: docker.io/victoriametrics/victoria-metrics:v1.137.0
     ports:
       - "8428:8428"
@@ -11,6 +12,7 @@ services:
       - "-dedup.minScrapeInterval=1ms"
 
   victorialogs:
+    container_name: ci-obs-victorialogs
     image: docker.io/victoriametrics/victoria-logs:v1.48.0
     ports:
       - "9428:9428"
@@ -20,6 +22,7 @@ services:
       - "-retentionPeriod=365d"
 
   grafana:
+    container_name: ci-obs-grafana
     image: docker.io/grafana/grafana:12.3.5
     ports:
       - "3000:3000"
@@ -38,9 +41,11 @@ services:
       - victorialogs
 
   scraper-watch:
+    container_name: ci-obs-scraper-watch
     build:
       context: .
       dockerfile: Containerfile.scraper
+    image: ci-obs-scraper:latest
     volumes:
       - scraper-state:/state
     environment:
@@ -58,9 +63,11 @@ services:
       - victorialogs
 
   scraper-backfill:
+    container_name: ci-obs-scraper-backfill
     build:
       context: .
       dockerfile: Containerfile.scraper
+    image: ci-obs-scraper:latest
     profiles:
       - backfill
     volumes:
@@ -81,6 +88,10 @@ services:
 
 volumes:
   vm-data:
+    name: ci-obs-vm-data
   vl-data:
+    name: ci-obs-vl-data
   grafana-data:
+    name: ci-obs-grafana-data
   scraper-state:
+    name: ci-obs-scraper-state

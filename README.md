@@ -6,18 +6,12 @@ Scrapes `ci-operator-metrics.json` artifacts from GCS for OpenShift CI builds an
 
 ```bash
 cp .env.example .env
-podman-compose up -d
+make up
 ```
 
-Open Grafana at http://localhost:3000 (anonymous access, no login required).
+Open Grafana at http://localhost:3000 (anonymous access, no login required). Historical data (last 90 days) is backfilled automatically. Set `BACKFILL_WINDOW` in `.env` to adjust (e.g. `6m`, `1y`).
 
-## Backfilling Historical Data
-
-```bash
-podman-compose --profile backfill up -d
-```
-
-Backfills the last 90 days by default. Set `BACKFILL_WINDOW` in `.env` to adjust (e.g. `6m`, `1y`).
+Run `make` to see all available commands (`up`, `down`, `restart`, `wipe`, `status`).
 
 ## Configuration
 
