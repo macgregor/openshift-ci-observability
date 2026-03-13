@@ -9,9 +9,9 @@
       {
         "name": "logquery",
         "label": "LogsQL",
-        "description": "Free-form LogsQL filter appended to the source filter",
+        "description": "LogsQL query — use * for all logs",
         "type": "textbox",
-        "current": { "selected": false, "text": "", "value": "" }
+        "current": { "selected": false, "text": "*", "value": "*" }
       }
     ]
   },
