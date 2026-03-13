@@ -60,15 +60,27 @@
   },
   "panels": [
     {
+      "id": 50,
+      "title": "Dashboard Guide",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "id": 51,
+      "title": "",
+      "type": "text",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
+      "options": {
+        "mode": "markdown",
+        "content": "### How to use this dashboard\n\n**Summary stats** (below) show at-a-glance health for the selected time range. Click **Failed Runs** to open the CI Investigation dashboard for detailed failure analysis.\n\n**Filters:** **Job Type** narrows to specific CI jobs. **Outcome** toggles between Success, Failure, or both.\n\n**Activity** -- pipeline run volume and success rate trends. **Duration** -- execution time envelope and retests per commit. **Steps & Infrastructure** -- step time breakdown and pod scheduling overhead. **Failure Patterns** -- which steps fail most and pod phase breakdown. For individual build investigation, use the CI Investigation dashboard."
+      }
+    },
+    {
       "id": 10,
       "title": "Failed Runs",
       "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 0
-      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 7 },
       "targets": [
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",job_name=~\"$job_type\"}))[$__range:]))",
@@ -78,34 +90,27 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "links": [
+            {
+              "title": "Investigate failures",
+              "url": "/d/ci-investigation/ci-investigation?var-job_type=${job_type}&from=${__from}&to=${__to}"
+            }
+          ],
           "color": {
             "mode": "fixed",
             "fixedColor": "red"
           },
           "thresholds": {
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 10
-              },
-              {
-                "color": "red",
-                "value": 50
-              }
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -115,12 +120,7 @@
       "title": "Avg Retests / Commit",
       "description": "Average number of pipeline runs per (PR, SHA) pair. Higher = more retries needed.",
       "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 7 },
       "targets": [
         {
           "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:])))",
@@ -133,28 +133,15 @@
           "decimals": 1,
           "thresholds": {
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 3
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 5 }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -163,12 +150,7 @@
       "id": 12,
       "title": "Success Rate",
       "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 0
-      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 7 },
       "targets": [
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__range:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:])) * 100",
@@ -182,28 +164,15 @@
           "decimals": 1,
           "thresholds": {
             "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 80 }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -212,12 +181,7 @@
       "id": 13,
       "title": "Active PRs",
       "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 0
-      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 7 },
       "targets": [
         {
           "expr": "count(count_over_time((group by (pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:]))",
@@ -234,54 +198,16 @@
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "value",
         "graphMode": "area"
       }
     },
     {
-      "id": 50,
-      "title": "Dashboard Guide",
-      "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 4
-      },
-      "collapsed": true,
-      "panels": [
-        {
-          "id": 51,
-          "title": "",
-          "type": "text",
-          "gridPos": {
-            "h": 10,
-            "w": 24,
-            "x": 0,
-            "y": 5
-          },
-          "options": {
-            "mode": "markdown",
-            "content": "### How to use this dashboard\n\n**Summary stats** (top row) show at-a-glance health for the selected time range. Use the time picker and filters to adjust scope.\n\n**Filters:**\n- **Job Type** -- narrow to specific CI jobs (e.g. just e2e tests). Select individual jobs to see their metrics in isolation.\n- **Outcome** -- toggle between Success, Failure, or both to compare behavior across outcomes.\n\n**Activity** -- pipeline run volume and success rate over time. Look for drops in success rate or unusual spikes in activity. Correlate activity spikes with infrastructure pressure in the panels below.\n\n**Duration** -- pipeline execution time envelope (min/avg/max) and retests per commit. A widening envelope suggests inconsistent infrastructure. High retests per commit indicates flakiness.\n\n**Steps & Infrastructure** -- which ci-operator steps consume the most time (stacked bars) and pod scheduling/initialization overhead. High infrastructure overhead relative to step duration suggests cluster resource pressure.\n\n**Outliers** -- longest and shortest individual runs with links to GitHub PRs and Prow job pages. Shortest failed runs often indicate infrastructure failures (scheduling, image pull) rather than test failures."
-          }
-        }
-      ]
-    },
-    {
       "id": 100,
       "title": "Activity",
       "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
       "collapsed": false
     },
     {
@@ -289,12 +215,7 @@
       "title": "Active Pipelines",
       "description": "Concurrent pipeline runs per bucket. Use to gauge cluster pool pressure.",
       "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 5
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
       "targets": [
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
@@ -316,72 +237,32 @@
             "drawStyle": "bars",
             "fillOpacity": 60,
             "lineWidth": 1,
-            "stacking": {
-              "mode": "none"
-            }
+            "stacking": { "mode": "none" }
           }
         },
         "overrides": [
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Active PRs"
-            },
+            "matcher": { "id": "byName", "options": "Active PRs" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.drawStyle",
-                "value": "line"
-              },
-              {
-                "id": "custom.fillOpacity",
-                "value": 0
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 2
-              },
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "custom.axisLabel",
-                "value": "PRs"
-              }
+              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
+              { "id": "custom.drawStyle", "value": "line" },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "custom.axisLabel", "value": "PRs" }
             ]
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Pipeline Runs"
-            },
+            "matcher": { "id": "byName", "options": "Pipeline Runs" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "semi-dark-green",
-                  "mode": "fixed"
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "semi-dark-green", "mode": "fixed" } }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": {
-          "mode": "multi"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
     {
@@ -389,12 +270,7 @@
       "title": "Success Rate",
       "description": "Percentage of pipeline runs that succeed. Drops indicate systemic issues or flaky tests.",
       "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 5
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
       "targets": [
         {
           "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
@@ -418,45 +294,24 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 80 }
             ]
           },
-          "color": {
-            "mode": "thresholds"
-          }
+          "color": { "mode": "thresholds" }
         }
       },
       "options": {
-        "tooltip": {
-          "mode": "single"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
     {
       "id": 200,
       "title": "Duration",
       "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 15
-      },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
       "collapsed": false
     },
     {
@@ -464,12 +319,7 @@
       "title": "Pipeline Duration",
       "description": "End-to-end execution time. Min/avg/max envelope shows spread.",
       "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 23 },
       "targets": [
         {
           "expr": "max(max_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
@@ -503,85 +353,31 @@
         },
         "overrides": [
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Max"
-            },
+            "matcher": { "id": "byName", "options": "Max" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
             ]
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Avg"
-            },
+            "matcher": { "id": "byName", "options": "Avg" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+              { "id": "custom.lineWidth", "value": 3 }
             ]
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Min"
-            },
+            "matcher": { "id": "byName", "options": "Min" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
     {
@@ -589,12 +385,7 @@
       "title": "Retests per Commit",
       "description": "How many times the same commit (pr+sha) runs the same job. High values = flaky tests or infra issues requiring retests.",
       "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 23 },
       "targets": [
         {
           "expr": "max(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])))",
@@ -622,72 +413,31 @@
         },
         "overrides": [
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Max"
-            },
+            "matcher": { "id": "byName", "options": "Max" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
             ]
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Avg"
-            },
+            "matcher": { "id": "byName", "options": "Avg" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "custom.lineWidth",
-                "value": 3
-              }
+              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
+              { "id": "custom.lineWidth", "value": 3 }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
     {
       "id": 300,
       "title": "Steps & Infrastructure",
       "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 26
-      },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
       "collapsed": false
     },
     {
@@ -695,12 +445,7 @@
       "title": "Step Duration by Type",
       "description": "Average duration of each ci-operator step. Identifies which steps dominate pipeline runtime.",
       "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 27
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 34 },
       "targets": [
         {
           "expr": "avg by (source) (avg_over_time(ci_step_duration_seconds{job_name=~\"$job_type\"}[$__interval:]))",
@@ -716,24 +461,13 @@
             "drawStyle": "bars",
             "fillOpacity": 80,
             "lineWidth": 1,
-            "stacking": {
-              "mode": "normal"
-            }
+            "stacking": { "mode": "normal" }
           }
         }
       },
       "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean"
-          ]
-        }
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean"] }
       }
     },
     {
@@ -741,12 +475,7 @@
       "title": "Infrastructure Overhead",
       "description": "Pod scheduling and initialization latency. High values indicate cluster resource pressure.",
       "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 27
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 34 },
       "targets": [
         {
           "expr": "avg(avg_over_time(ci_pod_scheduling_latency_seconds{job_name=~\"$job_type\"}[$__interval:]))",
@@ -786,76 +515,35 @@
         },
         "overrides": [
           {
-            "matcher": {
-              "id": "byRegexp",
-              "options": ".*max.*"
-            },
+            "matcher": { "id": "byRegexp", "options": ".*max.*" },
             "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
-              }
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
             ]
           },
           {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "Scheduling.*"
-            },
+            "matcher": { "id": "byRegexp", "options": "Scheduling.*" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
             ]
           },
           {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "Initialization.*"
-            },
+            "matcher": { "id": "byRegexp", "options": "Initialization.*" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
     {
       "id": 350,
       "title": "Failure Patterns",
       "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 37
-      },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
       "collapsed": false
     },
     {
@@ -863,12 +551,7 @@
       "title": "Step Failure Leaderboard",
       "description": "Which ci-operator steps fail most often. High counts indicate flaky steps or infrastructure issues at specific phases.",
       "type": "bargauge",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 38
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 45 },
       "targets": [
         {
           "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\"}))[$__range:])))",
@@ -877,22 +560,18 @@
           "refId": "A"
         }
       ],
-      "transformations": [],
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-reds"
+            "mode": "fixed",
+            "fixedColor": "red"
           }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
         "orientation": "horizontal",
-        "displayMode": "gradient",
+        "displayMode": "basic",
         "showUnfilled": true
       }
     },
@@ -901,12 +580,7 @@
       "title": "Pod Phase Breakdown",
       "description": "Distribution of pod outcomes. High Failed ratio suggests infrastructure pressure.",
       "type": "piechart",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 38
-      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 45 },
       "targets": [
         {
           "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name, pod_phase) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\"}))[$__range:]))",
@@ -919,528 +593,23 @@
         "defaults": {},
         "overrides": [
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Succeeded"
-            },
+            "matcher": { "id": "byName", "options": "Succeeded" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
             ]
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "Failed"
-            },
+            "matcher": { "id": "byName", "options": "Failed" },
             "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
             ]
           }
         ]
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "percent"
-          ]
-        },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["percent"] },
         "pieType": "donut"
-      }
-    },
-    {
-      "id": 400,
-      "title": "Outliers",
-      "type": "row",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 48
-      },
-      "collapsed": false
-    },
-    {
-      "id": 7,
-      "title": "Longest Runs",
-      "description": "Individual pipeline runs sorted by duration. Use to investigate outliers.",
-      "type": "table",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 61
-      },
-      "targets": [
-        {
-          "expr": "topk(20, max_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "name": true,
-              "branch": true,
-              "timestamp": true,
-              "author": true
-            },
-            "renameByName": {
-              "pr_number": "PR",
-              "pr_sha": "Commit",
-              "job_name": "Job",
-              "build_id": "Build ID",
-              "success": "Outcome",
-              "Value": "Duration",
-              "org": "org",
-              "repo": "repo"
-            },
-            "indexByName": {
-              "pr_number": 0,
-              "pr_sha": 1,
-              "job_name": 2,
-              "success": 3,
-              "Value": 4,
-              "build_id": 5,
-              "org": 6,
-              "repo": 7
-            }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Duration"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "s"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "PR"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 60
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "GitHub PR",
-                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Commit"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 115
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Outcome"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 75
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "true": {
-                        "text": "Success",
-                        "color": "green"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "false": {
-                        "text": "Failure",
-                        "color": "red"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Build ID"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 175
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Prow Job",
-                    "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "org"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "repo"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "sortBy": [
-          {
-            "displayName": "Duration",
-            "desc": true
-          }
-        ]
-      }
-    },
-    {
-      "id": 8,
-      "title": "Shortest Runs",
-      "description": "Runs that completed unusually fast. Often indicates infrastructure failures, scheduling issues, or early-exit errors.",
-      "type": "table",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 61
-      },
-      "targets": [
-        {
-          "expr": "bottomk(20, min_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "name": true,
-              "branch": true,
-              "timestamp": true,
-              "author": true
-            },
-            "renameByName": {
-              "pr_number": "PR",
-              "pr_sha": "Commit",
-              "job_name": "Job",
-              "build_id": "Build ID",
-              "success": "Outcome",
-              "Value": "Duration",
-              "org": "org",
-              "repo": "repo"
-            },
-            "indexByName": {
-              "pr_number": 0,
-              "pr_sha": 1,
-              "job_name": 2,
-              "success": 3,
-              "Value": 4,
-              "build_id": 5,
-              "org": 6,
-              "repo": 7
-            }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Duration"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "s"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "PR"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 60
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "GitHub PR",
-                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Commit"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 115
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Outcome"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 75
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "true": {
-                        "text": "Success",
-                        "color": "green"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "false": {
-                        "text": "Failure",
-                        "color": "red"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Build ID"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 175
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Prow Job",
-                    "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "org"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "repo"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "PR"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "GitHub PR",
-                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Build ID"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Prow Job",
-                    "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Outcome"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "true": {
-                        "text": "Success",
-                        "color": "green"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "false": {
-                        "text": "Failure",
-                        "color": "red"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "sortBy": [
-          {
-            "displayName": "Duration",
-            "desc": false
-          }
-        ]
       }
     }
   ],
