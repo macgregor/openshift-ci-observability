@@ -1,4 +1,4 @@
-# CI Metrics Scraper
+# OpenShift CI Observability
 
 ## Key files
 - `scraper/scrape.py` -- single-file scraper: GCS navigation, metric/log conversion, VM/VL ingestion

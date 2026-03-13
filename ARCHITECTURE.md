@@ -1,5 +1,5 @@
 ---
-description: System architecture and data flow for the CI metrics scraper
+description: System architecture and data flow for OpenShift CI Observability
 ---
 
 # Architecture

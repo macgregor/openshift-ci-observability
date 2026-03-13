@@ -1,5 +1,5 @@
 ---
-description: Developer guide for contributing to the CI metrics scraper
+description: Developer guide for contributing to OpenShift CI Observability
 ---
 
 # Contributing

@@ -1,4 +1,4 @@
-# AICP CI Metrics Scraper
+# OpenShift CI Observability
 
 Scrapes `ci-operator-metrics.json` artifacts from GCS for OpenShift CI builds and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured events) for exploration via Grafana.
 
