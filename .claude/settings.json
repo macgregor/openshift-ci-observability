@@ -31,7 +31,6 @@
       "Bash(git diff)",
       "Bash(git diff *)",
       "Bash(git log *)",
-      "Bash(git mv *)",
       "mcp__chrome-devtools__*"
     ],
     "deny": [],
