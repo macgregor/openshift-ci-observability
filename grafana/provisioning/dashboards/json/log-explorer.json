@@ -1,49 +1,94 @@
 {
-  "uid": "log-explorer",
-  "title": "Log Explorer",
+  "uid": "ci-logs",
+  "title": "CI Logs",
   "timezone": "utc",
   "refresh": "",
   "time": { "from": "now-24h", "to": "now" },
   "templating": {
     "list": [
       {
+        "name": "level",
+        "label": "Level",
+        "type": "custom",
+        "query": "error,warning,info,debug,trace",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "sort": 0
+      },
+      {
+        "name": "pr_number",
+        "label": "PR",
+        "type": "query",
+        "query": "label_values(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\"}, pr_number)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "sort": 3
+      },
+      {
+        "name": "build_id",
+        "label": "Build",
+        "type": "query",
+        "query": "label_values(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\"}, build_id)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "sort": 3
+      },
+      {
+        "name": "source",
+        "label": "Source",
+        "type": "custom",
+        "query": "ci-operator",
+        "multi": true,
+        "includeAll": false,
+        "current": { "selected": true, "text": "ci-operator", "value": "ci-operator" },
+        "sort": 0
+      },
+      {
         "name": "logquery",
-        "label": "LogsQL",
-        "description": "LogsQL query — use * for all logs",
+        "label": "Filter",
+        "description": "Additional LogsQL filter (e.g. _msg:~\"timeout\")",
         "type": "textbox",
-        "current": { "selected": false, "text": "*", "value": "*" }
+        "current": { "selected": false, "text": "", "value": "" }
       }
     ]
   },
   "panels": [
     {
-      "id": 3,
-      "title": "Example Queries",
+      "id": 50,
+      "title": "Dashboard Guide",
       "type": "row",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "collapsed": true,
       "panels": [
         {
-          "id": 2,
+          "id": 51,
           "title": "",
           "type": "text",
-          "gridPos": { "h": 11, "w": 24, "x": 0, "y": 1 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 1 },
           "options": {
             "mode": "markdown",
-            "content": "| Goal | LogsQL |\n|------|--------|\n| Specific build | `build_id:1969142006726791168` |\n| Error logs | `level:error` |\n| Errors with keyword | `level:error AND _msg:~\"failed\"` |\n| By component | `component:metricsAgent` |\n| Step failures | `_msg:~\"step.*failed\"` |\n| PR errors | `pr_number:2490 AND level:error` |\n\nType queries in the **LogsQL** box above. For complex multi-line queries, use [Explore](../explore) with the VictoriaLogs datasource.\n\n[LogsQL reference docs](https://docs.victoriametrics.com/victorialogs/logsql/)"
+            "content": "### How to use this dashboard\n\nThis dashboard shows ci-operator logs organized by source, with each source displayed in its own panel to preserve log ordering.\n\n**Filters:**\n- **Level** — filter by log level (error, warning, info, debug, trace). Start with \"error\" to find failures.\n- **PR** / **Build** — narrow to specific PRs or builds. Leave as \"All\" for cross-build analysis.\n- **Source** — select which log sources to display. Each selected source gets its own panel.\n- **Filter** — additional LogsQL expression appended to the query (e.g. `_msg:~\"timeout\"`, `component:metricsAgent`).\n\n**Tips:**\n- Set Level to \"error\" first to see what's failing across all builds.\n- Select a specific PR to see all its log activity.\n- The histogram at the top of each log panel shows volume over time — spikes indicate bursts of activity.\n- Click any log entry to expand it and see all fields.\n- Use [Explore](/explore) with VictoriaLogs for complex queries or stats aggregations.\n\n**Example filters:**\n| Goal | Filter value |\n|------|--------|\n| Timeout errors | `_msg:~\"timeout\"` |\n| Step failures | `_msg:~\"step.*failed\"` |\n| Specific component | `component:metricsAgent` |"
           }
         }
       ]
     },
     {
       "id": 1,
-      "title": "",
+      "title": "Logs: $source",
       "type": "logs",
-      "gridPos": { "h": 24, "w": 24, "x": 0, "y": 1 },
+      "gridPos": { "h": 25, "w": 24, "x": 0, "y": 1 },
       "datasource": { "type": "victoriametrics-logs-datasource" },
       "targets": [
         {
-          "expr": "$logquery",
+          "expr": "source:$source AND level:~\"${level:pipe}\" AND pr_number:~\"${pr_number:pipe}\" AND build_id:~\"${build_id:pipe}\" $logquery",
           "refId": "A"
         }
       ],
@@ -56,7 +101,10 @@
         "enableLogDetails": true,
         "sortOrder": "Descending",
         "dedupStrategy": "none"
-      }
+      },
+      "repeat": "source",
+      "repeatDirection": "v",
+      "maxPerRow": 1
     }
   ],
   "schemaVersion": 39
