@@ -17,5 +17,17 @@
 ## Dashboard verification
 After creating or modifying Grafana dashboards, verify them visually in the browser using chrome-devtools MCP. Don't rely solely on JSON syntax validation -- panels can be syntactically valid but render "No data", "Configure your query", or display incorrect data. Navigate to the dashboard URL, wait for panels to load, and screenshot to confirm panels render with actual data.
 
+## CI query capture
+
+When a CI investigation requires an ad-hoc VictoriaMetrics or VictoriaLogs query that proves useful, **capture it as a ci-query subcommand** rather than leaving it as inline Python or raw HTTP calls. The workflow:
+
+1. Develop the query during investigation (ad-hoc is fine for exploration)
+2. Once it proves useful, add a `cmd_<name>(args)` function to `.claude/skills/ci-investigator/ci-query`
+3. Register it in the `COMMANDS` dict
+4. Document it in `.claude/skills/ci-investigator/query-recipes.md`
+5. If it reveals a stable failure pattern, add that to `.claude/skills/ci-investigator/known-patterns.md`
+
+**Why this matters:** The ci-query script runs as a pre-approved Bash command. Ad-hoc Python scripts and raw HTTP calls require explicit user permission for every invocation and fail entirely when run by subagents. Capturing queries in ci-query makes them reliably available to the investigator skill and any agent that uses it.
+
 ## Documentation quality
 Run `/document-reviewer` after creating or substantially updating documentation. Skip for minor fixes (typos, single-line edits).
