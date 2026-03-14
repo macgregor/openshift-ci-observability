@@ -554,6 +554,118 @@ def cmd_top_failing_tests(args):
         emit({"test_name": r["metric"]["test_name"], "failure_count": int(val(r))})
 
 
+# --- Cluster health / hibernation ---
+
+def cmd_claim_times(args):
+    """Cluster claim-to-ready times, comparing broken vs healthy builds."""
+    window = args[0] if args else "14d"
+    broken_pattern = args[1] if len(args) > 1 else "serviceaccount.*default.*not found"
+    # Find builds with the broken pattern
+    broken_entries = vl_query(f'_time:{window} AND _msg:~"{broken_pattern}"', 500)
+    broken_bids = set(e.get("build_id", "") for e in broken_entries if e.get("build_id"))
+    # Find claim-to-ready log entries
+    claim_entries = vl_query(f'_time:{window} AND _msg:~"claimed cluster.*ready after"', 500)
+    import re
+    seen = set()
+    broken_times = []
+    healthy_times = []
+    for e in claim_entries:
+        bid = e.get("build_id", "")
+        if bid in seen:
+            continue
+        seen.add(bid)
+        msg = e.get("_msg", "")
+        m = re.search(r"ready after (\d+m)?(\d+(?:\.\d+)?)s", msg)
+        if m:
+            minutes = int(m.group(1)[:-1]) if m.group(1) else 0
+            seconds = float(m.group(2))
+            total_s = minutes * 60 + seconds
+            if bid in broken_bids:
+                broken_times.append(total_s)
+            else:
+                healthy_times.append(total_s)
+    if broken_times:
+        emit({
+            "category": "broken",
+            "count": len(broken_times),
+            "avg_s": round(sum(broken_times) / len(broken_times), 0),
+            "min_s": round(min(broken_times), 0),
+            "max_s": round(max(broken_times), 0),
+        })
+    if healthy_times:
+        emit({
+            "category": "healthy",
+            "count": len(healthy_times),
+            "avg_s": round(sum(healthy_times) / len(healthy_times), 0),
+            "min_s": round(min(healthy_times), 0),
+            "max_s": round(max(healthy_times), 0),
+        })
+
+
+def cmd_classify_sa_failures(args):
+    """Classify SA-not-found failures as cluster-wide vs namespace-specific."""
+    window = args[0] if args else "14d"
+    entries = vl_query(
+        f'_time:{window} AND _msg:~"serviceaccount.*default.*not found"', 500
+    )
+    builds = {}
+    for e in entries:
+        bid = e.get("build_id", "")
+        if not bid:
+            continue
+        if bid not in builds:
+            builds[bid] = {
+                "build_id": bid,
+                "pr_number": e.get("pr_number", ""),
+                "must_gather_sa": False,
+                "install_sa": False,
+            }
+        msg = e.get("_msg", "")
+        if "openshift-must-gather" in msg:
+            builds[bid]["must_gather_sa"] = True
+        elif any(
+            ns in msg
+            for ns in ("opendatahub-operator", "redhat-ods-operator")
+        ):
+            builds[bid]["install_sa"] = True
+    cluster_wide = 0
+    namespace_only = 0
+    for info in builds.values():
+        if info["must_gather_sa"]:
+            info["classification"] = "cluster_wide"
+            cluster_wide += 1
+        else:
+            info["classification"] = "namespace_only"
+            namespace_only += 1
+        emit(info)
+    emit({
+        "summary": {
+            "total": len(builds),
+            "cluster_wide": cluster_wide,
+            "namespace_only": namespace_only,
+        }
+    })
+
+
+def cmd_failure_hours(args):
+    """Group failures by hour-of-day (UTC) to detect time-correlated patterns."""
+    pattern = require_arg(args, "pattern")
+    window = args[1] if len(args) > 1 else "14d"
+    entries = vl_query(f'_time:{window} AND _msg:~"{pattern}"', 500)
+    seen = set()
+    hours = Counter()
+    for e in entries:
+        bid = e.get("build_id", "")
+        if bid in seen:
+            continue
+        seen.add(bid)
+        ts = e.get("_time", "")
+        if len(ts) >= 13:
+            hours[ts[11:13]] += 1
+    for hour in sorted(hours):
+        emit({"hour_utc": f"{hour}:00", "failure_count": hours[hour]})
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -583,6 +695,9 @@ COMMANDS = {
     "junit-steps":        (cmd_junit_steps,          "<build_id> [limit]",            "Step results with failure messages (JUnit)"),
     "junit-tests":        (cmd_junit_tests,          "<build_id> [limit]",            "Test case results (JUnit)"),
     "top-failing-tests":  (cmd_top_failing_tests,    "[window] [limit]",              "Most frequently failing test cases"),
+    "claim-times":        (cmd_claim_times,           "[window] [broken_pattern]",     "Cluster claim-to-ready times: broken vs healthy"),
+    "classify-sa":        (cmd_classify_sa_failures,   "[window]",                     "Classify SA failures: cluster-wide vs namespace-only"),
+    "failure-hours":      (cmd_failure_hours,          "<pattern> [window]",            "Group failures by hour-of-day (UTC)"),
 }
 
 

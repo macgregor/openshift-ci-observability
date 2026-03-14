@@ -384,3 +384,58 @@ ci-query top-failing-tests 30d 20  # 30 days, top 20
 - High failure count on a specific test = likely flaky or broken test
 - Compare against `top-failing-steps` -- if the e2e step is the top failing step and specific tests dominate, those tests are the root cause
 - Use `junit-tests` on specific builds to see the failure messages for top-failing tests
+
+---
+
+## Cluster Health / Hibernation
+
+### `classify-sa [window]`
+
+Classify "serviceaccount default not found" failures as cluster-wide (broken cluster) vs namespace-specific (possible race condition). Checks whether the SA error also appears in `openshift-must-gather-*` namespaces (created by ci-operator, separate from the test namespace).
+
+```
+ci-query classify-sa           # last 14 days
+ci-query classify-sa 7d
+```
+
+**Output:** Per-build classification, then a summary line.
+
+**Output fields (per-build):** `build_id`, `pr_number`, `must_gather_sa`, `install_sa`, `classification` (`cluster_wide` or `namespace_only`)
+**Output fields (summary):** `total`, `cluster_wide`, `namespace_only`
+
+**Interpretation:**
+- `cluster_wide` = SA controller is non-functional on the entire cluster (hibernation resume issue, not a namespace race)
+- `namespace_only` = SA might be slow to create in one namespace (genuine race condition, wait/retry may help)
+- If most failures are `cluster_wide`, the problem is infrastructure (Hive pool / hibernation), not the test
+
+### `claim-times [window] [broken_pattern]`
+
+Compare cluster claim-to-ready times between builds matching a failure pattern vs healthy builds. Useful for diagnosing hibernation resume issues.
+
+```
+ci-query claim-times                                           # default: 14d, SA error pattern
+ci-query claim-times 7d "serviceaccount.*default.*not found"   # explicit
+```
+
+**Output:** Two JSON lines, one per category (`broken`, `healthy`).
+
+**Output fields:** `category`, `count`, `avg_s`, `min_s`, `max_s`
+
+**Interpretation:**
+- Broken clusters claiming *faster* than healthy ones = hibernation resume issue. The broken clusters were sitting in the pool (hibernated), resumed quickly but aren't fully initialized. Healthy clusters waited longer (pool exhaustion or slower resume), giving controllers time to sync.
+- Similar claim times = the issue is not resume-related
+
+### `failure-hours <pattern> [window]`
+
+Group failures matching a log pattern by hour-of-day (UTC). Detects time-correlated patterns like hibernation resume failures clustering during off-peak hours.
+
+```
+ci-query failure-hours 'serviceaccount.*default.*not found' 14d
+ci-query failure-hours 'quota exceeded' 7d
+```
+
+**Output fields:** `hour_utc`, `failure_count`
+
+**Interpretation:**
+- Failures clustering in off-peak hours (e.g., 00:00-06:00 UTC) = clusters sit idle longer before being claimed, more likely to have stale state after hibernation
+- Even distribution = not time-correlated, likely a different root cause
