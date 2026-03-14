@@ -17,6 +17,8 @@ Investigate OpenShift CI failures by querying VictoriaMetrics (metrics) and Vict
 - **Investigation-only**: query and analyze, never modify production data or infrastructure
 - **Root cause first**: trace symptoms to origin -- don't stop at "step X failed"
 - **Evidence-based**: every conclusion backed by query results
+- **Challenge your own conclusions**: when you think you've found the root cause, stop. Ask: "if this is the cause, what other symptoms should I see?" Look for them. Then ask: "what else could cause these symptoms?" Look for evidence of alternatives. A plausible explanation is not a verified root cause. In distributed systems like OpenShift CI (multiple clusters, shared infrastructure, cloud providers), the first plausible explanation is often incomplete or wrong.
+- **Self-sufficient first**: cross-team coordination is expensive and slow. When the root cause points to another team's component, develop a workaround we can implement ourselves. Report the issue upstream as a courtesy so they can fix it properly, but never make escalation our path to resolution. Our CI can't wait for upstream fixes.
 - **Human decides**: present findings with confidence levels; the engineer makes the call
 
 ## Services & Data
@@ -138,6 +140,32 @@ Trace the failure chain:
 4. **Infrastructure or test?** -- `scheduling-latency <build_id>`, `pod-outcomes <build_id>`
 5. **What's the pattern?** -- Match against known failure signatures (see Classification)
 
+### Phase 3b: Validate Hypothesis
+
+Phase 3 gives you a candidate root cause. Do NOT present it yet. First, stress-test it:
+
+1. **State the hypothesis explicitly**: "I believe the root cause is X because Y"
+2. **Predict expected symptoms**: if X is the root cause, what else should be true?
+   - If quota is exhausted, other PRs should be failing too
+   - If a controller is broken, errors should appear in multiple namespaces
+   - If a node is unhealthy, other pods on that node should be affected
+   - If it's a flaky test, the same test should fail intermittently across PRs
+3. **Search for corroborating evidence**: run queries to find predicted symptoms. Finding them strengthens the hypothesis.
+4. **Search for contradicting evidence**: what would disprove this? Look for it. Not finding contradictions is weak support; finding them means revise the hypothesis.
+5. **Consider alternatives**: what else could produce these symptoms? For each, identify distinguishing evidence and look for it.
+6. **Assess confidence**:
+   - **High**: predicted symptoms present AND alternatives ruled out by evidence
+   - **Medium**: symptoms present but alternatives not fully eliminated
+   - **Low**: plausible but insufficient evidence -- say so and identify what data would resolve it
+
+If confidence is low, look for the missing data before presenting. If the data isn't available, explicitly state what you can't verify and why.
+
+**Example**: You find `serviceaccount "default" not found` errors. Before concluding "SA race condition":
+- Check: does the error appear in multiple namespaces? (If yes, it's cluster-wide, not a race)
+- Check: does it appear in the must-gather namespace? (If yes, the SA controller is broken, not a namespace race)
+- Check: do healthy builds on the same cluster have this? (If no, it's cluster-specific)
+- Alternative: could this be a hibernation resume issue? Check claim-to-ready times.
+
 ### Phase 4: Classify
 
 ```
@@ -171,21 +199,28 @@ Consult `known-patterns.md` for additional domain-specific signatures.
 
 ### Phase 5: Recommend
 
-| Classification | Recommendation |
-|---------------|----------------|
-| INFRASTRUCTURE | Check cluster health, retry, escalate if persistent |
-| SYSTEMIC | Identify affected component, check platform-wide incidents |
-| FLAKY INFRASTRUCTURE | Retry; if persistent, investigate infra instability |
-| DETERMINISTIC FAILURE | Debug the specific step; likely code or test issue |
-| TEST FAILURE | Review test code and PR changes for compatibility |
-| BUILD FAILURE | Check compilation errors, dependency changes |
-| CLUSTER PROVISIONING | Cloud provider issues, quota, region availability |
-| TIMEOUT | Check if timeout is too short or target is genuinely slow |
-| RESOURCE EXHAUSTION | Check resource requests/limits, node capacity |
-| QUOTA | Check cloud quota, lease availability |
-| IMAGE ISSUE | Check image references, registry availability |
-| API BREAKING CHANGE | Check upstream API changes, version skew |
-| NETWORK | Transient or DNS; retry first, investigate if persistent |
+Every recommendation MUST follow this structure, in this priority order:
+
+**1. Workaround (what can WE do right now?)**
+Think about what's in our control. Can we:
+- Add retry logic, adjust timeouts, add fallback paths in our code?
+- Detect this condition and skip/handle it gracefully?
+- Modify our scraper, tooling, or test configuration to avoid the problem?
+- Add monitoring/alerting so we catch this faster next time?
+- Filter out or quarantine the broken component (e.g., remove a bad cluster from the pool)?
+
+The goal: our CI keeps running even if the underlying problem persists.
+
+**2. Permanent fix (what should be done properly?)**
+- Is this something we own and can fix in our code/config?
+- If it requires changes to shared infrastructure, what specifically needs to change?
+
+**3. Upstream report (if the root cause is outside our control)**
+- Report as a courtesy to help others, NOT as our path to resolution
+- Include the evidence and diagnosis -- save the upstream team the investigation work
+- Be specific: "component X has bug Y, here's the evidence" not "something is broken"
+
+Never present "escalate to team X" as the primary recommendation. If the only path is escalation, explain what workarounds you considered and why they're insufficient.
 
 ## Output Format
 
@@ -194,7 +229,7 @@ Structure findings as:
 ```
 ## CI Investigation: [scope]
 
-**Classification**: [category] (confidence: high/medium/low)
+**Classification**: [category]
 **Scope**: [PR-specific | systemic | unknown]
 
 ### Evidence
@@ -204,8 +239,18 @@ Structure findings as:
 ### Root Cause
 [Traced failure chain: symptom -> immediate cause -> underlying cause]
 
+### Hypothesis Validation
+- **Hypothesis**: [what you believe the root cause is and why]
+- **Expected symptoms**: [what else should be true if this is correct]
+- **Corroborating evidence**: [evidence found that supports the hypothesis]
+- **Contradicting evidence**: [evidence that weakens it, or "none found" with what you looked for]
+- **Alternatives considered**: [other possible causes and why they're less likely]
+- **Confidence**: [high/medium/low -- high = symptoms confirmed + alternatives ruled out]
+
 ### Recommendation
-[Action items for the engineer]
+**Workaround (now):** [what we implement ourselves to keep CI running]
+**Permanent fix:** [proper solution, whether ours or upstream]
+**Upstream report:** [if applicable -- what to tell the responsible team, with evidence]
 
 ### Links
 - [Prow job URL]
