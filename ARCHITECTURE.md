@@ -9,12 +9,14 @@ description: System architecture and data flow for OpenShift CI Observability
 ```mermaid
 graph TD
     GCS["Google Cloud Storage\n(GCS Buckets)"]
+    Cache["Local GCS Cache\n(podman volume)"]
     Scraper["Scraper\nscraper-watch · scraper-backfill"]
     VM["VictoriaMetrics"]
     VL["VictoriaLogs"]
     Grafana["Grafana"]
 
-    GCS -- "GCS XML API" --> Scraper
+    GCS -- "GCS XML API" --> Cache
+    Cache -- "cached artifacts" --> Scraper
     Scraper -- "Remote-write\n(Prometheus)" --> VM
     Scraper -- "JSON lines" --> VL
     VM -- "PromQL" --> Grafana
@@ -55,19 +57,41 @@ The scraper fetches `ci-operator.log` from each build's artifact directory. This
 
 Logs are pushed to VictoriaLogs as JSON lines with `_stream_fields=job_name,build_id`.
 
-## Domain Model
+## Scraper Internals
 
-The scraper is built around a pipeline architecture with four core entities:
+### Pipeline Architecture
 
-- **Pipeline**: A named processor that takes a `BuildContext` and produces records for a sink. Each pipeline targets a specific artifact (e.g., `MetricsPipeline` processes `ci-operator-metrics.json`, `LogPipeline` processes `ci-operator.log`). Adding a new scrape target means writing a new Pipeline and registering it in the CLI wiring.
+The scraper is built around a pipeline architecture. Each pipeline processes a specific artifact type and emits records to a sink:
 
-- **Sink**: A destination for records. Sinks handle batching and HTTP transport. `VictoriaMetricsSink` pushes Prometheus text format to VictoriaMetrics. `VictoriaLogsSink` pushes JSON lines to VictoriaLogs.
+| Pipeline | Artifact | Output | Sink |
+|---|---|---|---|
+| MetricsPipeline | `ci-operator-metrics.json` | Prometheus metrics | VictoriaMetrics |
+| LogPipeline | `ci-operator.log` | JSON log lines | VictoriaLogs |
+| JunitPipeline | `junit_operator.xml`, `junit_*.xml` | Metrics + failure logs | Both |
+| ClusterPoolPipeline | `clusterClaim.json`, `clusterDeployment.json` | Pool lifecycle metrics | VictoriaMetrics |
+| TestClusterMetricsPipeline | `prometheus.tar` (TSDB dump) | Cluster utilization metrics | VictoriaMetrics |
 
-- **BuildContext**: A per-build facade that provides lazy artifact fetching (with caching) and label extraction. Pipelines access build artifacts and job labels through the context without needing to know about GCS paths or label parsing.
+Adding a new scrape target means writing a new Pipeline class and registering it in `__main__.py`. Pipelines are independent -- each receives a `BuildContext` and decides what to fetch and emit.
 
-- **Scraper**: The orchestrator that discovers builds via GCS, filters by date range, skips builds already in VictoriaMetrics, creates a `BuildContext` for each qualifying build, and runs all registered pipelines. Pipeline failures are caught per-pipeline so all pipelines get a chance to run.
+### Core Entities
 
-Components are composed at startup: the CLI creates a session, GCS client, sinks, pipelines, and scraper, then calls `scraper.scrape()`.
+- **BuildContext**: Per-build facade providing lazy artifact fetching (with in-memory caching) and job label extraction. Pipelines access build artifacts and labels through the context without needing to know about GCS paths.
+
+- **Sink**: Handles batching and HTTP transport to backend services. `VictoriaMetricsSink` pushes Prometheus text format, `VictoriaLogsSink` pushes JSON lines.
+
+- **GCSClient**: HTTP client for the GCS XML API with optional filesystem cache. Listing operations (PR/job/build enumeration) are never cached; object fetches are cached on disk so re-ingestion after a DB wipe reads from local disk.
+
+- **Scraper**: Orchestrator that discovers builds, filters by date range, skips already-processed builds, and runs all pipelines via a thread pool.
+
+### Concurrency
+
+The scraper uses a `ThreadPoolExecutor` to process builds in parallel. Discovery (listing PRs, jobs, builds from GCS) runs on the main thread and submits builds to the pool as they're discovered. All builds across all PRs and jobs share the pool, so workers stay saturated even when individual builds take varying amounts of time (e.g., prometheus.tar extraction is much slower than JSON parsing).
+
+### GCS Artifact Cache
+
+GCS artifacts are immutable once written, so the scraper caches fetched objects to a local directory (a podman volume shared between watch and backfill services). Cache entries use the GCS path as the filesystem path, mirroring the bucket layout. 404 responses are cached as `.miss` marker files to avoid re-probing missing artifacts.
+
+`make wipe-db` clears the database but preserves the cache, enabling fast re-ingestion after scrape logic changes. `make wipe-all` clears both.
 
 ## Portability Design
 
