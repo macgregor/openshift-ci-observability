@@ -96,6 +96,16 @@ JUnit entries use `source` to distinguish record types:
 
 ## Investigation Workflow
 
+### Phase -1: Ensure Services Are Running
+
+Before any investigation, check the status output above. If VictoriaMetrics or VictoriaLogs are not reachable, start them:
+
+```bash
+make up
+```
+
+Wait for services to be healthy before proceeding. The scraper backfills historical data automatically, so even a fresh start will have data within minutes. Do not skip this step or fall back to external-only investigation -- the local data is the primary source of truth.
+
 ### Phase 0: Parse Input
 
 Route by what the user provides:
