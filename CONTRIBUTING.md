@@ -50,6 +50,8 @@ Scraper state is stored in VictoriaMetrics itself (via a sentinel metric), so wi
 
 **When to wipe:** Changes to scraping logic (new pipelines, modified metric extraction, new artifact parsing) require a DB wipe to reprocess existing builds with the updated code. The scraper skips builds already present in VictoriaMetrics, so existing builds won't pick up new data without a wipe. You don't need to clear the GCS cache for this -- the cached artifacts are the raw inputs, not the processed output.
 
+**Cache growth:** The GCS cache grows as builds are processed and is never automatically pruned. This is intentional -- cached artifacts remain available for re-ingestion even after GCS applies its own retention policy (~90 days), so you can retain historical data longer than the source bucket. Run `make wipe-cache` periodically if disk space is a concern, or `podman exec ci-obs-scraper-backfill du -sh /cache` to check current size.
+
 ## Chrome DevTools MCP (for Claude)
 
 The project includes a chrome-devtools MCP server that lets Claude interact with Grafana dashboards in a browser -- taking screenshots, inspecting panels, clicking elements, and verifying dashboard changes visually.
