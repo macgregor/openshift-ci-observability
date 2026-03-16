@@ -55,6 +55,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - WORKERS=${WATCH_WORKERS:-8}
       - GCS_CACHE_DIR=/cache
+      - GCS_NO_CACHE=${GCS_NO_CACHE:-}
     volumes:
       - gcs-cache:/cache
     command: ["watch"]
@@ -79,6 +80,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - WORKERS=${BACKFILL_WORKERS:-16}
       - GCS_CACHE_DIR=/cache
+      - GCS_NO_CACHE=${GCS_NO_CACHE:-}
     volumes:
       - gcs-cache:/cache
     command: ["backfill"]
