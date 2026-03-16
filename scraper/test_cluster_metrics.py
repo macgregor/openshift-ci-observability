@@ -1,9 +1,12 @@
 """Pipeline for extracting utilization metrics from test cluster Prometheus TSDBs."""
 import logging
+import os
 import re
+import shutil
 import subprocess
 import tarfile
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 
 from scraper.context import BuildContext
@@ -11,6 +14,19 @@ from scraper.metrics import format_prometheus_line, sanitize_metric_name
 from scraper.models import Sink
 
 log = logging.getLogger("scraper")
+
+# Prometheus TSDB processing gets its own thread pool to avoid starving the main
+# scraper pool.  WAL replay is CPU/IO-intensive and benefits from limited
+# concurrency -- 4 workers keeps throughput high without the contention that
+# comes from 16 workers all replaying WALs simultaneously.
+_PROMTOOL_WORKERS = 4
+
+# Skip prometheus.tar files larger than this.  CI test clusters dump the full
+# Prometheus TSDB as a tar archive.  promtool must replay the WAL to extract
+# our target metrics, which is CPU-intensive and scales linearly with WAL size.
+# Large tars frequently contain corrupted WALs (truncated by the CI kill
+# signal) that burn CPU for minutes before returning zero data.
+_MAX_PROMETHEUS_TAR_BYTES = 150 * 1024 * 1024
 
 METRICS = [
     "cluster:cpu_usage_cores:sum",
@@ -20,11 +36,22 @@ METRICS = [
     "instance:node_memory_utilisation:ratio",
     "node_memory_MemTotal_bytes",
     "machine_cpu_cores",
+    "kube_node_role",
 ]
+
+# Metrics that get emitted. kube_node_role is extracted only for the node→role mapping.
+_EMITTED_METRICS = [m for m in METRICS if m != "kube_node_role"]
 
 # Map original metric names to output names.
 # Colons become underscores via sanitize_metric_name, then prefixed with ci_test_cluster_.
-_OUTPUT_NAMES = {name: f"ci_test_cluster_{sanitize_metric_name(name)}" for name in METRICS}
+_OUTPUT_NAMES = {name: f"ci_test_cluster_{sanitize_metric_name(name)}" for name in _EMITTED_METRICS}
+
+# Per-node metrics that get enriched with a role label from kube_node_role.
+_PER_NODE_METRICS = {
+    "instance:node_memory_utilisation:ratio",
+    "node_memory_MemTotal_bytes",
+    "machine_cpu_cores",
+}
 
 # Artifact directories that are never test steps.
 _SKIP_DIRS = {"build-logs", "build-resources", "release"}
@@ -77,19 +104,37 @@ def _build_match_arg():
     return f'{{__name__=~"{names}"}}'
 
 
-def _run_promtool(tsdb_path):
+def _wal_size_mb(tsdb_path):
+    """Measure WAL directory size in MB."""
+    wal_dir = os.path.join(tsdb_path, "wal")
+    if not os.path.isdir(wal_dir):
+        return 0
+    total = sum(e.stat().st_size for e in os.scandir(wal_dir) if e.is_file())
+    return total // (1024 * 1024)
+
+
+def _promtool_timeout(wal_size_mb):
+    """Calculate promtool timeout proportional to WAL size.
+
+    With 4 concurrent workers, observed WAL replay rate is ~10 MB/s.
+    The formula gives generous headroom: 200 MB → 70s, 400 MB → 110s, 700 MB → 170s.
+    """
+    return min(300, 30 + int(wal_size_mb * 0.2))
+
+
+def _run_promtool(tsdb_path, timeout=120):
     """Run promtool tsdb dump and return stdout lines."""
     match_arg = _build_match_arg()
     try:
         result = subprocess.run(
             ["promtool", "tsdb", "dump", f"--match={match_arg}", tsdb_path],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=timeout,
         )
     except FileNotFoundError:
         log.warning("promtool not found in PATH, skipping test cluster metrics")
         return []
     except subprocess.TimeoutExpired:
-        log.warning("promtool timed out after 120s for %s", tsdb_path)
+        log.warning("promtool timed out after %ds for %s", timeout, tsdb_path)
         return []
     if result.returncode != 0:
         log.warning("promtool exited %d: %s", result.returncode, result.stderr[:500])
@@ -97,18 +142,56 @@ def _run_promtool(tsdb_path):
     return result.stdout.splitlines()
 
 
+def _build_node_role_map(parsed_lines):
+    """Build a node hostname → role mapping from kube_node_role entries.
+
+    OCP nodes can have multiple roles (master + control-plane). We normalize
+    to just "master" or "worker" since that's the meaningful distinction.
+    """
+    role_map = {}
+    for metric_name, labels, value, ts in parsed_lines:
+        if metric_name == "kube_node_role" and value == 1.0:
+            node = labels.get("node", "")
+            role = labels.get("role", "")
+            if not node or not role:
+                continue
+            # Normalize: "control-plane" and "master" both mean master
+            if role in ("master", "control-plane"):
+                role = "master"
+            # "master" takes precedence over "worker" if a node has both
+            if role_map.get(node) == "master":
+                continue
+            role_map[node] = role
+    return role_map
+
+
 def extract_test_cluster_metrics(lines, job_labels):
-    """Convert promtool dump lines to Prometheus text format with job labels."""
-    metrics = []
+    """Convert promtool dump lines to Prometheus text format with job labels.
+
+    Per-node metrics are enriched with a ``role`` label (master/worker) derived
+    from ``kube_node_role`` entries in the same TSDB dump.
+    """
+    # Parse all lines first so we can build the node→role map before emitting.
+    parsed = []
     for line in lines:
-        parsed = parse_promtool_line(line)
-        if parsed is None:
-            continue
-        metric_name, prom_labels, value, ts = parsed
+        result = parse_promtool_line(line)
+        if result is not None:
+            parsed.append(result)
+
+    role_map = _build_node_role_map(parsed)
+
+    metrics = []
+    for metric_name, prom_labels, value, ts in parsed:
         output_name = _OUTPUT_NAMES.get(metric_name)
         if output_name is None:
             continue
         combined_labels = {**job_labels, **prom_labels}
+        # Enrich per-node metrics with role from kube_node_role
+        if metric_name in _PER_NODE_METRICS and role_map:
+            node_key = prom_labels.get("node") or prom_labels.get("instance", "")
+            role = role_map.get(node_key, "")
+            if role:
+                combined_labels["role"] = role
         formatted = format_prometheus_line(output_name, combined_labels, value, ts)
         if formatted:
             metrics.append(formatted)
@@ -120,6 +203,9 @@ class TestClusterMetricsPipeline:
 
     def __init__(self, sink: Sink):
         self.sink = sink
+        self._pool = ThreadPoolExecutor(
+            max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
+        )
 
     def process(self, ctx: BuildContext) -> int:
         # Skip builds without a cluster claim -- no test cluster means no Prometheus data.
@@ -132,28 +218,57 @@ class TestClusterMetricsPipeline:
         if not steps:
             return 0
 
-        total = 0
         for step_name in steps:
-            count = self._process_step(ctx, step_name)
-            total += count
-        return total
+            self._submit_step(ctx, step_name)
+        # Actual count is logged asynchronously when each task completes.
+        return 0
 
-    def _process_step(self, ctx: BuildContext, step_name: str) -> int:
+    def _submit_step(self, ctx: BuildContext, step_name: str):
         artifact_path = f"artifacts/{step_name}/{_PROMETHEUS_TAR_SUFFIX}"
         tar_bytes = ctx.fetch_artifact_binary(artifact_path)
         if tar_bytes is None:
-            return 0
+            return
+
+        if len(tar_bytes) > _MAX_PROMETHEUS_TAR_BYTES:
+            log.debug("Skipping prometheus.tar for build %s step %s: "
+                      "%dMB exceeds %dMB limit",
+                      ctx.build.build_id, step_name,
+                      len(tar_bytes) // (1024 * 1024),
+                      _MAX_PROMETHEUS_TAR_BYTES // (1024 * 1024))
+            return
 
         step_labels = {**ctx.labels, "test_step": step_name}
+        self._pool.submit(
+            self._process_tar, tar_bytes, step_labels,
+            ctx.build.build_id, ctx.build.pr, step_name,
+        )
+
+    def _process_tar(self, tar_bytes, step_labels, build_id, pr, step_name):
+        tmpdir = tempfile.mkdtemp(prefix="prom-tsdb-")
         try:
-            with tempfile.TemporaryDirectory(prefix="prom-tsdb-") as tmpdir:
-                with tarfile.open(fileobj=BytesIO(tar_bytes)) as tf:
-                    tf.extractall(tmpdir, filter="data")
-                lines = _run_promtool(tmpdir)
-                metrics = extract_test_cluster_metrics(lines, step_labels)
-                self.sink.push(metrics)
-                return len(metrics)
+            with tarfile.open(fileobj=BytesIO(tar_bytes)) as tf:
+                tf.extractall(tmpdir, filter="data")
+            wal_mb = _wal_size_mb(tmpdir)
+            timeout = _promtool_timeout(wal_mb)
+            lines = _run_promtool(tmpdir, timeout=timeout)
+            metrics = extract_test_cluster_metrics(lines, step_labels)
+            self.sink.push(metrics)
+            if metrics:
+                log.info("PR %s build %s step %s: %d test_cluster_metrics "
+                         "(wal=%dMB, timeout=%ds)",
+                         pr, build_id, step_name, len(metrics), wal_mb, timeout)
         except (tarfile.TarError, OSError) as e:
-            log.warning("Failed to extract prometheus.tar for build %s step %s: %s",
-                        ctx.build.build_id, step_name, e)
-            return 0
+            log.warning("Failed to process prometheus.tar for build %s step %s: %s",
+                        build_id, step_name, e)
+        except Exception:
+            log.error("Prometheus pipeline failed for build %s step %s",
+                      build_id, step_name, exc_info=True)
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def drain(self):
+        """Wait for all outstanding prometheus processing to complete."""
+        self._pool.shutdown(wait=True)
+        self._pool = ThreadPoolExecutor(
+            max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
+        )

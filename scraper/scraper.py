@@ -89,6 +89,11 @@ class Scraper:
                         ingested += 1
                 except Exception:
                     log.error("Failed to process PR %s build %s", pr, bid, exc_info=True)
+        # Wait for async pipeline work (e.g. prometheus.tar processing in its own pool).
+        for pipeline in self.pipelines:
+            if hasattr(pipeline, 'drain'):
+                pipeline.drain()
+
         log.info("Scrape complete: %d ingested, %d skipped (already in VM)", ingested, skipped)
 
     def _process_build(self, base_path, pr, job, build_id, since, until, dry_run):
