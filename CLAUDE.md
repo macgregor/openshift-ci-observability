@@ -17,6 +17,9 @@
 ## Dashboard verification
 After creating or modifying Grafana dashboards, verify them visually in the browser using chrome-devtools MCP. Don't rely solely on JSON syntax validation -- panels can be syntactically valid but render "No data", "Configure your query", or display incorrect data. Navigate to the dashboard URL, wait for panels to load, and screenshot to confirm panels render with actual data.
 
+## CI investigation data sources
+When investigating CI failures, **always query VictoriaMetrics and VictoriaLogs first** (via `ci-query` or direct API calls) before scraping Prow pages, GCS artifacts, or other external sources. The local stack has metrics and logs for all ingested builds and is faster, more structured, and easier to work with. Only fall back to external sources (Prow HTML, GCS XML API, GitHub) for data not captured by the scraper (e.g. raw build logs, must-gather artifacts, or builds outside the ingestion window).
+
 ## CI query capture
 
 When a CI investigation requires an ad-hoc VictoriaMetrics or VictoriaLogs query that proves useful, **capture it as a ci-query subcommand** rather than leaving it as inline Python or raw HTTP calls. The workflow:

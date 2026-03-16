@@ -387,6 +387,43 @@ ci-query top-failing-tests 30d 20  # 30 days, top 20
 
 ---
 
+## Regression Detection
+
+### `last-success <job_pattern>`
+
+Find when a job last passed and the first failure after it. Useful for pinpointing when a regression started.
+
+```
+ci-query last-success rhoai-e2e
+ci-query last-success e2e-hypershift
+```
+
+**Output fields:** `last_success` (build_id), `pr_number`, `pr_sha`, `job_name`, `first_failure_after` (build_id), `first_failure_pr`, `total_builds`, `total_successes`, `failures_since`
+
+**Interpretation:**
+- `failures_since` > 0 with `total_successes` > 0 = regression occurred, investigate what changed between `last_success` and `first_failure_after`
+- `total_successes` == 0 = job has never passed in the data window
+- Compare timestamps of the transition builds against operator/manifest commits to find the culprit
+
+### `test-failures [job_pattern] [test_pattern] [limit]`
+
+Find failing test cases filtered by job name and/or test name. Useful for scoping test failures to a specific platform or component.
+
+```
+ci-query test-failures rhoai-e2e kserve
+ci-query test-failures e2e monitoring 20
+ci-query test-failures "" kserve          # all jobs, kserve tests
+```
+
+**Output fields:** `build_id`, `pr_number`, `test_name`, `msg` (truncated failure message), `time`
+
+**Interpretation:**
+- Same test failing across many builds/PRs = systemic (broken test or broken dependency)
+- Failures only in one job pattern (e.g., `rhoai-e2e` but not `e2e`) = platform-specific issue (check manifest/config differences)
+- `msg` contains the assertion failure -- look for ConfigMap errors, timeout messages, or crash indicators
+
+---
+
 ## Cluster Health / Hibernation
 
 ### `classify-sa [window]`

@@ -666,6 +666,69 @@ def cmd_failure_hours(args):
         emit({"hour_utc": f"{hour}:00", "failure_count": hours[hour]})
 
 
+def cmd_last_success(args):
+    """Find the last successful build for a job, with the first failure after it."""
+    job_pattern = require_arg(args, "job_pattern")
+    results = vm_query(
+        f'last_over_time({_OUTCOME}{{name="execution_completed",'
+        f'job_name=~".*{job_pattern}.*"}}[{LOOKBACK}])'
+    )
+    builds = []
+    for r in results:
+        m = r["metric"]
+        builds.append({
+            "build_id": m.get("build_id", ""),
+            "success": m.get("success", ""),
+            "pr_number": m.get("pr_number", ""),
+            "job_name": m.get("job_name", ""),
+            "pr_sha": m.get("pr_sha", "")[:8],
+        })
+    builds.sort(key=lambda x: x["build_id"])
+    successes = [b for b in builds if b["success"] == "true"]
+    if not successes:
+        emit({"status": "no_successes_found", "total_builds": len(builds)})
+        return
+    last = max(successes, key=lambda x: x["build_id"])
+    result = {"last_success": last["build_id"], "pr_number": last["pr_number"],
+              "pr_sha": last["pr_sha"], "job_name": last["job_name"]}
+    later_failures = [b for b in builds if b["success"] == "false" and b["build_id"] > last["build_id"]]
+    if later_failures:
+        first_fail = min(later_failures, key=lambda x: x["build_id"])
+        result["first_failure_after"] = first_fail["build_id"]
+        result["first_failure_pr"] = first_fail["pr_number"]
+    result["total_builds"] = len(builds)
+    result["total_successes"] = len(successes)
+    result["failures_since"] = len(later_failures)
+    emit(result)
+
+
+def cmd_test_failures(args):
+    """Find failing test cases filtered by job and/or test name pattern."""
+    job_pattern = args[0] if args else ""
+    test_pattern = args[1] if len(args) > 1 else ""
+    limit = int(args[2]) if len(args) > 2 else 50
+    query_parts = ['source:junit_test AND status:failed']
+    if job_pattern:
+        query_parts.append(f'job_name:~{job_pattern}')
+    if test_pattern:
+        query_parts.append(f'test_name:~{test_pattern}')
+    entries = vl_query(" AND ".join(query_parts), limit)
+    builds = {}
+    for e in entries:
+        bid = e.get("build_id", "")
+        test = e.get("test_name", "")
+        key = f"{bid}:{test}"
+        if key not in builds:
+            builds[key] = True
+            emit({
+                "build_id": bid,
+                "pr_number": e.get("pr_number", ""),
+                "test_name": test,
+                "msg": e.get("_msg", "")[:300],
+                "time": e.get("_time", ""),
+            })
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -698,6 +761,8 @@ COMMANDS = {
     "claim-times":        (cmd_claim_times,           "[window] [broken_pattern]",     "Cluster claim-to-ready times: broken vs healthy"),
     "classify-sa":        (cmd_classify_sa_failures,   "[window]",                     "Classify SA failures: cluster-wide vs namespace-only"),
     "failure-hours":      (cmd_failure_hours,          "<pattern> [window]",            "Group failures by hour-of-day (UTC)"),
+    "last-success":       (cmd_last_success,           "<job_pattern>",                 "Last successful build for a job"),
+    "test-failures":      (cmd_test_failures,          "[job_pattern] [test_pattern] [limit]", "Failing tests filtered by job/test name"),
 }
 
 
