@@ -133,6 +133,12 @@ class TestClusterMetricsPipeline:
         self.sink = sink
 
     def process(self, ctx: BuildContext) -> int:
+        # Skip builds without a cluster claim -- no test cluster means no Prometheus data.
+        # The cluster_pool pipeline runs before this one, so clusterClaim.json is already
+        # cached in the artifact cache (None if it doesn't exist).
+        if ctx.fetch_artifact("artifacts/build-resources/clusterClaim.json") is None:
+            return 0
+
         tar_paths = discover_prometheus_tar_paths(ctx)
         if not tar_paths:
             return 0

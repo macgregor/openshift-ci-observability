@@ -135,12 +135,25 @@ def test_extract_includes_test_step_label():
     assert 'test_step="my-e2e-step"' in metrics[0]
 
 
+def test_process_skips_without_cluster_claim():
+    """Pipeline skips entirely when no clusterClaim.json exists."""
+    sink = MagicMock()
+    pipeline = TestClusterMetricsPipeline(sink)
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.fetch_artifact.return_value = None
+    assert pipeline.process(ctx) == 0
+    ctx.list_artifact_dirs.assert_not_called()
+    sink.push.assert_not_called()
+
+
 def test_process_no_prometheus_tar():
     """Pipeline returns 0 when no steps have prometheus.tar."""
     sink = MagicMock()
     pipeline = TestClusterMetricsPipeline(sink)
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
+    ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.return_value = ["build-logs", "build-resources", "release"]
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
@@ -152,6 +165,7 @@ def test_process_head_miss():
     pipeline = TestClusterMetricsPipeline(sink)
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
+    ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.return_value = ["my-step"]
     ctx.head_artifact.return_value = False
     assert pipeline.process(ctx) == 0
@@ -169,6 +183,7 @@ def test_process_with_promtool(mock_promtool):
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.build.build_id = "123"
+    ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
     ctx.head_artifact.return_value = True
     # Create a minimal valid tar in memory

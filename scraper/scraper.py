@@ -63,6 +63,7 @@ class Scraper:
                  len(prs), since_str, until_str, self.workers)
         ingested = 0
         skipped = 0
+        futures = {}
         with ThreadPoolExecutor(max_workers=self.workers) as executor:
             for i, pr in enumerate(prs):
                 log.info("Scanning PR %s (%d/%d)", pr, i + 1, len(prs))
@@ -76,18 +77,18 @@ class Scraper:
                     if not new_builds:
                         continue
                     log.debug("PR %s job %s: %d new builds to check", pr, job, len(new_builds))
-                    futures = {
-                        executor.submit(self._process_build, base_path, pr, job, bid, since, until, dry_run): bid
-                        for bid in new_builds
-                    }
-                    for future in as_completed(futures):
-                        bid = futures[future]
-                        try:
-                            result = future.result()
-                            if result:
-                                ingested += 1
-                        except Exception:
-                            log.error("Failed to process PR %s build %s", pr, bid, exc_info=True)
+                    for bid in new_builds:
+                        f = executor.submit(self._process_build, base_path, pr, job, bid, since, until, dry_run)
+                        futures[f] = (pr, bid)
+
+            for future in as_completed(futures):
+                pr, bid = futures[future]
+                try:
+                    result = future.result()
+                    if result:
+                        ingested += 1
+                except Exception:
+                    log.error("Failed to process PR %s build %s", pr, bid, exc_info=True)
         log.info("Scrape complete: %d ingested, %d skipped (already in VM)", ingested, skipped)
 
     def _process_build(self, base_path, pr, job, build_id, since, until, dry_run):
