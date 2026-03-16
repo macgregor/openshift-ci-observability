@@ -54,6 +54,9 @@ services:
       - POLL_INTERVAL=${POLL_INTERVAL:-300}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - WORKERS=${WATCH_WORKERS:-8}
+      - GCS_CACHE_DIR=/cache
+    volumes:
+      - gcs-cache:/cache
     command: ["watch"]
     depends_on:
       - victoriametrics
@@ -75,6 +78,9 @@ services:
       - POLL_INTERVAL=${POLL_INTERVAL:-300}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - WORKERS=${BACKFILL_WORKERS:-16}
+      - GCS_CACHE_DIR=/cache
+    volumes:
+      - gcs-cache:/cache
     command: ["backfill"]
     depends_on:
       - victoriametrics
@@ -87,3 +93,5 @@ volumes:
     name: ci-obs-vl-data
   grafana-data:
     name: ci-obs-grafana-data
+  gcs-cache:
+    name: ci-obs-gcs-cache

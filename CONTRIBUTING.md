@@ -35,13 +35,20 @@ Run `make` to see all available commands.
 To start over with a clean database and re-ingest everything:
 
 ```bash
-make wipe
+make wipe-db
 make up
+```
+
+This preserves the GCS artifact cache, so re-ingestion reads from local disk instead of re-downloading from GCS. To also clear the cache:
+
+```bash
+make wipe-all    # delete DB + cache
+make wipe-cache  # delete cache only
 ```
 
 Scraper state is stored in VictoriaMetrics itself (via a sentinel metric), so wiping the database automatically resets state. VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
 
-**When to wipe:** Changes to scraping logic (new pipelines, modified metric extraction, new artifact parsing) require a DB wipe to reprocess existing builds with the updated code. The scraper skips builds already present in VictoriaMetrics, so existing builds won't pick up new data without a wipe.
+**When to wipe:** Changes to scraping logic (new pipelines, modified metric extraction, new artifact parsing) require a DB wipe to reprocess existing builds with the updated code. The scraper skips builds already present in VictoriaMetrics, so existing builds won't pick up new data without a wipe. You don't need to clear the GCS cache for this -- the cached artifacts are the raw inputs, not the processed output.
 
 ## Chrome DevTools MCP (for Claude)
 

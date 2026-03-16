@@ -1,8 +1,9 @@
 COMPOSE := podman-compose --profile backfill
 CONTAINERS := ci-obs-victoriametrics ci-obs-victorialogs ci-obs-grafana ci-obs-scraper-watch ci-obs-scraper-backfill
 VOLUMES := ci-obs-vm-data ci-obs-vl-data ci-obs-grafana-data
+CACHE_VOLUME := ci-obs-gcs-cache
 
-.PHONY: check-deps build up down restart wipe logs status test help
+.PHONY: check-deps build up down restart wipe-db wipe-cache wipe-all logs status test help
 
 check-deps:
 	@command -v podman >/dev/null || { echo "podman not found. Install: https://podman.io/docs/installation"; exit 1; }
@@ -28,12 +29,24 @@ restart: check-deps build ## Restart the stack (rebuilds scraper image)
 	@$(COMPOSE) up -d
 	@echo "Grafana: http://localhost:3000"
 
-wipe: check-deps ## Stop and delete all data
-	@echo "This will delete all metrics, logs, and scraper state."
+wipe-db: check-deps ## Stop and delete metrics/logs (keeps GCS cache for fast re-ingestion)
+	@echo "This will delete all metrics, logs, and scraper state (GCS cache preserved)."
 	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = y ] || exit 1
 	@$(MAKE) -s down
 	@podman volume rm -f $(VOLUMES) 2>/dev/null; true
-	@echo "All data wiped."
+	@echo "Data wiped. GCS cache preserved -- re-ingestion will use cached artifacts."
+
+wipe-cache: check-deps ## Delete only the GCS artifact cache
+	@$(MAKE) -s down
+	@podman volume rm -f $(CACHE_VOLUME) 2>/dev/null; true
+	@echo "GCS cache cleared."
+
+wipe-all: check-deps ## Stop and delete everything including GCS cache
+	@echo "This will delete all data AND the GCS artifact cache."
+	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = y ] || exit 1
+	@$(MAKE) -s down
+	@podman volume rm -f $(VOLUMES) $(CACHE_VOLUME) 2>/dev/null; true
+	@echo "All data and cache wiped."
 
 logs: check-deps ## Tail logs (use SVC=scraper-watch to filter)
 	@$(COMPOSE) logs -f --tail=100 $(SVC)

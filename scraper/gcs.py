@@ -1,5 +1,8 @@
 """GCS client for listing and fetching objects from Google Cloud Storage."""
 import logging
+import os
+import tempfile
+from pathlib import Path
 from typing import Optional
 from xml.etree import ElementTree as ET
 
@@ -24,9 +27,78 @@ def make_session(pool_size=10):
 
 
 class GCSClient:
-    def __init__(self, session: requests.Session, bucket: str):
+    def __init__(self, session: requests.Session, bucket: str, cache_dir: Optional[str] = None):
         self.session = session
         self.bucket = bucket
+        self._cache_dir = Path(cache_dir) if cache_dir else None
+        if self._cache_dir:
+            self._cache_dir.mkdir(parents=True, exist_ok=True)
+            self._log_cache_stats()
+
+    def _log_cache_stats(self):
+        total_bytes = 0
+        file_count = 0
+        for dirpath, _dirnames, filenames in os.walk(self._cache_dir):
+            for f in filenames:
+                file_count += 1
+                total_bytes += os.path.getsize(os.path.join(dirpath, f))
+        size_mb = total_bytes / (1024 * 1024)
+        log.info("GCS cache: %s (%.1f MB, %d files)", self._cache_dir, size_mb, file_count)
+
+    def _cache_path(self, gcs_path: str) -> Optional[Path]:
+        if self._cache_dir is None:
+            return None
+        return self._cache_dir / gcs_path
+
+    def _cache_read_bytes(self, gcs_path: str) -> Optional[bytes]:
+        """Read from cache. Returns content bytes, empty bytes for cached miss, or None for cache miss."""
+        cp = self._cache_path(gcs_path)
+        if cp is None:
+            return None
+        if cp.exists():
+            return cp.read_bytes()
+        miss = cp.with_suffix(cp.suffix + ".miss")
+        if miss.exists():
+            return b""  # sentinel: known 404
+        return None
+
+    def _cache_write(self, gcs_path: str, content: bytes):
+        cp = self._cache_path(gcs_path)
+        if cp is None:
+            return
+        cp.parent.mkdir(parents=True, exist_ok=True)
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=cp.parent)
+        try:
+            os.write(tmp_fd, content)
+            os.close(tmp_fd)
+            os.rename(tmp_path, cp)
+        except Exception:
+            os.close(tmp_fd) if not os.get_inheritable(tmp_fd) else None
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
+    def _cache_write_miss(self, gcs_path: str):
+        cp = self._cache_path(gcs_path)
+        if cp is None:
+            return
+        miss = cp.with_suffix(cp.suffix + ".miss")
+        miss.parent.mkdir(parents=True, exist_ok=True)
+        miss.touch()
+
+    def _cache_has_entry(self, gcs_path: str) -> Optional[bool]:
+        """Check if cache has an entry. Returns True (exists), False (cached miss), or None (no entry)."""
+        cp = self._cache_path(gcs_path)
+        if cp is None:
+            return None
+        if cp.exists():
+            return True
+        miss = cp.with_suffix(cp.suffix + ".miss")
+        if miss.exists():
+            return False
+        return None
 
     def list_prefixes(self, prefix: str) -> list[str]:
         prefixes = []
@@ -61,28 +133,49 @@ class GCSClient:
         return prefixes
 
     def fetch_object(self, path: str) -> Optional[str]:
+        cached = self._cache_read_bytes(path)
+        if cached is not None:
+            return cached.decode("utf-8") if cached else None  # empty = cached miss
+
         url = f"{GCS_BASE}/{self.bucket}/{path}"
         log.debug("GET %s", url)
         resp = self.session.get(url, timeout=30)
         if resp.status_code == 404:
+            self._cache_write_miss(path)
             return None
         resp.raise_for_status()
+        self._cache_write(path, resp.content)
         return resp.text
 
     def head_object(self, path: str) -> bool:
+        cached = self._cache_has_entry(path)
+        if cached is not None:
+            return cached
+
         url = f"{GCS_BASE}/{self.bucket}/{path}"
         log.debug("HEAD %s", url)
         resp = self.session.head(url, timeout=10)
-        return resp.status_code == 200
+        exists = resp.status_code == 200
+        if not exists:
+            self._cache_write_miss(path)
+        # Don't write a content entry for HEAD -- let fetch_binary populate it
+        return exists
 
     def fetch_binary(self, path: str) -> Optional[bytes]:
+        cached = self._cache_read_bytes(path)
+        if cached is not None:
+            return cached if cached else None  # empty = cached miss
+
         url = f"{GCS_BASE}/{self.bucket}/{path}"
         log.debug("GET %s (binary)", url)
         resp = self.session.get(url, timeout=300, stream=True)
         if resp.status_code == 404:
+            self._cache_write_miss(path)
             return None
         resp.raise_for_status()
-        return resp.content
+        content = resp.content
+        self._cache_write(path, content)
+        return content
 
     def _last_component(self, prefix: str) -> str:
         return prefix.rstrip("/").split("/")[-1]

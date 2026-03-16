@@ -51,6 +51,8 @@ def parse_args():
     parent.add_argument("--log-level", default=os.environ.get("LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         help="Log verbosity (env: LOG_LEVEL, default: INFO)")
+    parent.add_argument("--cache-dir", default=os.environ.get("GCS_CACHE_DIR"),
+                        help="Local cache directory for GCS objects (env: GCS_CACHE_DIR)")
 
     parser = argparse.ArgumentParser(description="CI Operator Metrics Scraper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -71,7 +73,7 @@ def main():
                         format="%(asctime)s %(levelname)s %(message)s")
 
     session = make_session(args.workers)
-    gcs = GCSClient(session, BUCKET)
+    gcs = GCSClient(session, BUCKET, cache_dir=args.cache_dir)
     vm_sink = VictoriaMetricsSink(session, args.vm_url)
     vl_sink = VictoriaLogsSink(session, args.vl_url)
     pipelines = [
