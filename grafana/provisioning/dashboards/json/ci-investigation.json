@@ -623,12 +623,12 @@
         {
           "id": 60,
           "title": "Avg CPU Utilization",
-          "description": "Average CPU utilization across test clusters for the selected scope. Low values indicate clusters are over-provisioned.",
+          "description": "Average worker node CPU utilization across test clusters for the selected scope. Low values indicate workers are over-provisioned.",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 68 },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -655,12 +655,12 @@
         {
           "id": 61,
           "title": "Avg Memory Utilization",
-          "description": "Average memory utilization across test clusters for the selected scope.",
+          "description": "Average worker node memory utilization across test clusters for the selected scope. Includes cache/buffers (reclaimable under pressure).",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 6, "y": 68 },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -723,7 +723,7 @@
               "interval": "3h"
             },
             {
-              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
               "legendFormat": "Capacity {{build_id}}",
               "refId": "B",
               "interval": "3h"
@@ -775,7 +775,7 @@
               "interval": "3h"
             },
             {
-              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
               "legendFormat": "Capacity {{build_id}}",
               "refId": "B",
               "interval": "3h"
@@ -827,7 +827,7 @@
               "refId": "cpu_usage"
             },
             {
-              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "cpu_capacity"
@@ -839,7 +839,7 @@
               "refId": "mem_usage"
             },
             {
-              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "mem_capacity"
@@ -858,9 +858,9 @@
                   "job_name": "Job",
                   "build_id": "Build ID",
                   "Value #cpu_usage": "CPU Used (cores)",
-                  "Value #cpu_capacity": "CPU Capacity (cores)",
+                  "Value #cpu_capacity": "Worker CPU Capacity (cores)",
                   "Value #mem_usage": "Memory Used",
-                  "Value #mem_capacity": "Memory Capacity"
+                  "Value #mem_capacity": "Worker Memory Capacity"
                 },
                 "indexByName": {
                   "pr_number": 0,
@@ -885,7 +885,7 @@
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "CPU Capacity (cores)" },
+                "matcher": { "id": "byName", "options": "Worker CPU Capacity (cores)" },
                 "properties": [
                   { "id": "decimals", "value": 0 },
                   { "id": "custom.width", "value": 140 }
@@ -899,7 +899,7 @@
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Memory Capacity" },
+                "matcher": { "id": "byName", "options": "Worker Memory Capacity" },
                 "properties": [
                   { "id": "unit", "value": "bytes" },
                   { "id": "custom.width", "value": 130 }

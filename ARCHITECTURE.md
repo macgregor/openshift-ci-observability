@@ -69,7 +69,7 @@ The scraper is built around a pipeline architecture. Each pipeline processes a s
 | LogPipeline | `ci-operator.log` | JSON log lines | VictoriaLogs |
 | JunitPipeline | `junit_operator.xml`, `junit_*.xml` | Metrics + failure logs | Both |
 | ClusterPoolPipeline | `clusterClaim.json`, `clusterDeployment.json` | Pool lifecycle metrics | VictoriaMetrics |
-| TestClusterMetricsPipeline | `prometheus.tar` (TSDB dump) | Cluster utilization metrics | VictoriaMetrics |
+| TestClusterMetricsPipeline | `prometheus.tar` (TSDB dump) | Cluster utilization metrics (per-node metrics enriched with master/worker `role` label) | VictoriaMetrics |
 
 Adding a new scrape target means writing a new Pipeline class and registering it in `__main__.py`. Pipelines are independent -- each receives a `BuildContext` and decides what to fetch and emit.
 

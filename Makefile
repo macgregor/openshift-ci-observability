@@ -51,8 +51,15 @@ wipe-all: check-deps ## Stop and delete everything including GCS cache
 logs: check-deps ## Tail logs (use SVC=scraper-watch to filter)
 	@$(COMPOSE) logs -f --tail=100 $(SVC)
 
-status: check-deps ## Show running containers
+status: check-deps ## Show running containers and volume sizes
 	@$(COMPOSE) ps
+	@echo ""
+	@echo "Volumes:"
+	@for v in $(VOLUMES) $(CACHE_VOLUME); do \
+		mp=$$(podman volume inspect "$$v" --format '{{.Mountpoint}}' 2>/dev/null) && \
+		sz=$$(du -sh "$$mp" 2>/dev/null | cut -f1) && \
+		printf "  %-25s %s\n" "$$v" "$$sz"; \
+	done
 
 test: ## Run tests
 	python -m pytest tests/ -v

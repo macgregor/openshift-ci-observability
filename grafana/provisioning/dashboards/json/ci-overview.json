@@ -885,12 +885,12 @@
         {
           "id": 26,
           "title": "Avg CPU Utilization",
-          "description": "Average CPU utilization across Hive-claimed test clusters. Based on actual Prometheus TSDB data from the ephemeral clusters where e2e tests run.",
+          "description": "Average worker node CPU utilization across Hive-claimed test clusters. Based on actual Prometheus TSDB data from the ephemeral clusters where e2e tests run.",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 71 },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -917,12 +917,12 @@
         {
           "id": 27,
           "title": "Avg Memory Utilization",
-          "description": "Average memory utilization across Hive-claimed test clusters.",
+          "description": "Average worker node memory utilization across Hive-claimed test clusters. Includes cache/buffers (reclaimable under pressure).",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 6, "y": 71 },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -960,8 +960,8 @@
               "interval": "3h"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\"}[$__interval:]))",
-              "legendFormat": "CPU Capacity (avg)",
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
+              "legendFormat": "Worker CPU Capacity (avg)",
               "refId": "B",
               "interval": "3h"
             }
@@ -985,7 +985,7 @@
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "CPU Capacity (avg)" },
+                "matcher": { "id": "byName", "options": "Worker CPU Capacity (avg)" },
                 "properties": [
                   { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
                   { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
@@ -1012,8 +1012,8 @@
               "interval": "3h"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\"}[$__interval:]))",
-              "legendFormat": "Memory Capacity (avg)",
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
+              "legendFormat": "Worker Memory Capacity (avg)",
               "refId": "B",
               "interval": "3h"
             }
@@ -1037,7 +1037,7 @@
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Memory Capacity (avg)" },
+                "matcher": { "id": "byName", "options": "Worker Memory Capacity (avg)" },
                 "properties": [
                   { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
                   { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }

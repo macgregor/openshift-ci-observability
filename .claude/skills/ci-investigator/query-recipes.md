@@ -540,38 +540,40 @@ ci-query pool-wait-trend 30d
 
 ### `test-cluster-utilization [window]`
 
-Average and max CPU/memory utilization from the Hive-claimed test clusters where e2e tests run. This is actual usage data extracted from the cluster's Prometheus TSDB, not resource requests.
+Average and max CPU/memory utilization from the Hive-claimed test clusters where e2e tests run (worker nodes only). This is actual usage data extracted from the cluster's Prometheus TSDB, not resource requests.
 
 ```
 ci-query test-cluster-utilization         # 7d
 ci-query test-cluster-utilization 30d
 ```
 
-**Output fields:** `window`, `builds_with_data`, `avg_cpu_cores`, `avg_cpu_capacity_cores`, `avg_cpu_util_pct`, `max_cpu_cores`, `avg_memory_gb`, `avg_memory_capacity_gb`, `avg_memory_util_pct`, `max_memory_gb`
+**Output fields:** `window`, `builds_with_data`, `worker_cpu_usage_cores`, `worker_cpu_capacity_cores`, `worker_cpu_util_pct`, `worker_max_cpu_cores`, `worker_memory_usage_gib`, `worker_memory_capacity_gib`, `worker_memory_util_pct`, `worker_max_memory_gib`, `note`
 
 **Interpretation:**
-- `avg_cpu_util_pct` < 30% = test clusters are significantly over-provisioned (cluster pool right-sizing opportunity)
-- `avg_cpu_util_pct` > 80% = tests may be resource-constrained, consider larger instances
-- Compare `avg_cpu_capacity_cores` with cluster pool machine type specs to verify pool configuration
-- `builds_with_data` tells how many builds had prometheus.tar artifacts (builds that didn't reach gather-extra won't have data)
+- Reports **worker nodes only** (excludes masters). Master utilization is available per-build via `test-cluster-build`.
+- `worker_cpu_util_pct` < 30% = workers are over-provisioned (right-sizing opportunity)
+- `worker_cpu_util_pct` > 80% = tests may be resource-constrained
+- `worker_memory_usage_gib` includes page cache and buffers (reclaimable under pressure). For actual working set, use `test-cluster-build` per-node breakdown.
+- Memory is reported in GiB (binary, 1024^3 bytes), matching how Kubernetes reports capacity.
 
 ### `test-cluster-build <build_id>`
 
-Utilization details for a specific build's test cluster. Shows CPU and memory usage vs capacity, plus per-node memory breakdown.
+Utilization details for a specific build's test cluster. Shows CPU and memory usage vs capacity split by role (master/worker), plus per-node memory working set.
 
 ```
 ci-query test-cluster-build 2031880686163464192
 ```
 
-**Output:** First line is cluster-level summary, followed by per-node memory utilization.
+**Output:** Per-role summary lines (master, worker), followed by per-node working set details.
 
-**Output fields (summary):** `build_id`, `cpu_usage_cores`, `cpu_capacity_cores`, `cpu_util_pct`, `memory_usage_gb`, `memory_capacity_gb`, `memory_util_pct`
-**Output fields (per-node):** `node`, `memory_util_pct`
+**Output fields (per-role):** `build_id`, `role`, `instance_type`, `cpu_capacity_cores`, `cpu_usage_cores`, `cpu_util_pct`, `memory_capacity_gib`, `memory_usage_gib`, `memory_util_pct`
+**Output fields (per-node):** `node`, `role`, `working_set_pct`, `working_set_gib`, `total_gib`
 
 **Interpretation:**
-- Compare utilization with pool-builds to correlate resource usage with pool configuration
-- Per-node memory imbalance may indicate workload scheduling issues
-- Use alongside `step-timeline` to correlate resource spikes with specific test phases
+- Per-role summary shows `memory_usage_gib` which includes cache/buffers. Per-node `working_set_gib` excludes reclaimable memory and reflects actual application memory consumption.
+- Worker `working_set_pct` is the key metric for VM right-sizing. If max working set per worker node is well below node capacity, smaller VMs can be used.
+- Master memory utilization tends to be high (etcd, API server, controller-manager). If master `working_set_pct` exceeds 80%, masters cannot be downsized.
+- The `role` label is set at ingestion time from `kube_node_role` in the test cluster's Prometheus TSDB.
 
 ### `node-utilization [window] [limit]`
 

@@ -52,8 +52,11 @@ Recording rules are available as pre-computed gauges, avoiding the need for rate
 | `instance:node_memory_utilisation:ratio` | ~419 | gauge | Per-node memory utilization (0-1) |
 | `node_memory_MemTotal_bytes` | ~850 | gauge | Per-node memory capacity |
 | `machine_cpu_cores` | ~424 | gauge | Per-node CPU count |
+| `kube_node_role` | ~420 | gauge | Node role mapping (value=1); used to enrich per-node metrics with `role` label |
 
-Total: ~2,100 samples per build.
+Total: ~2,500 samples per build.
+
+Per-node metrics are enriched at ingestion with a `role` label (`master` or `worker`) derived from `kube_node_role`. This enables filtering by node type without joining metrics at query time (e.g., `ci_test_cluster_machine_cpu_cores{role="worker"}`).
 
 ### Not Available
 

@@ -876,83 +876,121 @@ def cmd_node_utilization(args):
 # --- Test cluster utilization ---
 
 def cmd_test_cluster_utilization(args):
-    """Avg/max CPU and memory utilization from test clusters."""
+    """Avg/max CPU and memory utilization from test clusters (workers only)."""
     window = args[0] if args else "7d"
+    GiB = 1024 ** 3
+    # Filter to worker entries (no master role label) for accurate capacity/usage
+    worker_filter = 'label_node_role_kubernetes_io=""'
     cpu_usage = vm_scalar(
-        f"avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum[{window}]))"
+        f"avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{{{worker_filter}}}[{window}]))"
     )
     cpu_capacity = vm_scalar(
-        f"avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum[{window}]))"
+        f"avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{{{worker_filter}}}[{window}]))"
     )
     mem_usage = vm_scalar(
-        f"avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum[{window}]))"
+        f"avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{{{worker_filter}}}[{window}]))"
     )
     mem_capacity = vm_scalar(
-        f"avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum[{window}]))"
+        f"avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{{{worker_filter}}}[{window}]))"
     )
     max_cpu_usage = vm_scalar(
-        f"max(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum[{window}]))"
+        f"max(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{{{worker_filter}}}[{window}]))"
     )
     max_mem_usage = vm_scalar(
-        f"max(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum[{window}]))"
+        f"max(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{{{worker_filter}}}[{window}]))"
     )
     builds = vm_scalar(
-        f"count(group by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum[{window}])))"
+        f"count(group by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{{{worker_filter}}}[{window}])))"
     )
     emit({
         "window": window,
         "builds_with_data": int(builds),
-        "avg_cpu_cores": round(cpu_usage, 2),
-        "avg_cpu_capacity_cores": round(cpu_capacity, 2),
-        "avg_cpu_util_pct": round(cpu_usage / cpu_capacity * 100, 1) if cpu_capacity else 0,
-        "max_cpu_cores": round(max_cpu_usage, 2),
-        "avg_memory_gb": round(mem_usage / 1e9, 1) if mem_usage else 0,
-        "avg_memory_capacity_gb": round(mem_capacity / 1e9, 1) if mem_capacity else 0,
-        "avg_memory_util_pct": round(mem_usage / mem_capacity * 100, 1) if mem_capacity else 0,
-        "max_memory_gb": round(max_mem_usage / 1e9, 1) if max_mem_usage else 0,
+        "worker_cpu_usage_cores": round(cpu_usage, 2),
+        "worker_cpu_capacity_cores": round(cpu_capacity, 2),
+        "worker_cpu_util_pct": round(cpu_usage / cpu_capacity * 100, 1) if cpu_capacity else 0,
+        "worker_max_cpu_cores": round(max_cpu_usage, 2),
+        "worker_memory_usage_gib": round(mem_usage / GiB, 1) if mem_usage else 0,
+        "worker_memory_capacity_gib": round(mem_capacity / GiB, 1) if mem_capacity else 0,
+        "worker_memory_util_pct": round(mem_usage / mem_capacity * 100, 1) if mem_capacity else 0,
+        "worker_max_memory_gib": round(max_mem_usage / GiB, 1) if max_mem_usage else 0,
+        "note": "memory_usage includes cache/buffers; per-node working set is lower (use test-cluster-build for details)",
     })
 
 
 def cmd_test_cluster_build(args):
-    """Utilization timeline for a specific build's test cluster."""
+    """Utilization details for a specific build's test cluster."""
     bid = require_arg(args, "build_id")
-    cpu_results = vm_query(
-        f'last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{{build_id="{bid}"}}[{LOOKBACK}])'
-    )
+    GiB = 1024 ** 3
+    # Get capacity and usage, split by role (master vs worker)
     cap_results = vm_query(
         f'last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{{build_id="{bid}"}}[{LOOKBACK}])'
     )
-    mem_results = vm_query(
-        f'last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{{build_id="{bid}"}}[{LOOKBACK}])'
+    cpu_results = vm_query(
+        f'last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{{build_id="{bid}"}}[{LOOKBACK}])'
     )
     mem_cap_results = vm_query(
         f'last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{{build_id="{bid}"}}[{LOOKBACK}])'
     )
-    if not cpu_results and not mem_results:
+    mem_results = vm_query(
+        f'last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    if not cap_results and not cpu_results:
         emit({"error": f"No test cluster utilization data for build {bid}"})
         return
-    cpu_val = val(cpu_results[0]) if cpu_results else 0
-    cpu_cap = val(cap_results[0]) if cap_results else 0
-    mem_val = val(mem_results[0]) if mem_results else 0
-    mem_cap = val(mem_cap_results[0]) if mem_cap_results else 0
-    emit({
-        "build_id": bid,
-        "cpu_usage_cores": round(cpu_val, 2),
-        "cpu_capacity_cores": round(cpu_cap, 2),
-        "cpu_util_pct": round(cpu_val / cpu_cap * 100, 1) if cpu_cap else 0,
-        "memory_usage_gb": round(mem_val / 1e9, 1),
-        "memory_capacity_gb": round(mem_cap / 1e9, 1),
-        "memory_util_pct": round(mem_val / mem_cap * 100, 1) if mem_cap else 0,
-    })
-    # Per-node memory breakdown
+    # Emit per-role summary (master and worker have separate metric entries)
+    for cap in cap_results:
+        role_label = cap["metric"].get("label_node_role_kubernetes_io", "")
+        role = "master" if role_label == "master" else "worker"
+        itype = cap["metric"].get("label_beta_kubernetes_io_instance_type", "")
+        cpu_cap = val(cap)
+        # Find matching usage entry
+        cpu_usage = 0
+        for r in cpu_results:
+            r_role = r["metric"].get("label_node_role_kubernetes_io", "")
+            if (r_role == "master") == (role == "master"):
+                cpu_usage = val(r)
+        mem_cap = 0
+        mem_usage = 0
+        for r in mem_cap_results:
+            r_role = r["metric"].get("label_node_role_kubernetes_io", "")
+            if (r_role == "master") == (role == "master"):
+                mem_cap = val(r)
+        for r in mem_results:
+            r_role = r["metric"].get("label_node_role_kubernetes_io", "")
+            if (r_role == "master") == (role == "master"):
+                mem_usage = val(r)
+        entry = {
+            "build_id": bid,
+            "role": role,
+            "instance_type": itype,
+            "cpu_capacity_cores": round(cpu_cap, 0),
+            "cpu_usage_cores": round(cpu_usage, 2),
+            "cpu_util_pct": round(cpu_usage / cpu_cap * 100, 1) if cpu_cap else 0,
+            "memory_capacity_gib": round(mem_cap / GiB, 1) if mem_cap else 0,
+            "memory_usage_gib": round(mem_usage / GiB, 1) if mem_usage else 0,
+            "memory_util_pct": round(mem_usage / mem_cap * 100, 1) if mem_cap else 0,
+        }
+        emit(entry)
+    # Per-node memory working set (excludes cache/buffers)
+    # The role label is added at ingestion from kube_node_role in the test cluster TSDB.
     node_mem = vm_query(
         f'last_over_time(ci_test_cluster_instance_node_memory_utilisation_ratio{{build_id="{bid}"}}[{LOOKBACK}])'
     )
+    node_total = vm_query(
+        f'last_over_time(ci_test_cluster_node_memory_memtotal_bytes{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    totals = {r["metric"].get("instance", ""): val(r) / GiB for r in node_total}
     for r in node_mem:
-        m = r["metric"]
+        inst = r["metric"].get("instance", "")
+        ratio = val(r)
+        total_gib = totals.get(inst, 0)
+        role = r["metric"].get("role", "")
         emit({
-            "node": m.get("instance", ""),
-            "memory_util_pct": round(val(r) * 100, 1),
+            "node": inst,
+            "role": role,
+            "working_set_pct": round(ratio * 100, 1),
+            "working_set_gib": round(ratio * total_gib, 1),
+            "total_gib": round(total_gib, 0),
         })
 
 
