@@ -98,14 +98,42 @@ def apply_known_transforms(section, key, value):
     try:
         if section == "pods" and key.endswith("_latency"):
             return value / 1e9
-        if section == "nodes" and "resources" in key:
-            if isinstance(value, str):
-                parsed = parse_k8s_quantity(value)
-                if parsed is not None:
-                    return parsed
     except Exception:
         pass
     return value
+
+
+# Resource fields to extract with (suffix, unit_conversion_fn) pairs.
+# CPU is converted to millicores for consistency with usage_stats_*_cpu_milli.
+# Memory and ephemeral-storage are in bytes (parse_k8s_quantity handles Ki/Mi/Gi).
+# Pods are dimensionless.
+_RESOURCE_FIELDS = {
+    "cpu": ("cpu_milli", lambda v: v * 1000),
+    "memory": ("memory_bytes", lambda v: v),
+    "ephemeral-storage": ("ephemeral_storage_bytes", lambda v: v),
+    "pods": ("pods", lambda v: v),
+}
+
+
+def flatten_resource_fields(resources):
+    """Extract capacity/allocatable K8s quantities as numeric metrics.
+
+    Yields (metric_key_suffix, value) tuples like
+    ("resources_capacity_cpu_milli", 16000.0).
+    """
+    if not isinstance(resources, dict):
+        return
+    for category in ("capacity", "allocatable"):
+        cat_dict = resources.get(category)
+        if not isinstance(cat_dict, dict):
+            continue
+        for field, (suffix, convert) in _RESOURCE_FIELDS.items():
+            raw = cat_dict.get(field)
+            if raw is None:
+                continue
+            parsed = parse_k8s_quantity(raw)
+            if parsed is not None:
+                yield (f"resources_{category}_{suffix}", convert(parsed))
 
 
 CANONICAL_ALIASES = {
@@ -123,7 +151,11 @@ def extract_metrics_from_entry(section, entry, job_labels):
     if isinstance(ctx, dict):
         entry_labels.update(extract_string_fields(ctx))
 
-    for key, value in flatten_numeric_fields(entry):
+    numeric_fields = list(flatten_numeric_fields(entry))
+    if section == "nodes":
+        numeric_fields.extend(flatten_resource_fields(entry.get("resources")))
+
+    for key, value in numeric_fields:
         value = apply_known_transforms(section, key, value)
         metric_name = f"ci_{section}_{key}"
         line = format_prometheus_line(metric_name, entry_labels, value, timestamp)

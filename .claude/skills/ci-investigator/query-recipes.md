@@ -476,3 +476,83 @@ ci-query failure-hours 'quota exceeded' 7d
 **Interpretation:**
 - Failures clustering in off-peak hours (e.g., 00:00-06:00 UTC) = clusters sit idle longer before being claimed, more likely to have stale state after hibernation
 - Even distribution = not time-correlated, likely a different root cause
+
+---
+
+## Cluster Pool
+
+### `pool-health [window]`
+
+Cluster pool claim wait times and idle time statistics per pool. Answers "is the pool the right size?"
+
+```
+ci-query pool-health         # 7d
+ci-query pool-health 30d
+```
+
+**Output:** Per-pool claim wait stats, then per-pool idle time.
+
+**Output fields (wait):** `cluster_pool`, `builds`, `avg_wait_s`, `max_wait_s`
+**Output fields (idle):** `cluster_pool`, `avg_idle_s`
+
+**Interpretation:**
+- High `avg_wait_s` (>300s) = pool too small, builds are queuing for clusters
+- Low `avg_idle_s` with high `avg_wait_s` = pool is saturated
+- High `avg_idle_s` (>3600s) with low `avg_wait_s` = pool is over-provisioned
+- Compare across pools to identify which pools need resizing
+
+### `pool-builds <build_id>`
+
+Cluster pool details for a specific build. Shows which pool was used, claim wait time, install duration, and idle time.
+
+```
+ci-query pool-builds 2032428735797399552
+```
+
+**Output fields:** `build_id`, `cluster_pool`, `ocp_version`, `cloud_region`, `power_state`, `claim_wait_s`, `install_duration_s`, `idle_s`
+
+**Interpretation:**
+- `claim_wait_s` > 300s for a single build = this build was affected by pool contention
+- `power_state` = "Running" vs "Hibernating" helps diagnose hibernation resume issues
+- `idle_s` tells how long the cluster sat unused before this build claimed it
+- Use alongside `error-logs` to correlate pool issues with build failures
+
+### `pool-wait-trend [window]`
+
+Aggregate claim wait time statistics. Answers "is pool contention getting better or worse?"
+
+```
+ci-query pool-wait-trend         # 7d
+ci-query pool-wait-trend 30d
+```
+
+**Output fields:** `window`, `total_claims`, `avg_wait_s`, `p90_wait_s`, `max_wait_s`
+
+**Interpretation:**
+- `p90_wait_s` is the most actionable metric: 90% of builds wait less than this
+- `avg_wait_s` < 120s and `p90_wait_s` < 300s = healthy pool
+- Large gap between `avg_wait_s` and `max_wait_s` = occasional spikes (burst demand)
+- Small gap = consistently slow (pool permanently undersized)
+
+---
+
+## Resource Utilization
+
+### `node-utilization [window] [limit]`
+
+Build cluster node CPU and memory utilization as a percentage of capacity. Shows the shared CI infrastructure nodes where ci-operator orchestrates builds (not the Hive-claimed test clusters).
+
+```
+ci-query node-utilization         # 7d, top 20 nodes
+ci-query node-utilization 30d 10
+```
+
+**Output:** First block: per-node CPU utilization. Second block: per-node memory utilization.
+
+**Output fields (CPU):** `node`, `machine_type`, `cpu_util_pct`
+**Output fields (memory):** `node`, `machine_type`, `mem_util_pct`
+
+**Interpretation:**
+- These are build cluster nodes only (e.g., `build04-*-ci-longtests-worker-*`), not test cluster nodes
+- High utilization on build cluster nodes may explain pod scheduling latency (see `build-latency`)
+- Useful for CI infrastructure cost analysis, not for cluster pool right-sizing

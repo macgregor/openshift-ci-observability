@@ -10,6 +10,7 @@ from scraper.sinks import VictoriaMetricsSink, VictoriaLogsSink
 from scraper.metrics import MetricsPipeline
 from scraper.logs import LogPipeline
 from scraper.junit import JunitPipeline
+from scraper.cluster_pool import ClusterPoolPipeline
 from scraper.scraper import Scraper
 
 BUCKET = "test-platform-results"
@@ -76,6 +77,7 @@ def main():
         MetricsPipeline(vm_sink),
         LogPipeline(vl_sink),
         JunitPipeline(vm_sink, vl_sink),
+        ClusterPoolPipeline(vm_sink),
     ]
     scraper = Scraper(gcs, session, args.vm_url, pipelines, args.workers)
 

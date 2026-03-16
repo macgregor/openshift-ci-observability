@@ -1,5 +1,6 @@
 from scraper.metrics import (
     flatten_numeric_fields,
+    flatten_resource_fields,
     extract_string_fields,
     parse_timestamp_best_effort,
     sanitize_metric_name,
@@ -96,8 +97,43 @@ def test_parse_k8s_quantity():
 
 def test_apply_known_transforms():
     assert apply_known_transforms("pods", "scheduling_latency", 1_000_000_000) == 1.0
-    assert apply_known_transforms("nodes", "resources_cpu", "500m") == 0.5
     assert apply_known_transforms("events", "some_field", 42) == 42
+
+
+def test_flatten_resource_fields():
+    resources = {
+        "capacity": {
+            "cpu": "16",
+            "memory": "32856988Ki",
+            "ephemeral-storage": "209124332Ki",
+            "pods": "250",
+        },
+        "allocatable": {
+            "cpu": "15",
+            "memory": "29608860Ki",
+            "ephemeral-storage": "191655242229",
+            "pods": "250",
+        },
+    }
+    result = dict(flatten_resource_fields(resources))
+    # CPU converted to millicores
+    assert result["resources_capacity_cpu_milli"] == 16000.0
+    assert result["resources_allocatable_cpu_milli"] == 15000.0
+    # Memory in bytes (Ki suffix)
+    assert result["resources_capacity_memory_bytes"] == 32856988 * 1024
+    assert result["resources_allocatable_memory_bytes"] == 29608860 * 1024
+    # Ephemeral storage in bytes
+    assert result["resources_capacity_ephemeral_storage_bytes"] == 209124332 * 1024
+    assert result["resources_allocatable_ephemeral_storage_bytes"] == 191655242229.0
+    # Pods (dimensionless)
+    assert result["resources_capacity_pods"] == 250.0
+    assert result["resources_allocatable_pods"] == 250.0
+
+
+def test_flatten_resource_fields_empty():
+    assert list(flatten_resource_fields(None)) == []
+    assert list(flatten_resource_fields({})) == []
+    assert list(flatten_resource_fields({"capacity": "not-a-dict"})) == []
 
 
 def test_canonical_aliases():
@@ -115,6 +151,11 @@ def test_convert_to_metrics_full(metrics_json, sample_job_labels):
     assert any("ci_events" in n for n in names)
     assert any("ci_pods" in n for n in names)
     assert any(sample_job_labels["build_id"] in m for m in metrics)
+    # Node capacity/allocatable metrics extracted from K8s quantity strings
+    assert "ci_nodes_resources_capacity_cpu_milli" in names
+    assert "ci_nodes_resources_capacity_memory_bytes" in names
+    assert "ci_nodes_resources_allocatable_cpu_milli" in names
+    assert "ci_nodes_resources_allocatable_memory_bytes" in names
 
 
 def test_extract_step_offsets():

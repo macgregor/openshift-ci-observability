@@ -729,6 +729,150 @@ def cmd_test_failures(args):
             })
 
 
+# --- Cluster pool ---
+
+def cmd_pool_health(args):
+    """Cluster pool claim wait times and idle time statistics."""
+    window = args[0] if args else "7d"
+    # Claim wait time per pool
+    wait_results = vm_query(
+        f"avg by (cluster_pool) (avg_over_time("
+        f"ci_cluster_claim_wait_seconds[{window}]))"
+    )
+    for r in wait_results:
+        pool = r["metric"].get("cluster_pool", "unknown")
+        avg_wait = round(val(r), 0)
+        max_r = vm_query(
+            f'max(max_over_time(ci_cluster_claim_wait_seconds'
+            f'{{cluster_pool="{pool}"}}[{window}]))'
+        )
+        max_wait = round(val(max_r[0]), 0) if max_r else 0
+        count_r = vm_query(
+            f'count(last_over_time(ci_cluster_claim_wait_seconds'
+            f'{{cluster_pool="{pool}"}}[{window}]))'
+        )
+        count = int(val(count_r[0])) if count_r else 0
+        emit({
+            "cluster_pool": pool,
+            "builds": count,
+            "avg_wait_s": avg_wait,
+            "max_wait_s": max_wait,
+        })
+    # Idle time (how long clusters sit before being claimed)
+    idle_results = vm_query(
+        f"avg by (cluster_pool) (avg_over_time("
+        f"ci_cluster_idle_seconds[{window}]))"
+    )
+    for r in idle_results:
+        avg_idle = round(val(r), 0)
+        emit({
+            "cluster_pool": r["metric"].get("cluster_pool", "unknown"),
+            "avg_idle_s": avg_idle,
+        })
+
+
+def cmd_pool_builds(args):
+    """Cluster pool details for a specific build."""
+    bid = require_arg(args, "build_id")
+    results = vm_query(
+        f'last_over_time(ci_cluster_claim_wait_seconds{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    if not results:
+        emit({"error": f"No cluster pool data for build {bid}"})
+        return
+    m = results[0]["metric"]
+    wait = round(val(results[0]), 1)
+    info = {
+        "build_id": bid,
+        "cluster_pool": m.get("cluster_pool"),
+        "ocp_version": m.get("ocp_version"),
+        "cloud_region": m.get("cloud_region"),
+        "power_state": m.get("power_state"),
+        "claim_wait_s": wait,
+    }
+    # Install duration
+    install_r = vm_query(
+        f'last_over_time(ci_cluster_install_duration_seconds{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    if install_r:
+        info["install_duration_s"] = round(val(install_r[0]), 1)
+    # Idle time
+    idle_r = vm_query(
+        f'last_over_time(ci_cluster_idle_seconds{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    if idle_r:
+        info["idle_s"] = round(val(idle_r[0]), 1)
+    emit(info)
+
+
+def cmd_pool_wait_trend(args):
+    """Claim wait time trend bucketed over time."""
+    window = args[0] if args else "7d"
+    # Average and max claim wait over time
+    results = vm_query(
+        f"avg(avg_over_time(ci_cluster_claim_wait_seconds[{window}]))"
+    )
+    avg_wait = round(val(results[0]), 0) if results else 0
+    max_results = vm_query(
+        f"max(max_over_time(ci_cluster_claim_wait_seconds[{window}]))"
+    )
+    max_wait = round(val(max_results[0]), 0) if max_results else 0
+    p90_results = vm_query(
+        f"quantile(0.9, last_over_time(ci_cluster_claim_wait_seconds[{window}]))"
+    )
+    p90_wait = round(val(p90_results[0]), 0) if p90_results else 0
+    total_results = vm_query(
+        f"count(last_over_time(ci_cluster_claim_wait_seconds[{window}]))"
+    )
+    total = int(val(total_results[0])) if total_results else 0
+    emit({
+        "window": window,
+        "total_claims": total,
+        "avg_wait_s": avg_wait,
+        "p90_wait_s": p90_wait,
+        "max_wait_s": max_wait,
+    })
+
+
+# --- Resource utilization ---
+
+def cmd_node_utilization(args):
+    """Build cluster node utilization: actual usage vs capacity."""
+    window = args[0] if args else "7d"
+    limit = int(args[1]) if len(args) > 1 else 20
+    # Average CPU utilization per node
+    results = vm_query(
+        f"topk({limit},"
+        f"  avg_over_time(ci_nodes_usage_stats_avg_cpu_milli[{window}])"
+        f"  / avg_over_time(ci_nodes_resources_capacity_cpu_milli[{window}])"
+        f"  * 100"
+        f")"
+    )
+    for r in results:
+        m = r["metric"]
+        cpu_pct = round(val(r), 1)
+        emit({
+            "node": m.get("node"),
+            "machine_type": m.get("machine_type"),
+            "cpu_util_pct": cpu_pct,
+        })
+    # Memory utilization summary
+    mem_results = vm_query(
+        f"topk({limit},"
+        f"  avg_over_time(ci_nodes_usage_stats_avg_memory_bytes[{window}])"
+        f"  / avg_over_time(ci_nodes_resources_capacity_memory_bytes[{window}])"
+        f"  * 100"
+        f")"
+    )
+    for r in mem_results:
+        m = r["metric"]
+        emit({
+            "node": m.get("node"),
+            "machine_type": m.get("machine_type"),
+            "mem_util_pct": round(val(r), 1),
+        })
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -763,6 +907,10 @@ COMMANDS = {
     "failure-hours":      (cmd_failure_hours,          "<pattern> [window]",            "Group failures by hour-of-day (UTC)"),
     "last-success":       (cmd_last_success,           "<job_pattern>",                 "Last successful build for a job"),
     "test-failures":      (cmd_test_failures,          "[job_pattern] [test_pattern] [limit]", "Failing tests filtered by job/test name"),
+    "node-utilization":   (cmd_node_utilization,       "[window] [limit]",                     "Build cluster node CPU/memory utilization"),
+    "pool-health":        (cmd_pool_health,            "[window]",                             "Cluster pool claim wait and idle times"),
+    "pool-builds":        (cmd_pool_builds,            "<build_id>",                           "Cluster pool details for a build"),
+    "pool-wait-trend":    (cmd_pool_wait_trend,        "[window]",                             "Claim wait time statistics"),
 }
 
 
