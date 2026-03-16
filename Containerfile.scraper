@@ -1,4 +1,6 @@
+FROM docker.io/prom/prometheus:v3.3.1 AS promtool
 FROM python:3.12-slim
+COPY --from=promtool /bin/promtool /usr/local/bin/promtool
 WORKDIR /app
 COPY scraper/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -69,6 +69,21 @@ class GCSClient:
         resp.raise_for_status()
         return resp.text
 
+    def head_object(self, path: str) -> bool:
+        url = f"{GCS_BASE}/{self.bucket}/{path}"
+        log.debug("HEAD %s", url)
+        resp = self.session.head(url, timeout=10)
+        return resp.status_code == 200
+
+    def fetch_binary(self, path: str) -> Optional[bytes]:
+        url = f"{GCS_BASE}/{self.bucket}/{path}"
+        log.debug("GET %s (binary)", url)
+        resp = self.session.get(url, timeout=300, stream=True)
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.content
+
     def _last_component(self, prefix: str) -> str:
         return prefix.rstrip("/").split("/")[-1]
 

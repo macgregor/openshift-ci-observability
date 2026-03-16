@@ -36,6 +36,7 @@ class BuildContext:
         self._build = build
         self._gcs = gcs
         self._artifact_cache: dict[str, Optional[str]] = {}
+        self._binary_cache: dict[str, Optional[bytes]] = {}
         self._labels: Optional[JobLabels] = None
 
     @property
@@ -73,4 +74,24 @@ class BuildContext:
                      f"{self._build.build_id}/{relative_path}")
         result = self._gcs.fetch_object(full_path)
         self._artifact_cache[relative_path] = result
+        return result
+
+    def list_artifact_dirs(self, relative_prefix: str) -> list[str]:
+        full_prefix = (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
+                       f"{self._build.build_id}/{relative_prefix}")
+        return [p.split(relative_prefix)[-1].rstrip("/")
+                for p in self._gcs.list_prefixes(full_prefix)]
+
+    def head_artifact(self, relative_path: str) -> bool:
+        full_path = (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
+                     f"{self._build.build_id}/{relative_path}")
+        return self._gcs.head_object(full_path)
+
+    def fetch_artifact_binary(self, relative_path: str) -> Optional[bytes]:
+        if relative_path in self._binary_cache:
+            return self._binary_cache[relative_path]
+        full_path = (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
+                     f"{self._build.build_id}/{relative_path}")
+        result = self._gcs.fetch_binary(full_path)
+        self._binary_cache[relative_path] = result
         return result

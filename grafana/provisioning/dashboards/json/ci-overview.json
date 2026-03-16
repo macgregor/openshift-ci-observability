@@ -876,10 +876,187 @@
       }
     },
     {
+      "id": 600,
+      "title": "Test Cluster Utilization",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 26,
+          "title": "Avg CPU Utilization",
+          "description": "Average CPU utilization across Hive-claimed test clusters. Based on actual Prometheus TSDB data from the ephemeral clusters where e2e tests run.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 71 },
+          "targets": [
+            {
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\"}[$__range:])) * 100",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 27,
+          "title": "Avg Memory Utilization",
+          "description": "Average memory utilization across Hive-claimed test clusters.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 71 },
+          "targets": [
+            {
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\"}[$__range:])) * 100",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 28,
+          "title": "Test Cluster CPU Usage vs Capacity",
+          "description": "CPU usage cores vs capacity across test clusters over time. Gap between lines shows headroom.",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 75 },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\"}[$__interval:]))",
+              "legendFormat": "CPU Usage (avg)",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\"}[$__interval:]))",
+              "legendFormat": "CPU Capacity (avg)",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "CPU Usage (avg)" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "CPU Capacity (avg)" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          }
+        },
+        {
+          "id": 29,
+          "title": "Test Cluster Memory Usage vs Capacity",
+          "description": "Memory usage vs capacity across test clusters over time.",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 75 },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\"}[$__interval:]))",
+              "legendFormat": "Memory Usage (avg)",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\"}[$__interval:]))",
+              "legendFormat": "Memory Capacity (avg)",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Memory Usage (avg)" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Memory Capacity (avg)" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          }
+        }
+      ]
+    },
+    {
       "id": 500,
       "title": "Build Cluster Utilization",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
       "collapsed": true,
       "panels": [
         {
@@ -887,7 +1064,7 @@
           "title": "Avg CPU Utilization",
           "description": "Average CPU utilization across build cluster nodes. These are the shared CI infrastructure nodes where ci-operator runs, not the test clusters.",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 71 },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 86 },
           "targets": [
             {
               "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\"}[$__range:]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\"}[$__range:]) * 100)",
@@ -919,7 +1096,7 @@
           "title": "Avg Memory Utilization",
           "description": "Average memory utilization across build cluster nodes.",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 71 },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 86 },
           "targets": [
             {
               "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\"}[$__range:]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\"}[$__range:]) * 100)",
@@ -951,7 +1128,7 @@
           "title": "Node CPU Utilization",
           "description": "CPU utilization per build cluster node over time.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 75 },
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 90 },
           "targets": [
             {
               "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\"}[$__interval:]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\"}[$__interval:]) * 100)",
@@ -983,7 +1160,7 @@
           "title": "Node Memory Utilization",
           "description": "Memory utilization per build cluster node over time.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 75 },
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 90 },
           "targets": [
             {
               "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\"}[$__interval:]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\"}[$__interval:]) * 100)",

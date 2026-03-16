@@ -538,6 +538,41 @@ ci-query pool-wait-trend 30d
 
 ## Resource Utilization
 
+### `test-cluster-utilization [window]`
+
+Average and max CPU/memory utilization from the Hive-claimed test clusters where e2e tests run. This is actual usage data extracted from the cluster's Prometheus TSDB, not resource requests.
+
+```
+ci-query test-cluster-utilization         # 7d
+ci-query test-cluster-utilization 30d
+```
+
+**Output fields:** `window`, `builds_with_data`, `avg_cpu_cores`, `avg_cpu_capacity_cores`, `avg_cpu_util_pct`, `max_cpu_cores`, `avg_memory_gb`, `avg_memory_capacity_gb`, `avg_memory_util_pct`, `max_memory_gb`
+
+**Interpretation:**
+- `avg_cpu_util_pct` < 30% = test clusters are significantly over-provisioned (cluster pool right-sizing opportunity)
+- `avg_cpu_util_pct` > 80% = tests may be resource-constrained, consider larger instances
+- Compare `avg_cpu_capacity_cores` with cluster pool machine type specs to verify pool configuration
+- `builds_with_data` tells how many builds had prometheus.tar artifacts (builds that didn't reach gather-extra won't have data)
+
+### `test-cluster-build <build_id>`
+
+Utilization details for a specific build's test cluster. Shows CPU and memory usage vs capacity, plus per-node memory breakdown.
+
+```
+ci-query test-cluster-build 2031880686163464192
+```
+
+**Output:** First line is cluster-level summary, followed by per-node memory utilization.
+
+**Output fields (summary):** `build_id`, `cpu_usage_cores`, `cpu_capacity_cores`, `cpu_util_pct`, `memory_usage_gb`, `memory_capacity_gb`, `memory_util_pct`
+**Output fields (per-node):** `node`, `memory_util_pct`
+
+**Interpretation:**
+- Compare utilization with pool-builds to correlate resource usage with pool configuration
+- Per-node memory imbalance may indicate workload scheduling issues
+- Use alongside `step-timeline` to correlate resource spikes with specific test phases
+
 ### `node-utilization [window] [limit]`
 
 Build cluster node CPU and memory utilization as a percentage of capacity. Shows the shared CI infrastructure nodes where ci-operator orchestrates builds (not the Hive-claimed test clusters).

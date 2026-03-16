@@ -873,6 +873,89 @@ def cmd_node_utilization(args):
         })
 
 
+# --- Test cluster utilization ---
+
+def cmd_test_cluster_utilization(args):
+    """Avg/max CPU and memory utilization from test clusters."""
+    window = args[0] if args else "7d"
+    cpu_usage = vm_scalar(
+        f"avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum[{window}]))"
+    )
+    cpu_capacity = vm_scalar(
+        f"avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum[{window}]))"
+    )
+    mem_usage = vm_scalar(
+        f"avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum[{window}]))"
+    )
+    mem_capacity = vm_scalar(
+        f"avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum[{window}]))"
+    )
+    max_cpu_usage = vm_scalar(
+        f"max(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum[{window}]))"
+    )
+    max_mem_usage = vm_scalar(
+        f"max(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum[{window}]))"
+    )
+    builds = vm_scalar(
+        f"count(group by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum[{window}])))"
+    )
+    emit({
+        "window": window,
+        "builds_with_data": int(builds),
+        "avg_cpu_cores": round(cpu_usage, 2),
+        "avg_cpu_capacity_cores": round(cpu_capacity, 2),
+        "avg_cpu_util_pct": round(cpu_usage / cpu_capacity * 100, 1) if cpu_capacity else 0,
+        "max_cpu_cores": round(max_cpu_usage, 2),
+        "avg_memory_gb": round(mem_usage / 1e9, 1) if mem_usage else 0,
+        "avg_memory_capacity_gb": round(mem_capacity / 1e9, 1) if mem_capacity else 0,
+        "avg_memory_util_pct": round(mem_usage / mem_capacity * 100, 1) if mem_capacity else 0,
+        "max_memory_gb": round(max_mem_usage / 1e9, 1) if max_mem_usage else 0,
+    })
+
+
+def cmd_test_cluster_build(args):
+    """Utilization timeline for a specific build's test cluster."""
+    bid = require_arg(args, "build_id")
+    cpu_results = vm_query(
+        f'last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    cap_results = vm_query(
+        f'last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    mem_results = vm_query(
+        f'last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    mem_cap_results = vm_query(
+        f'last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    if not cpu_results and not mem_results:
+        emit({"error": f"No test cluster utilization data for build {bid}"})
+        return
+    cpu_val = val(cpu_results[0]) if cpu_results else 0
+    cpu_cap = val(cap_results[0]) if cap_results else 0
+    mem_val = val(mem_results[0]) if mem_results else 0
+    mem_cap = val(mem_cap_results[0]) if mem_cap_results else 0
+    emit({
+        "build_id": bid,
+        "cpu_usage_cores": round(cpu_val, 2),
+        "cpu_capacity_cores": round(cpu_cap, 2),
+        "cpu_util_pct": round(cpu_val / cpu_cap * 100, 1) if cpu_cap else 0,
+        "memory_usage_gb": round(mem_val / 1e9, 1),
+        "memory_capacity_gb": round(mem_cap / 1e9, 1),
+        "memory_util_pct": round(mem_val / mem_cap * 100, 1) if mem_cap else 0,
+    })
+    # Per-node memory breakdown
+    node_mem = vm_query(
+        f'last_over_time(ci_test_cluster_instance_node_memory_utilisation_ratio{{build_id="{bid}"}}[{LOOKBACK}])'
+    )
+    for r in node_mem:
+        m = r["metric"]
+        emit({
+            "node": m.get("instance", ""),
+            "memory_util_pct": round(val(r) * 100, 1),
+        })
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -911,6 +994,8 @@ COMMANDS = {
     "pool-health":        (cmd_pool_health,            "[window]",                             "Cluster pool claim wait and idle times"),
     "pool-builds":        (cmd_pool_builds,            "<build_id>",                           "Cluster pool details for a build"),
     "pool-wait-trend":    (cmd_pool_wait_trend,        "[window]",                             "Claim wait time statistics"),
+    "test-cluster-utilization": (cmd_test_cluster_utilization, "[window]",                     "Test cluster avg/max CPU and memory utilization"),
+    "test-cluster-build":       (cmd_test_cluster_build,      "<build_id>",                    "Test cluster utilization for a specific build"),
 }
 
 

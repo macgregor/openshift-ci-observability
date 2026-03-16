@@ -47,6 +47,19 @@
         "current": { "selected": true, "text": "All", "value": "$__all" },
         "refresh": 2,
         "sort": 3
+      },
+      {
+        "name": "test_step",
+        "label": "Test Step",
+        "type": "query",
+        "query": "query_result(group by (test_step) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum[$__range:])))",
+        "regex": "/test_step=\"([^\"]+)\"/",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "refresh": 2,
+        "sort": 1
       }
     ]
   },
@@ -596,6 +609,320 @@
             "wrapLogMessage": true,
             "enableLogDetails": true,
             "sortOrder": "Descending"
+          }
+        }
+      ]
+    },
+    {
+      "id": 500,
+      "title": "Test Cluster Utilization",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 60,
+          "title": "Avg CPU Utilization",
+          "description": "Average CPU utilization across test clusters for the selected scope. Low values indicate clusters are over-provisioned.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 68 },
+          "targets": [
+            {
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) * 100",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 61,
+          "title": "Avg Memory Utilization",
+          "description": "Average memory utilization across test clusters for the selected scope.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 68 },
+          "targets": [
+            {
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) * 100",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 62,
+          "title": "Builds with Data",
+          "description": "Number of builds in scope that have test cluster Prometheus data. Builds that fail before the gather-extra step won't have data.",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 68 },
+          "targets": [
+            {
+              "expr": "count(group by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])))",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "blue" },
+              "noValue": "0"
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 63,
+          "title": "CPU Usage vs Capacity",
+          "description": "Test cluster CPU: actual usage vs total capacity. The gap between lines shows over-provisioning headroom.",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 72 },
+          "targets": [
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "legendFormat": "Usage {{build_id}}",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "legendFormat": "Capacity {{build_id}}",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": "Usage.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": "Capacity.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          }
+        },
+        {
+          "id": 64,
+          "title": "Memory Usage vs Capacity",
+          "description": "Test cluster memory: actual usage vs total capacity.",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 72 },
+          "targets": [
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "legendFormat": "Usage {{build_id}}",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "legendFormat": "Capacity {{build_id}}",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": "Usage.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": "Capacity.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "desc" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          }
+        },
+        {
+          "id": 65,
+          "title": "Per-Build Utilization",
+          "description": "CPU and memory utilization per build. Helps identify builds with unusual resource consumption.",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 82 },
+          "targets": [
+            {
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "refId": "cpu_usage"
+            },
+            {
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "refId": "cpu_capacity"
+            },
+            {
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "refId": "mem_usage"
+            },
+            {
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "refId": "mem_capacity"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge"
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": { "Time": true, "__name__": true },
+                "renameByName": {
+                  "pr_number": "PR",
+                  "job_name": "Job",
+                  "build_id": "Build ID",
+                  "Value #cpu_usage": "CPU Used (cores)",
+                  "Value #cpu_capacity": "CPU Capacity (cores)",
+                  "Value #mem_usage": "Memory Used",
+                  "Value #mem_capacity": "Memory Capacity"
+                },
+                "indexByName": {
+                  "pr_number": 0,
+                  "build_id": 1,
+                  "job_name": 2,
+                  "Value #cpu_usage": 3,
+                  "Value #cpu_capacity": 4,
+                  "Value #mem_usage": 5,
+                  "Value #mem_capacity": 6
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "CPU Used (cores)" },
+                "properties": [
+                  { "id": "decimals", "value": 1 },
+                  { "id": "custom.width", "value": 120 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "CPU Capacity (cores)" },
+                "properties": [
+                  { "id": "decimals", "value": 0 },
+                  { "id": "custom.width", "value": 140 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Memory Used" },
+                "properties": [
+                  { "id": "unit", "value": "bytes" },
+                  { "id": "custom.width", "value": 120 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Memory Capacity" },
+                "properties": [
+                  { "id": "unit", "value": "bytes" },
+                  { "id": "custom.width", "value": 130 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "PR" },
+                "properties": [
+                  { "id": "custom.width", "value": 60 },
+                  { "id": "links", "value": [{ "title": "Investigate this PR", "url": "/d/ci-investigation/ci-investigation?var-pr_number=${__value.raw}&var-job_type=${job_type}&var-build_id=All&from=${__from}&to=${__to}" }] }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Build ID" },
+                "properties": [
+                  { "id": "custom.width", "value": 175 },
+                  { "id": "links", "value": [{ "title": "Filter to this build", "url": "/d/ci-investigation/ci-investigation?var-pr_number=${__data.fields.PR}&var-build_id=${__value.raw}&var-job_type=${job_type}&from=${__from}&to=${__to}" }] }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "sortBy": [{ "displayName": "CPU Used (cores)", "desc": true }]
           }
         }
       ]

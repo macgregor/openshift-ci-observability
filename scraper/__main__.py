@@ -11,6 +11,7 @@ from scraper.metrics import MetricsPipeline
 from scraper.logs import LogPipeline
 from scraper.junit import JunitPipeline
 from scraper.cluster_pool import ClusterPoolPipeline
+from scraper.test_cluster_metrics import TestClusterMetricsPipeline
 from scraper.scraper import Scraper
 
 BUCKET = "test-platform-results"
@@ -78,6 +79,7 @@ def main():
         LogPipeline(vl_sink),
         JunitPipeline(vm_sink, vl_sink),
         ClusterPoolPipeline(vm_sink),
+        TestClusterMetricsPipeline(vm_sink),
     ]
     scraper = Scraper(gcs, session, args.vm_url, pipelines, args.workers)
 
