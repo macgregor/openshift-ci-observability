@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from scraper.test_cluster_metrics import (
-    discover_prometheus_tar_paths,
+    discover_test_steps,
     parse_promtool_line,
     extract_test_cluster_metrics,
     _OUTPUT_NAMES,
@@ -21,43 +21,24 @@ SAMPLE_LABELS = {
 }
 
 
-def test_discover_finds_prometheus_tar():
+def test_discover_test_steps_filters_infra():
     ctx = MagicMock()
     ctx.list_artifact_dirs.return_value = [
         "build-logs", "build-resources", "my-e2e-step", "release",
     ]
-    ctx.head_artifact.return_value = True
-    result = discover_prometheus_tar_paths(ctx)
-    assert len(result) == 1
-    assert result[0][0] == "my-e2e-step"
-    assert result[0][1] == "artifacts/my-e2e-step/gather-extra/artifacts/metrics/prometheus.tar"
-    ctx.head_artifact.assert_called_once()
+    assert discover_test_steps(ctx) == ["my-e2e-step"]
 
 
-def test_discover_skips_infra_dirs():
-    ctx = MagicMock()
-    ctx.list_artifact_dirs.return_value = ["build-logs", "build-resources", "release"]
-    result = discover_prometheus_tar_paths(ctx)
-    assert result == []
-    ctx.head_artifact.assert_not_called()
-
-
-def test_discover_multiple_steps():
+def test_discover_test_steps_multiple():
     ctx = MagicMock()
     ctx.list_artifact_dirs.return_value = ["step-a", "step-b"]
-    ctx.head_artifact.side_effect = [True, True]
-    result = discover_prometheus_tar_paths(ctx)
-    assert len(result) == 2
-    assert result[0][0] == "step-a"
-    assert result[1][0] == "step-b"
+    assert discover_test_steps(ctx) == ["step-a", "step-b"]
 
 
-def test_discover_head_returns_false():
+def test_discover_test_steps_all_infra():
     ctx = MagicMock()
-    ctx.list_artifact_dirs.return_value = ["my-step"]
-    ctx.head_artifact.return_value = False
-    result = discover_prometheus_tar_paths(ctx)
-    assert result == []
+    ctx.list_artifact_dirs.return_value = ["build-logs", "build-resources", "release"]
+    assert discover_test_steps(ctx) == []
 
 
 def test_parse_promtool_line_basic():
@@ -147,8 +128,8 @@ def test_process_skips_without_cluster_claim():
     sink.push.assert_not_called()
 
 
-def test_process_no_prometheus_tar():
-    """Pipeline returns 0 when no steps have prometheus.tar."""
+def test_process_no_test_steps():
+    """Pipeline returns 0 when no test step directories exist."""
     sink = MagicMock()
     pipeline = TestClusterMetricsPipeline(sink)
     ctx = MagicMock()
@@ -159,7 +140,7 @@ def test_process_no_prometheus_tar():
     sink.push.assert_not_called()
 
 
-def test_process_head_miss():
+def test_process_no_prometheus_tar():
     """Pipeline returns 0 when step exists but prometheus.tar doesn't."""
     sink = MagicMock()
     pipeline = TestClusterMetricsPipeline(sink)
@@ -167,7 +148,7 @@ def test_process_head_miss():
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.return_value = ["my-step"]
-    ctx.head_artifact.return_value = False
+    ctx.fetch_artifact_binary.return_value = None  # prometheus.tar not found
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
 
@@ -185,7 +166,6 @@ def test_process_with_promtool(mock_promtool):
     ctx.build.build_id = "123"
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
-    ctx.head_artifact.return_value = True
     # Create a minimal valid tar in memory
     import io
     import tarfile

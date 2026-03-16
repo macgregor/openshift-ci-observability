@@ -32,20 +32,9 @@ _SKIP_DIRS = {"build-logs", "build-resources", "release"}
 _PROMETHEUS_TAR_SUFFIX = "gather-extra/artifacts/metrics/prometheus.tar"
 
 
-def discover_prometheus_tar_paths(ctx: BuildContext) -> list[tuple[str, str]]:
-    """Find all prometheus.tar artifacts by listing step directories.
-
-    Returns list of (step_name, artifact_relative_path) tuples.
-    """
-    step_dirs = ctx.list_artifact_dirs("artifacts/")
-    results = []
-    for step in step_dirs:
-        if step in _SKIP_DIRS:
-            continue
-        path = f"artifacts/{step}/{_PROMETHEUS_TAR_SUFFIX}"
-        if ctx.head_artifact(path):
-            results.append((step, path))
-    return results
+def discover_test_steps(ctx: BuildContext) -> list[str]:
+    """List artifact directories that could contain test cluster data."""
+    return [s for s in ctx.list_artifact_dirs("artifacts/") if s not in _SKIP_DIRS]
 
 
 # Regex to parse a promtool tsdb dump line:
@@ -139,17 +128,18 @@ class TestClusterMetricsPipeline:
         if ctx.fetch_artifact("artifacts/build-resources/clusterClaim.json") is None:
             return 0
 
-        tar_paths = discover_prometheus_tar_paths(ctx)
-        if not tar_paths:
+        steps = discover_test_steps(ctx)
+        if not steps:
             return 0
 
         total = 0
-        for step_name, artifact_path in tar_paths:
-            count = self._process_tar(ctx, step_name, artifact_path)
+        for step_name in steps:
+            count = self._process_step(ctx, step_name)
             total += count
         return total
 
-    def _process_tar(self, ctx: BuildContext, step_name: str, artifact_path: str) -> int:
+    def _process_step(self, ctx: BuildContext, step_name: str) -> int:
+        artifact_path = f"artifacts/{step_name}/{_PROMETHEUS_TAR_SUFFIX}"
         tar_bytes = ctx.fetch_artifact_binary(artifact_path)
         if tar_bytes is None:
             return 0
