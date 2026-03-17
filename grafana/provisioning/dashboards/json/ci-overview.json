@@ -128,7 +128,7 @@
       },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:]))",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:]))",
           "instant": false,
           "refId": "A"
         }
@@ -166,7 +166,7 @@
       "options": {
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ]
         },
         "colorMode": "value",
@@ -1164,7 +1164,7 @@
       },
       "targets": [
         {
-          "expr": "count(last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]))",
+          "expr": "count(last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "instant": false,
           "refId": "A"
         }
@@ -1180,7 +1180,7 @@
       "options": {
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ]
         },
         "colorMode": "value",

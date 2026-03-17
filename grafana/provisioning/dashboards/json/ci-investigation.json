@@ -148,7 +148,7 @@
       },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:]))",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:]))",
           "instant": false,
           "refId": "A"
         }
@@ -164,7 +164,7 @@
       "options": {
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ]
         },
         "colorMode": "value",
