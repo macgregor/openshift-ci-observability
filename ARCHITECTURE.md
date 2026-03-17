@@ -27,7 +27,7 @@ graph TD
 
 ### Discovery
 
-The scraper discovers CI builds for a specific repo via the GCS XML API:
+The scraper discovers CI builds for the configured `--repo` via the GCS XML API:
 
 1. **PR Enumeration**: List prefixes under `gs://test-platform-results/pr-logs/pull/{org}_{repo}/` (derived from the `--repo` flag)
 2. **Job Enumeration**: Within each PR, list job directories

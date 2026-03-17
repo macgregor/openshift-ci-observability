@@ -50,7 +50,7 @@ services:
     environment:
       - VM_URL=http://victoriametrics:8428
       - VL_URL=http://victorialogs:9428
-      - REPO=${REPO:-opendatahub-io/opendatahub-operator}
+      - REPO=${REPO:?Set REPO in .env to the GitHub org/repo to scrape (e.g. openshift/cluster-monitoring-operator)}
       - WINDOW=${WATCH_WINDOW:-24h}
       - POLL_INTERVAL=${POLL_INTERVAL:-300}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -76,7 +76,7 @@ services:
     environment:
       - VM_URL=http://victoriametrics:8428
       - VL_URL=http://victorialogs:9428
-      - REPO=${REPO:-opendatahub-io/opendatahub-operator}
+      - REPO=${REPO:?Set REPO in .env to the GitHub org/repo to scrape (e.g. openshift/cluster-monitoring-operator)}
       - WINDOW=${BACKFILL_WINDOW:-90d}
       - POLL_INTERVAL=${POLL_INTERVAL:-300}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}

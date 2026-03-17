@@ -2,6 +2,7 @@
 import argparse
 import logging
 import os
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -34,10 +35,27 @@ def _parse_duration(s):
     return timedelta(days=int(s))
 
 
+def _normalize_repo(value):
+    """Normalize a repo value to org/repo format, handling common mistakes."""
+    if not value:
+        return value
+    # Strip trailing slashes, .git suffix, whitespace
+    value = value.strip().rstrip("/")
+    if value.endswith(".git"):
+        value = value[:-4]
+    # Handle full GitHub URLs: https://github.com/org/repo
+    for prefix in ("https://github.com/", "http://github.com/", "github.com/"):
+        if value.startswith(prefix):
+            value = value[len(prefix):]
+            break
+    return value
+
+
 def parse_args():
     parent = argparse.ArgumentParser(add_help=False)
-    parent.add_argument("--repo", default=os.environ.get("REPO", "opendatahub-io/opendatahub-operator"),
-                        help="GitHub org/repo (env: REPO, default: opendatahub-io/opendatahub-operator)")
+    parent.add_argument("--repo", default=os.environ.get("REPO"),
+                        help="GitHub org/repo to scrape (e.g. openshift/cluster-monitoring-operator). "
+                             "env: REPO. Required.")
     parent.add_argument("--vm-url", default=os.environ.get("VM_URL", "http://localhost:8428"),
                         help="VictoriaMetrics URL (env: VM_URL, default: http://localhost:8428)")
     parent.add_argument("--vl-url", default=os.environ.get("VL_URL", "http://localhost:9428"),
@@ -75,6 +93,27 @@ def main():
     args = parse_args()
     logging.basicConfig(level=getattr(logging, args.log_level),
                         format="%(asctime)s %(levelname)s %(message)s")
+
+    if not args.repo:
+        print("Error: --repo is required (or set REPO in .env).\n"
+              "  This is the GitHub org/repo whose CI builds you want to scrape.\n"
+              "  Use the same org/repo as the GitHub URL path.\n\n"
+              "  Examples:\n"
+              "    REPO=openshift/cluster-monitoring-operator\n"
+              "    REPO=openshift/installer\n"
+              "    REPO=opendatahub-io/opendatahub-operator",
+              file=sys.stderr)
+        sys.exit(1)
+
+    args.repo = _normalize_repo(args.repo)
+    if "/" not in args.repo or args.repo.count("/") != 1:
+        print(f"Error: --repo must be in org/repo format, got: {args.repo!r}\n"
+              "  Use the GitHub org and repo name separated by a slash.\n\n"
+              "  Examples:\n"
+              "    openshift/cluster-monitoring-operator\n"
+              "    opendatahub-io/opendatahub-operator",
+              file=sys.stderr)
+        sys.exit(1)
 
     session = make_session(args.workers)
     cache_dir = None if args.no_cache else args.cache_dir

@@ -17,7 +17,7 @@ Install dependencies and run a dry-run backfill:
 
 ```bash
 pip install -r scraper/dev-requirements.txt
-python -m scraper backfill --dry-run --window 2d
+python -m scraper backfill --repo openshift/cluster-monitoring-operator --dry-run --window 2d
 ```
 
 This installs both runtime and test dependencies. Run `make test` to run the test suite.

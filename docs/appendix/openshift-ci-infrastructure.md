@@ -77,7 +77,7 @@ Pre-provisioned clusters managed by the Hive operator. Jobs claim a cluster from
 cluster_claim:
   architecture: amd64
   cloud: aws
-  owner: opendatahub
+  owner: my-team
   product: ocp
   timeout: 2h0m0s      # max wait for a cluster
   version: "4.19"

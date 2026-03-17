@@ -1,11 +1,15 @@
 # OpenShift CI Observability
 
-Scrapes CI build artifacts (`ci-operator-metrics.json`, `ci-operator.log`, and JUnit XML) from GCS for OpenShift CI builds and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured logs) for exploration via Grafana.
+Scrapes CI build artifacts (`ci-operator-metrics.json`, `ci-operator.log`, and JUnit XML) from GCS for any OpenShift CI repository and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured logs) for exploration via Grafana.
+
+Works with any GitHub repository that uses [OpenShift CI](https://docs.ci.openshift.org/) (ci-operator / Prow). Point it at your repo and get dashboards, metrics, and log search immediately.
 
 ## Quickstart
 
 ```bash
 cp .env.example .env
+# Edit .env and set REPO to your GitHub org/repo:
+#   REPO=openshift/cluster-monitoring-operator
 make up
 ```
 
@@ -15,7 +19,7 @@ Run `make` to see all available commands.
 
 ## Configuration
 
-All parameters can be set via `.env` for compose or CLI flags for direct execution. The scraper uses env vars as defaults when CLI flags aren't provided. Run `python -m scraper backfill --help` or `watch --help` for the full list with env var names and defaults.
+`REPO` is the only required setting -- set it in `.env` to the GitHub org/repo you want to scrape (the same `org/repo` as the GitHub URL path, e.g. `openshift/installer`). All other parameters have sensible defaults. Run `python -m scraper backfill --help` or `watch --help` for the full list.
 
 ## Dashboards
 

@@ -364,7 +364,7 @@ ci-query junit-tests 2030989391509327872 200
 **Output fields:** `test_name`, `status`, `duration_seconds`, `test_variant`, `_msg` (failure message, only for failed tests)
 
 **Interpretation:**
-- `test_name` is the full Go test path (e.g., `TestOdhOperator/Operator_Manager_E2E_Tests/...`)
+- `test_name` is the full Go test path (e.g., `TestSuite/SubTest/...`)
 - `test_variant` identifies which e2e suite the test belongs to
 - Failed tests include `_msg` with the assertion failure message
 - Use to identify specific test failures within the e2e step
@@ -394,7 +394,7 @@ ci-query top-failing-tests 30d 20  # 30 days, top 20
 Find when a job last passed and the first failure after it. Useful for pinpointing when a regression started.
 
 ```
-ci-query last-success rhoai-e2e
+ci-query last-success e2e-agnostic
 ci-query last-success e2e-hypershift
 ```
 
@@ -410,16 +410,16 @@ ci-query last-success e2e-hypershift
 Find failing test cases filtered by job name and/or test name. Useful for scoping test failures to a specific platform or component.
 
 ```
-ci-query test-failures rhoai-e2e kserve
-ci-query test-failures e2e monitoring 20
-ci-query test-failures "" kserve          # all jobs, kserve tests
+ci-query test-failures e2e-agnostic monitoring
+ci-query test-failures e2e "" 20
+ci-query test-failures "" alertmanager    # all jobs, alertmanager tests
 ```
 
 **Output fields:** `build_id`, `pr_number`, `test_name`, `msg` (truncated failure message), `time`
 
 **Interpretation:**
 - Same test failing across many builds/PRs = systemic (broken test or broken dependency)
-- Failures only in one job pattern (e.g., `rhoai-e2e` but not `e2e`) = platform-specific issue (check manifest/config differences)
+- Failures only in one job pattern (e.g., `e2e-agnostic` but not `e2e-aws-ovn`) = platform-specific issue (check manifest/config differences)
 - `msg` contains the assertion failure -- look for ConfigMap errors, timeout messages, or crash indicators
 
 ---

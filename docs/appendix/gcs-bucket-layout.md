@@ -30,15 +30,15 @@ pr-logs/pull/{org}_{repo}/{pr_number}/{job_name}/{build_id}/
 
 ### Path Components
 
-- `{org}_{repo}`: GitHub organization and repository, separated by underscore (e.g., `opendatahub-io_opendatahub-operator`)
-- `{pr_number}`: Pull request number (e.g., `3260`)
-- `{job_name}`: CI job name (e.g., `pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e`)
+- `{org}_{repo}`: GitHub organization and repository, separated by underscore (e.g., `openshift_cluster-monitoring-operator`)
+- `{pr_number}`: Pull request number (e.g., `2850`)
+- `{job_name}`: CI job name (e.g., `pull-ci-openshift-cluster-monitoring-operator-main-e2e-agnostic-operator`)
 - `{build_id}`: Unique build identifier (e.g., `2032076068386508800`)
 
 ### Example Path
 
 ```
-pr-logs/pull/opendatahub-io_opendatahub-operator/3260/pull-ci-opendatahub-io-opendatahub-operator-main-opendatahub-operator-e2e/2032076068386508800/artifacts/ci-operator-metrics.json
+pr-logs/pull/openshift_cluster-monitoring-operator/2850/pull-ci-openshift-cluster-monitoring-operator-main-e2e-agnostic-operator/2032076068386508800/artifacts/ci-operator-metrics.json
 ```
 
 ## Build Directory Contents
@@ -90,7 +90,7 @@ Each build directory (`{build_path}/`) contains Prow-produced metadata and an `a
 │   ├── sidecar-logs.json
 │   └── artifacts/
 │       └── release-images-*         #   imported release image metadata
-└── {test-name}/                     # one per test container (e.g. opendatahub-operator-e2e)
+└── {test-name}/                     # one per test container (e.g. e2e-agnostic-operator)
     ├── {step}/                      #   each step (e2e, install, ipi-install-rbac, ...)
     │   ├── build-log.txt            #     step execution log (text)
     │   ├── finished.json            #     step completion status
@@ -123,7 +123,7 @@ Each build directory (`{build_path}/`) contains Prow-produced metadata and an `a
 
 **Available for future use:**
 - **`metadata.json`** — repo, commit, work namespace, and pod name. Small.
-- **`build-logs/{image}.log`** — text build output for each container image built by ci-operator. One file per image (e.g., `src-amd64.log`, `opendatahub-operator-bundle.log`).
+- **`build-logs/{image}.log`** — text build output for each container image built by ci-operator. One file per image (e.g., `src-amd64.log`, `cluster-monitoring-operator-amd64.log`).
 - **`build-resources/`** (other files) — JSON snapshots of K8s resources in the ci-operator work namespace at completion: builds, events, imagestreams, pods, templateinstances. Useful for debugging resource-level failures.
 - **`{test-name}/gather-extra/artifacts/`** (other files) — post-test cluster diagnostics. Contains JSON dumps of cluster resources (events, pods, nodes, configmaps, CSVs, etc.), audit logs, and `oc` command output. Can be very large (10-30MB for the full gather).
 
