@@ -56,10 +56,10 @@ See `query-recipes.md` for detailed usage of each subcommand with interpretation
 |-------|----------|
 | Health check | `health`, `top-failing-steps`, `top-failing-prs`, `top-failing-tests` |
 | Discovery | `list-jobs`, `list-prs` |
-| Scope to PR | `builds-for-pr`, `pr-success-rate`, `flakiness` |
+| Scope to PR | `builds-for-pr`, `flakiness`, `step-consistency` |
 | Scope to build | `build-info`, `step-failures`, `step-timeline`, `junit-steps`, `junit-tests` |
-| Root cause | `error-logs`, `warning-logs`, `search-logs`, `step-offsets`, `pod-outcomes`, `scheduling-latency` |
-| Cross-build | `cross-pr-errors`, `step-consistency`, `error-impact` |
+| Root cause | `search-logs`, `all-logs`, `step-offsets`, `pod-outcomes`, `scheduling-latency` |
+| Cross-build | `error-impact`, `step-errors` |
 | Infrastructure | `build-latency` |
 
 ## Key Metrics
@@ -134,7 +134,7 @@ Follow up with `ci-query top-failing-steps` and `ci-query top-failing-prs` to id
 ### Phase 2: Scope
 
 Narrow focus to the specific problem area:
-- **For a PR**: `builds-for-pr`, `pr-success-rate`, compare against global from `health`
+- **For a PR**: `builds-for-pr`, `flakiness`, compare against global from `health`
 - **For a build**: `build-info`, `step-failures`
 - **For a job type**: aggregate failure patterns via `top-failing-steps`
 
@@ -145,7 +145,7 @@ Key question: **Is this PR-specific or systemic?** Compare PR success rate vs gl
 Trace the failure chain:
 
 1. **What failed?** -- `step-failures <build_id>`
-2. **How did it fail?** -- `error-logs <build_id>`, expand with `all-logs` around key errors
+2. **How did it fail?** -- `search-logs <build_id> error`, expand with `all-logs` around key errors
 3. **Is it consistent?** -- `step-consistency <pr_number>`, `flakiness <pr_number>`
 4. **Infrastructure or test?** -- `scheduling-latency <build_id>`, `pod-outcomes <build_id>`
 5. **What's the pattern?** -- Match against known failure signatures (see Classification)
@@ -290,7 +290,7 @@ The script is designed for easy extension -- each command is a standalone functi
 
 - **Check data exists first**: run `ci-query health` before complex queries. Zero builds = no data.
 - **VictoriaLogs levels are mixed-case**: ci-operator uses lowercase (`error`), events use capitalized (`Error`). The ci-query tool handles this with case-insensitive matching.
-- **Error logs first**: start with `error-logs`, then expand context with `all-logs` around key messages.
+- **Error logs first**: start with `search-logs <build_id> error`, then expand context with `all-logs` around key messages.
 - **Step names are in `source` label**: e.g., `steps.clusterClaimStep`, `release.importReleaseStep`.
 - **Grafana dashboards** provide visual context. Use chrome-devtools MCP to screenshot relevant panels.
 - **Labels override log fields**: job labels (build_id, pr_number, etc.) take precedence over same-named fields in log entries.

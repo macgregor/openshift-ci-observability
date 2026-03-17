@@ -240,24 +240,6 @@ def cmd_build_info(args):
     })
 
 
-def cmd_pr_success_rate(args):
-    """Success rate for a specific PR."""
-    pr = require_arg(args, "pr_number")
-    total = vm_scalar(
-        f'count(last_over_time({_OUTCOME}{{name="execution_completed",pr_number="{pr}"}}[{LOOKBACK}]))'
-    )
-    passed = vm_scalar(
-        f'count(last_over_time({_OUTCOME}{{name="execution_completed",success="true",pr_number="{pr}"}}[{LOOKBACK}]))'
-    )
-    emit({
-        "pr_number": pr,
-        "total_builds": int(total),
-        "passed_builds": int(passed),
-        "failed_builds": int(total - passed),
-        "success_rate_pct": round(passed / total * 100, 1) if total else 0,
-    })
-
-
 # --- Phase 3: Investigate ---
 
 def cmd_step_failures(args):
@@ -330,32 +312,6 @@ def cmd_scheduling_latency(args):
         })
 
 
-def cmd_error_logs(args):
-    """Error-level logs for a build."""
-    bid = require_arg(args, "build_id")
-    limit = int(args[1]) if len(args) > 1 else 50
-    for e in vl_query(f'build_id:{bid} AND level:~"(?i)error"', limit):
-        emit({
-            "_time": e.get("_time"),
-            "_msg": e.get("_msg"),
-            "source": e.get("source"),
-            "component": e.get("component"),
-        })
-
-
-def cmd_warning_logs(args):
-    """Warning-level logs for a build."""
-    bid = require_arg(args, "build_id")
-    limit = int(args[1]) if len(args) > 1 else 50
-    for e in vl_query(f'build_id:{bid} AND level:~"(?i)warning"', limit):
-        emit({
-            "_time": e.get("_time"),
-            "_msg": e.get("_msg"),
-            "source": e.get("source"),
-            "component": e.get("component"),
-        })
-
-
 def cmd_all_logs(args):
     """All logs for a build (context expansion)."""
     bid = require_arg(args, "build_id")
@@ -385,23 +341,6 @@ def cmd_search_logs(args):
             "level": e.get("level"),
             "source": e.get("source"),
         })
-
-
-def cmd_cross_pr_errors(args):
-    """Find an error pattern across all builds (one result per build)."""
-    pattern = require_arg(args, "pattern")
-    limit = int(args[1]) if len(args) > 1 else 50
-    seen = {}
-    for e in vl_query(f'level:error AND _msg:~"{pattern}"', limit):
-        bid = e.get("build_id", "?")
-        if bid not in seen:
-            seen[bid] = True
-            emit({
-                "build_id": bid,
-                "pr_number": e.get("pr_number"),
-                "job_name": e.get("job_name"),
-                "_msg": e.get("_msg"),
-            })
 
 
 def cmd_flakiness(args):
@@ -584,91 +523,6 @@ def cmd_top_failing_tests(args):
 
 # --- Cluster health / hibernation ---
 
-def cmd_claim_times(args):
-    """Cluster claim-to-ready times, comparing broken vs healthy builds."""
-    window = args[0] if args else "14d"
-    broken_pattern = args[1] if len(args) > 1 else "serviceaccount.*default.*not found"
-    # Find builds with the broken pattern
-    broken_entries = vl_query(f'_time:{window} AND _msg:~"{broken_pattern}"', 500)
-    broken_bids = set(e.get("build_id", "") for e in broken_entries if e.get("build_id"))
-    # Find claim-to-ready log entries
-    claim_entries = vl_query(f'_time:{window} AND _msg:~"claimed cluster.*ready after"', 500)
-    import re
-    seen = set()
-    broken_times = []
-    healthy_times = []
-    for e in claim_entries:
-        bid = e.get("build_id", "")
-        if bid in seen:
-            continue
-        seen.add(bid)
-        msg = e.get("_msg", "")
-        m = re.search(r"ready after (\d+m)?(\d+(?:\.\d+)?)s", msg)
-        if m:
-            minutes = int(m.group(1)[:-1]) if m.group(1) else 0
-            seconds = float(m.group(2))
-            total_s = minutes * 60 + seconds
-            if bid in broken_bids:
-                broken_times.append(total_s)
-            else:
-                healthy_times.append(total_s)
-    if broken_times:
-        emit({
-            "category": "broken",
-            "count": len(broken_times),
-            "avg_s": round(sum(broken_times) / len(broken_times), 0),
-            "min_s": round(min(broken_times), 0),
-            "max_s": round(max(broken_times), 0),
-        })
-    if healthy_times:
-        emit({
-            "category": "healthy",
-            "count": len(healthy_times),
-            "avg_s": round(sum(healthy_times) / len(healthy_times), 0),
-            "min_s": round(min(healthy_times), 0),
-            "max_s": round(max(healthy_times), 0),
-        })
-
-
-def cmd_classify_sa_failures(args):
-    """Classify SA-not-found failures as cluster-wide vs namespace-specific."""
-    window = args[0] if args else "14d"
-    entries = vl_query(
-        f'_time:{window} AND _msg:~"serviceaccount.*default.*not found"', 500
-    )
-    builds = {}
-    for e in entries:
-        bid = e.get("build_id", "")
-        if not bid:
-            continue
-        if bid not in builds:
-            builds[bid] = {
-                "build_id": bid,
-                "pr_number": e.get("pr_number", ""),
-                "must_gather_sa": False,
-            }
-        msg = e.get("_msg", "")
-        if "openshift-must-gather" in msg:
-            builds[bid]["must_gather_sa"] = True
-    cluster_wide = 0
-    namespace_only = 0
-    for info in builds.values():
-        if info["must_gather_sa"]:
-            info["classification"] = "cluster_wide"
-            cluster_wide += 1
-        else:
-            info["classification"] = "namespace_only"
-            namespace_only += 1
-        emit(info)
-    emit({
-        "summary": {
-            "total": len(builds),
-            "cluster_wide": cluster_wide,
-            "namespace_only": namespace_only,
-        }
-    })
-
-
 def cmd_failure_hours(args):
     """Group failures by hour-of-day (UTC) to detect time-correlated patterns."""
     pattern = require_arg(args, "pattern")
@@ -769,6 +623,11 @@ def cmd_pool_health(args):
             f'{{cluster_pool="{pool}"}}[{window}]))'
         )
         max_wait = round(val(max_r[0]), 0) if max_r else 0
+        p90_r = vm_query(
+            f'quantile(0.9, last_over_time(ci_cluster_claim_wait_seconds'
+            f'{{cluster_pool="{pool}"}}[{window}]))'
+        )
+        p90_wait = round(val(p90_r[0]), 0) if p90_r else 0
         count_r = vm_query(
             f'count(last_over_time(ci_cluster_claim_wait_seconds'
             f'{{cluster_pool="{pool}"}}[{window}]))'
@@ -778,6 +637,7 @@ def cmd_pool_health(args):
             "cluster_pool": pool,
             "builds": count,
             "avg_wait_s": avg_wait,
+            "p90_wait_s": p90_wait,
             "max_wait_s": max_wait,
         })
     # Idle time (how long clusters sit before being claimed)
@@ -825,35 +685,6 @@ def cmd_pool_builds(args):
     if idle_r:
         info["idle_s"] = round(val(idle_r[0]), 1)
     emit(info)
-
-
-def cmd_pool_wait_trend(args):
-    """Claim wait time trend bucketed over time."""
-    window = args[0] if args else "7d"
-    # Average and max claim wait over time
-    results = vm_query(
-        f"avg(avg_over_time(ci_cluster_claim_wait_seconds[{window}]))"
-    )
-    avg_wait = round(val(results[0]), 0) if results else 0
-    max_results = vm_query(
-        f"max(max_over_time(ci_cluster_claim_wait_seconds[{window}]))"
-    )
-    max_wait = round(val(max_results[0]), 0) if max_results else 0
-    p90_results = vm_query(
-        f"quantile(0.9, last_over_time(ci_cluster_claim_wait_seconds[{window}]))"
-    )
-    p90_wait = round(val(p90_results[0]), 0) if p90_results else 0
-    total_results = vm_query(
-        f"count(last_over_time(ci_cluster_claim_wait_seconds[{window}]))"
-    )
-    total = int(val(total_results[0])) if total_results else 0
-    emit({
-        "window": window,
-        "total_claims": total,
-        "avg_wait_s": avg_wait,
-        "p90_wait_s": p90_wait,
-        "max_wait_s": max_wait,
-    })
 
 
 # --- Resource utilization ---
@@ -1107,17 +938,13 @@ COMMANDS = {
     "list-prs":           (cmd_list_prs,           "[limit]",                        "List PR numbers with build counts"),
     "builds-for-pr":      (cmd_builds_for_pr,     "<pr_number>",                    "All builds for a PR"),
     "build-info":         (cmd_build_info,         "<build_id>",                     "Single build details"),
-    "pr-success-rate":    (cmd_pr_success_rate,    "<pr_number>",                    "Success rate for a PR"),
     "step-failures":      (cmd_step_failures,      "<build_id>",                     "Failed steps for a build"),
     "step-timeline":      (cmd_step_timeline,      "<build_id>",                     "All steps sorted by duration"),
     "step-offsets":       (cmd_step_offsets,        "<build_id>",                     "Step start times (chronological)"),
     "pod-outcomes":       (cmd_pod_outcomes,        "<build_id>",                     "Pod phase outcomes"),
     "scheduling-latency": (cmd_scheduling_latency, "<build_id>",                     "Pod scheduling latency"),
-    "error-logs":         (cmd_error_logs,          "<build_id> [limit]",            "Error logs from VictoriaLogs"),
-    "warning-logs":       (cmd_warning_logs,        "<build_id> [limit]",            "Warning logs from VictoriaLogs"),
     "all-logs":           (cmd_all_logs,            "<build_id> [limit]",            "All logs (context expansion)"),
     "search-logs":        (cmd_search_logs,         "<build_id> <pattern> [limit]",  "Search logs by regex"),
-    "cross-pr-errors":    (cmd_cross_pr_errors,     "<pattern> [limit]",             "Find error across all builds"),
     "flakiness":          (cmd_flakiness,           "<pr_number>",                   "Detect flaky pass/fail mix"),
     "step-consistency":   (cmd_step_consistency,    "<pr_number>",                   "Step failure consistency"),
     "step-errors":        (cmd_step_errors,         "<step> [window] [max_builds]",  "Error logs across builds where step failed"),
@@ -1126,15 +953,12 @@ COMMANDS = {
     "junit-steps":        (cmd_junit_steps,          "<build_id> [limit]",            "Step results with failure messages (JUnit)"),
     "junit-tests":        (cmd_junit_tests,          "<build_id> [limit]",            "Test case results (JUnit)"),
     "top-failing-tests":  (cmd_top_failing_tests,    "[window] [limit]",              "Most frequently failing test cases"),
-    "claim-times":        (cmd_claim_times,           "[window] [broken_pattern]",     "Cluster claim-to-ready times: broken vs healthy"),
-    "classify-sa":        (cmd_classify_sa_failures,   "[window]",                     "Classify SA failures: cluster-wide vs namespace-only"),
     "failure-hours":      (cmd_failure_hours,          "<pattern> [window]",            "Group failures by hour-of-day (UTC)"),
     "last-success":       (cmd_last_success,           "<job_pattern>",                 "Last successful build for a job"),
     "test-failures":      (cmd_test_failures,          "[job_pattern] [test_pattern] [limit]", "Failing tests filtered by job/test name"),
     "node-utilization":   (cmd_node_utilization,       "[window] [limit]",                     "Build cluster node CPU/memory utilization"),
     "pool-health":        (cmd_pool_health,            "[window]",                             "Cluster pool claim wait and idle times"),
     "pool-builds":        (cmd_pool_builds,            "<build_id>",                           "Cluster pool details for a build"),
-    "pool-wait-trend":    (cmd_pool_wait_trend,        "[window]",                             "Claim wait time statistics"),
     "test-cluster-utilization": (cmd_test_cluster_utilization, "[window]",                     "Test cluster avg/max CPU and memory utilization"),
     "test-cluster-build":       (cmd_test_cluster_build,      "<build_id>",                    "Test cluster utilization for a specific build"),
     "config-versions":          (cmd_config_versions,          "[window]",                     "Distinct config hashes with build counts"),

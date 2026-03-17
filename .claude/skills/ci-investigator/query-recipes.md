@@ -112,20 +112,6 @@ ci-query build-info 2031722177379700736
 
 **Output fields:** `build_id`, `job_name`, `pr_number`, `pr_sha`, `success`, `duration_s`, `author`, `org`, `repo`, `branch`
 
-### `pr-success-rate <pr_number>`
-
-Success rate for a specific PR. Compare against global rate from `health` to determine if the PR is an outlier.
-
-```
-ci-query pr-success-rate 3221
-```
-
-**Output fields:** `pr_number`, `total_builds`, `passed_builds`, `failed_builds`, `success_rate_pct`
-
-**Interpretation:**
-- PR rate significantly below global rate = PR-specific issue
-- PR rate similar to global rate = systemic issue, not the PR's fault
-
 ---
 
 ## Phase 3: Investigate
@@ -193,27 +179,6 @@ ci-query scheduling-latency 2031722177379700736
 - >30s average = cluster under pressure
 - >120s for any pod = likely caused downstream timeouts
 
-### `error-logs <build_id> [limit]`
-
-Error-level log entries (case-insensitive match, catches both `error` and `Error`).
-
-```
-ci-query error-logs 2031722177379700736
-ci-query error-logs 2031722177379700736 100
-```
-
-**Output fields:** `_time`, `_msg`, `source`, `component`
-
-### `warning-logs <build_id> [limit]`
-
-Warning-level log entries.
-
-```
-ci-query warning-logs 2031722177379700736
-```
-
-**Output fields:** `_time`, `_msg`, `source`, `component`
-
 ### `all-logs <build_id> [limit]`
 
 All log entries for context expansion around errors. Default limit: 200.
@@ -235,21 +200,6 @@ ci-query search-logs 2031722177379700736 "OOM|memory" 50
 ```
 
 **Output fields:** `_time`, `_msg`, `level`, `source`
-
-### `cross-pr-errors <pattern> [limit]`
-
-Find an error pattern across all builds (deduplicated to one result per build). Useful for confirming systemic issues.
-
-```
-ci-query cross-pr-errors "quota exceeded"
-ci-query cross-pr-errors "image pull" 100
-```
-
-**Output fields:** `build_id`, `pr_number`, `job_name`, `_msg`
-
-**Interpretation:**
-- Same error across many PRs/builds = systemic issue
-- Error only in one PR's builds = PR-specific
 
 ### `flakiness <pr_number>`
 
@@ -316,7 +266,7 @@ ci-query error-impact 'quota exceeded' 24h
 **Interpretation:**
 - High `unique_prs` relative to total active PRs = systemic issue
 - Most builds concentrated in one PR = likely PR-specific
-- Use `cross-pr-errors` to see the actual error messages once impact is confirmed
+- Use `search-logs` on affected builds to see the actual error messages
 
 ### `step-consistency <pr_number>`
 
@@ -422,46 +372,6 @@ ci-query test-failures "" alertmanager    # all jobs, alertmanager tests
 - Failures only in one job pattern (e.g., `e2e-agnostic` but not `e2e-aws-ovn`) = platform-specific issue (check manifest/config differences)
 - `msg` contains the assertion failure -- look for ConfigMap errors, timeout messages, or crash indicators
 
----
-
-## Cluster Health / Hibernation
-
-### `classify-sa [window]`
-
-Classify "serviceaccount default not found" failures as cluster-wide (broken cluster) vs namespace-specific (possible race condition). Checks whether the SA error also appears in `openshift-must-gather-*` namespaces (created by ci-operator, separate from the test namespace).
-
-```
-ci-query classify-sa           # last 14 days
-ci-query classify-sa 7d
-```
-
-**Output:** Per-build classification, then a summary line.
-
-**Output fields (per-build):** `build_id`, `pr_number`, `must_gather_sa`, `install_sa`, `classification` (`cluster_wide` or `namespace_only`)
-**Output fields (summary):** `total`, `cluster_wide`, `namespace_only`
-
-**Interpretation:**
-- `cluster_wide` = SA controller is non-functional on the entire cluster (hibernation resume issue, not a namespace race)
-- `namespace_only` = SA might be slow to create in one namespace (genuine race condition, wait/retry may help)
-- If most failures are `cluster_wide`, the problem is infrastructure (Hive pool / hibernation), not the test
-
-### `claim-times [window] [broken_pattern]`
-
-Compare cluster claim-to-ready times between builds matching a failure pattern vs healthy builds. Useful for diagnosing hibernation resume issues.
-
-```
-ci-query claim-times                                           # default: 14d, SA error pattern
-ci-query claim-times 7d "serviceaccount.*default.*not found"   # explicit
-```
-
-**Output:** Two JSON lines, one per category (`broken`, `healthy`).
-
-**Output fields:** `category`, `count`, `avg_s`, `min_s`, `max_s`
-
-**Interpretation:**
-- Broken clusters claiming *faster* than healthy ones = hibernation resume issue. The broken clusters were sitting in the pool (hibernated), resumed quickly but aren't fully initialized. Healthy clusters waited longer (pool exhaustion or slower resume), giving controllers time to sync.
-- Similar claim times = the issue is not resume-related
-
 ### `failure-hours <pattern> [window]`
 
 Group failures matching a log pattern by hour-of-day (UTC). Detects time-correlated patterns like hibernation resume failures clustering during off-peak hours.
@@ -492,7 +402,7 @@ ci-query pool-health 30d
 
 **Output:** Per-pool claim wait stats, then per-pool idle time.
 
-**Output fields (wait):** `cluster_pool`, `builds`, `avg_wait_s`, `max_wait_s`
+**Output fields (wait):** `cluster_pool`, `builds`, `avg_wait_s`, `p90_wait_s`, `max_wait_s`
 **Output fields (idle):** `cluster_pool`, `avg_idle_s`
 
 **Interpretation:**
@@ -515,24 +425,7 @@ ci-query pool-builds 2032428735797399552
 - `claim_wait_s` > 300s for a single build = this build was affected by pool contention
 - `power_state` = "Running" vs "Hibernating" helps diagnose hibernation resume issues
 - `idle_s` tells how long the cluster sat unused before this build claimed it
-- Use alongside `error-logs` to correlate pool issues with build failures
-
-### `pool-wait-trend [window]`
-
-Aggregate claim wait time statistics. Answers "is pool contention getting better or worse?"
-
-```
-ci-query pool-wait-trend         # 7d
-ci-query pool-wait-trend 30d
-```
-
-**Output fields:** `window`, `total_claims`, `avg_wait_s`, `p90_wait_s`, `max_wait_s`
-
-**Interpretation:**
-- `p90_wait_s` is the most actionable metric: 90% of builds wait less than this
-- `avg_wait_s` < 120s and `p90_wait_s` < 300s = healthy pool
-- Large gap between `avg_wait_s` and `max_wait_s` = occasional spikes (burst demand)
-- Small gap = consistently slow (pool permanently undersized)
+- Use alongside `search-logs` to correlate pool issues with build failures
 
 ---
 
