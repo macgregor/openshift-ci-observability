@@ -121,12 +121,12 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### How to use this dashboard\n\nThis dashboard helps investigate CI failures at two levels:\n\n**General investigation** (all filters set to \"All\"):\n1. Check summary stats for overall CI health.\n2. Look at **Top Failing PRs** to find which PRs have the most failures. Select a PR from the **PR** dropdown to drill down.\n3. Compare **PR Success Rate vs Global** to see if failures are systemic or isolated.\n4. Check **Step Failure Leaderboard** to see which ci-operator steps fail most.\n5. Look at **Longest/Shortest Runs** for outlier builds.\n\n**Specific PR investigation** (set the PR filter):\n1. All panels update to show only that PR's data.\n2. Compare your PR's success rate against the global baseline.\n3. See which steps are failing in your builds.\n4. Expand **Build Detail** for full build history and error logs.\n\n**Links:** Click PR numbers for GitHub PRs, commit SHAs for GitHub commits, and Build IDs for Prow job pages.\n\n**Filters:**\n- **Job Type** -- narrow to specific CI jobs.\n- **PR** -- leave as \"All\" for general investigation, or select specific PRs.\n- **Build** -- narrow to specific build IDs."
+        "content": "### Reading this dashboard\n\nStart with all filters set to \"All\" to see the big picture, then select a **PR** to drill into a specific pull request. When a PR is selected, all panels scope to that PR -- compare its success rate against the global baseline to tell if failures are isolated or systemic.\n\nPR numbers, commit SHAs, and Build IDs in tables are clickable links to GitHub and Prow."
       }
     },
     {
       "id": 100,
-      "title": "Context",
+      "title": "Summary",
       "type": "row",
       "gridPos": {
         "h": 1,
@@ -222,7 +222,7 @@
     },
     {
       "id": 12,
-      "title": "Avg Retries / Commit",
+      "title": "Avg Retests / Commit",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -266,11 +266,12 @@
         },
         "colorMode": "value",
         "graphMode": "area"
-      }
+      },
+      "description": "Average pipeline runs per commit. Values above 1 mean commits are being retested."
     },
     {
       "id": 200,
-      "title": "Identify Problems",
+      "title": "Failure Hotspots",
       "type": "row",
       "gridPos": {
         "h": 1,
@@ -283,7 +284,7 @@
     {
       "id": 20,
       "title": "Top Failing PRs",
-      "description": "PRs with the most failed builds. Click a bar to filter this dashboard to that PR.",
+      "description": "PRs with the most failed builds in the selected time range.",
       "type": "bargauge",
       "gridPos": {
         "h": 10,
@@ -426,8 +427,8 @@
     },
     {
       "id": 30,
-      "title": "Step Failure Leaderboard",
-      "description": "Which ci-operator steps fail most often within the selected scope.",
+      "title": "Top Failing Steps",
+      "description": "Steps with the most failures within the selected scope.",
       "type": "bargauge",
       "gridPos": {
         "h": 8,

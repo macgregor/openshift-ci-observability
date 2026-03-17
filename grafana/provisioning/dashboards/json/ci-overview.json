@@ -101,7 +101,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### How to use this dashboard\n\n**Summary stats** (below) show at-a-glance health for the selected time range. Click **Failed Runs** to open the CI Investigation dashboard for detailed failure analysis.\n\n**Filters:** **Job Type** narrows to specific CI jobs. **Outcome** toggles between Success, Failure, or both.\n\n**Activity** -- pipeline run volume and success rate trends. **Duration** -- execution time envelope and retests per commit. **Steps & Infrastructure** -- step time breakdown and pod scheduling overhead. **Failure Patterns** -- which steps fail most and pod phase breakdown. **Cluster Pool** -- claim wait times, idle time, and install duration for Hive cluster pools. For individual build investigation, use the CI Investigation dashboard."
+        "content": "### Reading this dashboard\n\nClick **Failed Runs** to jump to the [CI Investigation](/d/ci-investigation) dashboard for failure analysis. If your repo uses Hive cluster pools, the **Cluster Pool** and **Test Cluster Utilization** rows show pool health and resource usage -- these rows will be empty for repos that provision clusters inline."
       }
     },
     {
@@ -176,7 +176,7 @@
     {
       "id": 11,
       "title": "Avg Retests / Commit",
-      "description": "Average number of pipeline runs per (PR, SHA) pair. Higher = more retries needed.",
+      "description": "Average pipeline runs per commit (PR + SHA). Values above 1 mean commits are being retested.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -320,8 +320,8 @@
     },
     {
       "id": 1,
-      "title": "Active Pipelines",
-      "description": "Concurrent pipeline runs per bucket. Use to gauge cluster pool pressure.",
+      "title": "Pipeline Runs",
+      "description": "Number of pipeline runs over time, with active PRs overlay.",
       "type": "timeseries",
       "gridPos": {
         "h": 10,
@@ -420,8 +420,8 @@
     },
     {
       "id": 2,
-      "title": "Success Rate",
-      "description": "Percentage of pipeline runs that succeed. Drops indicate systemic issues or flaky tests.",
+      "title": "Success Rate Over Time",
+      "description": "Percentage of pipeline runs that succeed. Sustained drops indicate systemic issues.",
       "type": "timeseries",
       "gridPos": {
         "h": 10,
@@ -621,7 +621,7 @@
     {
       "id": 4,
       "title": "Retests per Commit",
-      "description": "How many times the same commit (pr+sha) runs the same job. High values = flaky tests or infra issues requiring retests.",
+      "description": "Pipeline runs per commit over time. Spikes indicate periods of heavy retesting.",
       "type": "timeseries",
       "gridPos": {
         "h": 10,
@@ -714,7 +714,7 @@
     },
     {
       "id": 300,
-      "title": "Steps & Infrastructure",
+      "title": "Steps & Scheduling",
       "type": "row",
       "gridPos": {
         "h": 1,
@@ -726,7 +726,7 @@
     },
     {
       "id": 5,
-      "title": "Step Duration by Type",
+      "title": "Avg Step Duration",
       "description": "Average duration of each ci-operator step. Identifies which steps dominate pipeline runtime.",
       "type": "timeseries",
       "gridPos": {
@@ -772,8 +772,8 @@
     },
     {
       "id": 6,
-      "title": "Infrastructure Overhead",
-      "description": "Pod scheduling and initialization latency. High values indicate cluster resource pressure.",
+      "title": "Pod Scheduling Latency",
+      "description": "Time between pod creation and container start. High values indicate build cluster resource pressure.",
       "type": "timeseries",
       "gridPos": {
         "h": 10,
@@ -894,8 +894,8 @@
     },
     {
       "id": 14,
-      "title": "Step Failure Leaderboard",
-      "description": "Which ci-operator steps fail most often. High counts indicate flaky steps or infrastructure issues at specific phases.",
+      "title": "Top Failing Steps",
+      "description": "Steps with the most failures across builds. High counts suggest flaky steps or infrastructure issues.",
       "type": "bargauge",
       "gridPos": {
         "h": 10,
@@ -933,7 +933,7 @@
     {
       "id": 15,
       "title": "Pod Phase Breakdown",
-      "description": "Distribution of pod outcomes. High Failed ratio suggests infrastructure pressure.",
+      "description": "Distribution of pod exit states (Succeeded, Failed, etc). High failure ratio suggests infrastructure problems rather than test failures.",
       "type": "piechart",
       "gridPos": {
         "h": 10,

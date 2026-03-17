@@ -115,7 +115,7 @@
           },
           "options": {
             "mode": "markdown",
-            "content": "### How to use this dashboard\n\nThis dashboard shows test-case-level results from JUnit XML artifacts.\n\n**Filters:**\n- **Job Type** -- narrow to specific CI jobs.\n- **PR** -- filter to a specific pull request.\n- **Test Variant** -- filter to a specific e2e test variant.\n\n**Panels:**\n- **Row 1 (Health):** at-a-glance test pass rate, unique failing tests, suite duration, and build count.\n- **Row 2 (Trends):** pass rate and suite duration over time.\n- **Row 3 (Breakdown):** most frequently failing tests and slowest tests.\n- **Row 4 (Investigation):** detailed test results table and step failure messages from VictoriaLogs.\n\n**Tips:**\n- Start with the pass rate stat. If it's green, tests are healthy.\n- Check \"Top Failing Tests\" to find flaky or broken tests.\n- Use \"Slowest Tests\" to identify performance regressions.\n- Expand the Investigation row for per-build details."
+            "content": "### Reading this dashboard\n\nThis dashboard shows test-case-level results from JUnit XML. Not all CI jobs produce per-test JUnit results -- if panels show \"No data\", the repo's test jobs may only report step-level pass/fail (visible on the [CI Overview](/d/ci-overview) dashboard instead).\n\nUse the **Test** filter to search for a specific test name (partial match)."
           }
         }
       ]
