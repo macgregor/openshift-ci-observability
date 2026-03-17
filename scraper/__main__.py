@@ -12,6 +12,7 @@ from scraper.logs import LogPipeline
 from scraper.junit import JunitPipeline
 from scraper.cluster_pool import ClusterPoolPipeline
 from scraper.test_cluster_metrics import TestClusterMetricsPipeline
+from scraper.step_graph import StepGraphPipeline
 from scraper.scraper import Scraper
 
 BUCKET = "test-platform-results"
@@ -86,6 +87,7 @@ def main():
         JunitPipeline(vm_sink, vl_sink),
         ClusterPoolPipeline(vm_sink),
         TestClusterMetricsPipeline(vm_sink, gcs, session, args.vm_url),
+        StepGraphPipeline(vm_sink, vl_sink),
     ]
     scraper = Scraper(gcs, session, args.vm_url, args.vl_url, pipelines, args.workers)
 

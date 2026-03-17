@@ -61,6 +61,10 @@ def test_scrape_discovers_and_ingests(metrics_json):
     responses.add(responses.GET,
                   f"{BASE_URL}/{base_path}/100/job-e2e/12345/artifacts/ci-operator-metrics.json",
                   json=metrics_json, status=200)
+    # Step graph fetch for config_hash computation (404 = no step graph)
+    responses.add(responses.GET,
+                  f"{BASE_URL}/{base_path}/100/job-e2e/12345/artifacts/ci-operator-step-graph.json",
+                  status=404)
     # Mock VM push (metrics + sentinel)
     responses.add(responses.POST, f"{VM_URL}/api/v1/import/prometheus", status=204)
 
@@ -113,6 +117,9 @@ def test_scrape_dry_run(metrics_json):
     responses.add(responses.GET,
                   f"{BASE_URL}/{base_path}/100/job-e2e/12345/artifacts/ci-operator-metrics.json",
                   json=metrics_json, status=200)
+    responses.add(responses.GET,
+                  f"{BASE_URL}/{base_path}/100/job-e2e/12345/artifacts/ci-operator-step-graph.json",
+                  status=404)
 
     session = requests.Session()
     gcs = GCSClient(session, BUCKET)
@@ -163,6 +170,9 @@ def test_scrape_reprocesses_pipeline_on_version_mismatch(metrics_json):
     responses.add(responses.GET,
                   f"{BASE_URL}/{base_path}/100/job-e2e/12345/artifacts/ci-operator-metrics.json",
                   json=metrics_json, status=200)
+    responses.add(responses.GET,
+                  f"{BASE_URL}/{base_path}/100/job-e2e/12345/artifacts/ci-operator-step-graph.json",
+                  status=404)
     responses.add(responses.POST, f"{VM_URL}/api/v1/import/prometheus", status=204)
 
     session = requests.Session()

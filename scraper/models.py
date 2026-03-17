@@ -14,6 +14,7 @@ class JobLabels(TypedDict):
     pr_sha: str
     author: str
     build_id: str
+    config_hash: str
 
 
 @dataclass

@@ -593,3 +593,41 @@ ci-query node-utilization 30d 10
 - These are build cluster nodes only (e.g., `build04-*-ci-longtests-worker-*`), not test cluster nodes
 - High utilization on build cluster nodes may explain pod scheduling latency (see `build-latency`)
 - Useful for CI infrastructure cost analysis, not for cluster pool right-sizing
+
+---
+
+## Config Tracking
+
+### `config-versions [window]`
+
+List distinct config hashes with build counts and date ranges. Shows when CI config transitions happened.
+
+```
+ci-query config-versions           # 90d
+ci-query config-versions 30d
+```
+
+**Output fields:** `config_hash`, `build_count`, `first_seen_ts`, `last_seen_ts`
+
+**Interpretation:**
+- Multiple hashes = config changed during the window
+- A hash with few builds at the end of the range = recent config change
+- Use `config-diff` to compare what changed between hashes
+
+### `config-diff <hash1> <hash2>`
+
+Compare step graph contents between two config hashes. Shows which steps were added, removed, or changed.
+
+```
+ci-query config-diff abc123def456 789abc012345
+```
+
+**Output:** One line per changed step, then a summary.
+
+**Output fields (per-step):** `step`, `change` (`added`/`removed`/`modified`), `description`, `dependencies`
+**Output fields (summary):** `hash1`, `hash2`, `added`, `removed`, `modified`, `unchanged`
+
+**Interpretation:**
+- Added/removed steps = structural config change (new test steps, removed stages)
+- Modified steps = description or dependency changes
+- Use alongside `top-failing-steps` to correlate config changes with failure patterns

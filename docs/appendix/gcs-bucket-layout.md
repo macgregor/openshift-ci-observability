@@ -119,9 +119,9 @@ Each build directory (`{build_path}/`) contains Prow-produced metadata and an `a
 - **`{test-name}/{step}/artifacts/junit_report.xml`** — per-step JUnit results. The `e2e` step's JUnit is typically the richest, containing individual test case pass/fail with duration. Test names discovered from "Run multi-stage test {X}" entries in `junit_operator.xml`.
 - **`build-resources/clusterClaim.json`**, **`clusterDeployment.json`** — cluster pool lifecycle data: claim timing, pool name, namespace, and cluster deployment status. Used to track pool checkout duration and cluster provisioning.
 - **`{test-name}/gather-extra/artifacts/metrics/prometheus.tar`** — Prometheus TSDB dump from the test cluster. Contains WAL segments and head chunks with cluster utilization metrics (CPU, memory, node roles). Typically 60-500MB.
+- **`ci-operator-step-graph.json`** — DAG of step dependencies with execution status. Typically 50-150KB. Used to compute a `config_hash` label (SHA256 of structural fields: step names, descriptions, dependencies) that tracks CI config changes across builds. Step-level details are also pushed to VictoriaLogs for cross-referencing.
 
 **Available for future use:**
-- **`ci-operator-step-graph.json`** — DAG of step dependencies with execution status. Typically 50-150KB. Useful for visualizing pipeline structure and step ordering.
 - **`metadata.json`** — repo, commit, work namespace, and pod name. Small.
 - **`build-logs/{image}.log`** — text build output for each container image built by ci-operator. One file per image (e.g., `src-amd64.log`, `opendatahub-operator-bundle.log`).
 - **`build-resources/`** (other files) — JSON snapshots of K8s resources in the ci-operator work namespace at completion: builds, events, imagestreams, pods, templateinstances. Useful for debugging resource-level failures.

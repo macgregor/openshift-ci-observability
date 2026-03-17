@@ -1,6 +1,7 @@
 """Build context providing lazy artifact fetching and label extraction."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -26,10 +27,11 @@ def extract_job_labels(data) -> JobLabels:
             "pr_sha": pulls[0].get("sha", "")[:12] if pulls else "",
             "author": pulls[0].get("author", "") if pulls else "",
             "build_id": job_spec.get("buildid", ""),
+            "config_hash": "",
         }
     except (StopIteration, KeyError, IndexError):
         log.warning("Could not extract job labels from test_platform_insights")
-        return {"build_id": "unknown"}
+        return {"build_id": "unknown", "config_hash": ""}
 
 
 class BuildContext:
@@ -66,7 +68,30 @@ class BuildContext:
                     "author": "",
                     "build_id": self._build.build_id,
                 }
+            self._labels["config_hash"] = self._compute_config_hash()
         return self._labels
+
+    def _compute_config_hash(self) -> str:
+        content = self.fetch_artifact("artifacts/ci-operator-step-graph.json")
+        if content is None:
+            return ""
+        try:
+            steps = json.loads(content)
+        except (json.JSONDecodeError, ValueError):
+            return ""
+        structural = sorted(
+            [
+                {
+                    "name": s.get("name", ""),
+                    "description": s.get("description", ""),
+                    "dependencies": s.get("dependencies", []),
+                }
+                for s in steps
+            ],
+            key=lambda s: s["name"],
+        )
+        canonical = json.dumps(structural, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode()).hexdigest()[:12]
 
     def fetch_artifact(self, relative_path: str) -> Optional[str]:
         if relative_path in self._artifact_cache:

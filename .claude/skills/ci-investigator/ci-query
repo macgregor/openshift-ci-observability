@@ -994,6 +994,87 @@ def cmd_test_cluster_build(args):
         })
 
 
+# --- Config hash ---
+
+def cmd_config_versions(args):
+    """List distinct config hashes with build counts and date ranges."""
+    window = args[0] if args else "90d"
+    results = vm_query(
+        f'count by (config_hash) (last_over_time('
+        f'ci_config_hash{{config_hash=~".+"}}[{window}]))'
+    )
+    if not results:
+        emit({"error": "No config hash data found"})
+        return
+    for r in sorted(results, key=lambda x: -val(x)):
+        h = r["metric"].get("config_hash", "")
+        count = int(val(r))
+        # Get date range for this hash
+        first_r = vm_query(
+            f'min(last_over_time(ci_config_hash{{config_hash="{h}"}}[{window}]))'
+        )
+        last_r = vm_query(
+            f'max(last_over_time(ci_config_hash{{config_hash="{h}"}}[{window}]))'
+        )
+        entry = {"config_hash": h, "build_count": count}
+        if first_r:
+            entry["first_seen_ts"] = first_r[0]["value"][0]
+        if last_r:
+            entry["last_seen_ts"] = last_r[0]["value"][0]
+        emit(entry)
+
+
+def cmd_config_diff(args):
+    """Compare step graph contents between two config hashes."""
+    if len(args) < 2:
+        emit_error("Usage: config-diff <hash1> <hash2>")
+        sys.exit(1)
+    hash1, hash2 = args[0], args[1]
+
+    def get_steps(h):
+        entries = vl_query(f'source:step_graph AND config_hash:{h}', 500)
+        steps = {}
+        for e in entries:
+            name = e.get("step_name", "")
+            if name and name not in steps:
+                steps[name] = {
+                    "description": e.get("_msg", ""),
+                    "dependencies": e.get("dependencies", "[]"),
+                }
+        return steps
+
+    steps1 = get_steps(hash1)
+    steps2 = get_steps(hash2)
+    all_names = sorted(set(steps1) | set(steps2))
+
+    if not steps1 and not steps2:
+        emit({"error": "No step graph data found for either hash"})
+        return
+
+    for name in all_names:
+        in1 = name in steps1
+        in2 = name in steps2
+        if in1 and not in2:
+            emit({"step": name, "change": "removed", **steps1[name]})
+        elif in2 and not in1:
+            emit({"step": name, "change": "added", **steps2[name]})
+        elif steps1[name] != steps2[name]:
+            emit({
+                "step": name, "change": "modified",
+                "before": steps1[name], "after": steps2[name],
+            })
+    unchanged = sum(1 for n in all_names if n in steps1 and n in steps2 and steps1[n] == steps2[n])
+    emit({
+        "summary": {
+            "hash1": hash1, "hash2": hash2,
+            "added": sum(1 for n in all_names if n not in steps1),
+            "removed": sum(1 for n in all_names if n not in steps2),
+            "modified": sum(1 for n in all_names if n in steps1 and n in steps2 and steps1[n] != steps2[n]),
+            "unchanged": unchanged,
+        }
+    })
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -1034,6 +1115,8 @@ COMMANDS = {
     "pool-wait-trend":    (cmd_pool_wait_trend,        "[window]",                             "Claim wait time statistics"),
     "test-cluster-utilization": (cmd_test_cluster_utilization, "[window]",                     "Test cluster avg/max CPU and memory utilization"),
     "test-cluster-build":       (cmd_test_cluster_build,      "<build_id>",                    "Test cluster utilization for a specific build"),
+    "config-versions":          (cmd_config_versions,          "[window]",                     "Distinct config hashes with build counts"),
+    "config-diff":              (cmd_config_diff,              "<hash1> <hash2>",              "Compare step graph between two config hashes"),
 }
 
 
