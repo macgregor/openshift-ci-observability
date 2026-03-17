@@ -7,9 +7,13 @@ import subprocess
 import tarfile
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from io import BytesIO
+from pathlib import Path
 
+import requests
+
+from scraper import SHARED_VERSION
 from scraper.context import BuildContext
+from scraper.gcs import GCSClient
 from scraper.metrics import format_prometheus_line, sanitize_metric_name
 from scraper.models import Sink
 
@@ -57,6 +61,8 @@ _PER_NODE_METRICS = {
 _SKIP_DIRS = {"build-logs", "build-resources", "release"}
 
 _PROMETHEUS_TAR_SUFFIX = "gather-extra/artifacts/metrics/prometheus.tar"
+
+_METRICS_CACHE_VERSION_PREFIX = "# version="
 
 
 def discover_test_steps(ctx: BuildContext) -> list[str]:
@@ -198,16 +204,48 @@ def extract_test_cluster_metrics(lines, job_labels):
     return metrics
 
 
+def _read_cached_metrics(gcs: GCSClient, gcs_path: str, version: str):
+    """Read cached .metrics file if it exists and version matches.
+
+    Returns list of metric lines, or None on cache miss/stale.
+    """
+    content = gcs.read_processed(gcs_path)
+    if content is None:
+        return None
+    first_line, _, rest = content.partition("\n")
+    if first_line != f"{_METRICS_CACHE_VERSION_PREFIX}{version}":
+        return None
+    return [line for line in rest.splitlines() if line]
+
+
+def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_lines: list[str]):
+    """Write .metrics cache file with version header."""
+    content = f"{_METRICS_CACHE_VERSION_PREFIX}{version}\n"
+    if metric_lines:
+        content += "\n".join(metric_lines) + "\n"
+    gcs.write_processed(gcs_path, content)
+
+
 class TestClusterMetricsPipeline:
     name = "test_cluster_metrics"
+    version = f"{SHARED_VERSION}.1"
+    pushes_own_sentinel = True
 
-    def __init__(self, sink: Sink):
+    def __init__(self, sink: Sink, gcs: GCSClient,
+                 session: requests.Session, vm_url: str):
         self.sink = sink
+        self._gcs = gcs
+        self._session = session
+        self._vm_url = vm_url
         self._pool = ThreadPoolExecutor(
             max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
         )
 
     def process(self, ctx: BuildContext) -> int:
+        if not self._gcs.has_cache:
+            log.warning("TSDB pipeline requires disk cache (GCS_NO_CACHE disables it); skipping")
+            return 0
+
         # Skip builds without a cluster claim -- no test cluster means no Prometheus data.
         # The cluster_pool pipeline runs before this one, so clusterClaim.json is already
         # cached in the artifact cache (None if it doesn't exist).
@@ -225,38 +263,57 @@ class TestClusterMetricsPipeline:
 
     def _submit_step(self, ctx: BuildContext, step_name: str):
         artifact_path = f"artifacts/{step_name}/{_PROMETHEUS_TAR_SUFFIX}"
-        tar_bytes = ctx.fetch_artifact_binary(artifact_path)
-        if tar_bytes is None:
+        gcs_path = ctx.artifact_gcs_path(artifact_path)
+
+        # Fast path: check .metrics cache
+        cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
+        if cached is not None:
+            if cached:
+                self.sink.push(cached)
+                log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
+                         ctx.build.pr, ctx.build.build_id, step_name, len(cached))
+            self._push_sentinel(ctx.build.build_id, ctx.labels.get("build_id", ctx.build.build_id))
             return
 
-        if len(tar_bytes) > _MAX_PROMETHEUS_TAR_BYTES:
-            log.debug("Skipping prometheus.tar for build %s step %s: "
-                      "%dMB exceeds %dMB limit",
-                      ctx.build.build_id, step_name,
-                      len(tar_bytes) // (1024 * 1024),
-                      _MAX_PROMETHEUS_TAR_BYTES // (1024 * 1024))
+        # Slow path: ensure tar is on disk
+        tar_path = ctx.artifact_cache_path(artifact_path)
+        if tar_path is None:
+            return
+
+        tar_size = tar_path.stat().st_size
+        if tar_size > _MAX_PROMETHEUS_TAR_BYTES:
+            log.info("Skipping prometheus.tar for build %s step %s: "
+                     "%dMB exceeds %dMB limit",
+                     ctx.build.build_id, step_name,
+                     tar_size // (1024 * 1024),
+                     _MAX_PROMETHEUS_TAR_BYTES // (1024 * 1024))
+            # Write empty .metrics so we don't re-check next time
+            _write_cached_metrics(self._gcs, gcs_path, self.version, [])
             return
 
         step_labels = {**ctx.labels, "test_step": step_name}
         self._pool.submit(
-            self._process_tar, tar_bytes, step_labels,
+            self._process_tar_from_path, tar_path, gcs_path, step_labels,
             ctx.build.build_id, ctx.build.pr, step_name,
         )
 
-    def _process_tar(self, tar_bytes, step_labels, build_id, pr, step_name):
+    def _process_tar_from_path(self, tar_path: Path, gcs_path: str,
+                               step_labels, build_id, pr, step_name):
         tmpdir = tempfile.mkdtemp(prefix="prom-tsdb-")
         try:
-            with tarfile.open(fileobj=BytesIO(tar_bytes)) as tf:
+            with tarfile.open(str(tar_path)) as tf:
                 tf.extractall(tmpdir, filter="data")
             wal_mb = _wal_size_mb(tmpdir)
             timeout = _promtool_timeout(wal_mb)
             lines = _run_promtool(tmpdir, timeout=timeout)
             metrics = extract_test_cluster_metrics(lines, step_labels)
+            _write_cached_metrics(self._gcs, gcs_path, self.version, metrics)
             self.sink.push(metrics)
             if metrics:
                 log.info("PR %s build %s step %s: %d test_cluster_metrics "
                          "(wal=%dMB, timeout=%ds)",
                          pr, build_id, step_name, len(metrics), wal_mb, timeout)
+            self._push_sentinel(build_id, step_labels.get("build_id", build_id))
         except (tarfile.TarError, OSError) as e:
             log.warning("Failed to process prometheus.tar for build %s step %s: %s",
                         build_id, step_name, e)
@@ -265,6 +322,14 @@ class TestClusterMetricsPipeline:
                       build_id, step_name, exc_info=True)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def _push_sentinel(self, build_id, label_build_id):
+        """Push per-pipeline sentinel metric from pool worker."""
+        from scraper.scraper import push_pipeline_sentinel
+        push_pipeline_sentinel(
+            self._session, self._vm_url,
+            self.name, self.version, label_build_id,
+        )
 
     def drain(self):
         """Wait for all outstanding prometheus processing to complete."""

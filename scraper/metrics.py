@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import datetime
 
+from scraper import SHARED_VERSION
 from scraper.models import Sink
 from scraper.context import BuildContext
 
@@ -230,6 +231,7 @@ def convert_to_metrics(data, job_labels):
 
 class MetricsPipeline:
     name = "metrics"
+    version = f"{SHARED_VERSION}.1"
 
     def __init__(self, sink: Sink):
         self.sink = sink

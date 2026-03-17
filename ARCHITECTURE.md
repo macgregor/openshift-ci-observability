@@ -71,7 +71,7 @@ The scraper is built around a pipeline architecture. Each pipeline processes a s
 | ClusterPoolPipeline | `clusterClaim.json`, `clusterDeployment.json` | Pool lifecycle metrics | VictoriaMetrics |
 | TestClusterMetricsPipeline | `prometheus.tar` (TSDB dump) | Cluster utilization metrics (per-node metrics enriched with master/worker `role` label) | VictoriaMetrics |
 
-Adding a new scrape target means writing a new Pipeline class and registering it in `__main__.py`. Pipelines are independent -- each receives a `BuildContext` and decides what to fetch and emit.
+Adding a new scrape target means writing a new Pipeline class and registering it in `__main__.py`. Pipelines are independent -- each receives a `BuildContext` and decides what to fetch and emit. Each pipeline declares a `version` string composed of `SHARED_VERSION` (for cross-cutting changes) and a pipeline-specific suffix. Bumping a pipeline's suffix invalidates only that pipeline; bumping `SHARED_VERSION` invalidates all pipelines.
 
 ### Core Entities
 
@@ -85,11 +85,13 @@ Adding a new scrape target means writing a new Pipeline class and registering it
 
 ### Concurrency
 
-The scraper uses a `ThreadPoolExecutor` to process builds in parallel. Discovery (listing PRs, jobs, builds from GCS) runs on the main thread and submits builds to the pool as they're discovered. All builds across all PRs and jobs share the pool, so workers stay saturated even when individual builds take varying amounts of time (e.g., prometheus.tar extraction is much slower than JSON parsing).
+The scraper uses a `ThreadPoolExecutor` shared by both discovery and build processing. PR listing runs first (single GCS call), then per-PR discovery tasks (list jobs, list builds) and build processing tasks compete for the pool. As each discovery completes, its builds are submitted immediately and interleave with remaining discoveries. The main thread drives the work loop, submitting new discoveries to keep the pipeline fed as earlier ones complete. The TestClusterMetricsPipeline runs `promtool` WAL replay in a separate 4-worker pool to avoid starving the main pool with CPU-intensive work.
 
 ### GCS Artifact Cache
 
 GCS artifacts are immutable once written, so the scraper caches fetched objects to a local directory (a podman volume shared between watch and backfill services). Cache entries use the GCS path as the filesystem path, mirroring the bucket layout. 404 responses are cached as `.miss` marker files to avoid re-probing missing artifacts.
+
+The TestClusterMetricsPipeline also caches processed output as `.metrics` sibling files next to the raw `prometheus.tar`. Each `.metrics` file contains a version header and the final Prometheus text format ready for pushing. On read, the version is compared against the pipeline's current version -- a mismatch means stale, and the file is reprocessed. This avoids redundant `promtool` WAL replay, which is the most expensive operation in the scraper.
 
 `make wipe-db` clears the database but preserves the cache, enabling fast re-ingestion after scrape logic changes. `make wipe-all` clears both.
 
@@ -106,11 +108,11 @@ This design enables migration to hosted observability platforms by changing the 
 
 ### Metrics
 
-VictoriaMetrics handles deduplication via `-dedup.minScrapeInterval=1ms` flag, which deduplicates samples with identical timestamps and labels.
+VictoriaMetrics handles deduplication via `-dedup.minScrapeInterval=1ms` flag, which deduplicates samples with identical timestamps and labels. Changed or removed metrics age out via retention.
 
 ### Logs
 
-The scraper skips builds already present in VictoriaMetrics (see State Management below). Metrics deduplication handles any rare duplicate processing from concurrent scraper instances.
+Log entries include a `pipeline` field (`"logs"` or `"junit"`). When a pipeline's version changes and a build is reprocessed, the scraper deletes old log entries for that build_id and pipeline via the VictoriaLogs delete API before re-pushing, preventing duplicates.
 
 ## Operational Modes
 
@@ -132,8 +134,17 @@ The scraper runs as two compose services:
 
 ## State Management
 
-Build processing state is stored in VictoriaMetrics itself. The scraper queries for known `build_id` values at the start of each cycle and pushes a `ci_build_scraped` sentinel metric after processing each build. This means:
+Build processing state is stored in VictoriaMetrics itself via per-pipeline sentinel metrics. For each pipeline+build combination, the scraper pushes:
+
+```
+ci_pipeline_scraped{build_id="123", pipeline="metrics", pipeline_v="1.1"} 1
+```
+
+At the start of each scrape cycle, the scraper queries for known build_ids per pipeline at the current version. A build is skipped only if ALL pipelines have processed it at their current version. If any pipeline's version has changed, only that pipeline reprocesses -- no `make wipe-db` needed.
+
+This means:
 
 - **No external state**: no state file, no shared volume between scraper instances
 - **Self-healing**: if VictoriaMetrics data is wiped, builds are automatically re-ingested
 - **Idempotency**: builds can be reprocessed safely; VictoriaMetrics deduplicates identical data points
+- **Selective reprocessing**: bumping a pipeline's version reprocesses only that pipeline for all builds

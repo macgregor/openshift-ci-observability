@@ -1,13 +1,18 @@
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from scraper.test_cluster_metrics import (
     discover_test_steps,
     parse_promtool_line,
     extract_test_cluster_metrics,
     _build_node_role_map,
+    _read_cached_metrics,
+    _write_cached_metrics,
     _OUTPUT_NAMES,
     TestClusterMetricsPipeline,
 )
+from scraper.gcs import GCSClient
 
 
 SAMPLE_LABELS = {
@@ -20,6 +25,20 @@ SAMPLE_LABELS = {
     "author": "dev",
     "build_id": "2031880686163464192",
 }
+
+BUCKET = "test-platform-results"
+VM_URL = "http://vm:8428"
+
+
+def _make_pipeline():
+    """Create a TestClusterMetricsPipeline with mock dependencies."""
+    sink = MagicMock()
+    gcs = MagicMock(spec=GCSClient)
+    gcs.has_cache = True
+    gcs.read_processed.return_value = None
+    session = MagicMock(spec=requests.Session)
+    pipeline = TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
+    return pipeline, sink, gcs, session
 
 
 def test_discover_test_steps_filters_infra():
@@ -177,8 +196,7 @@ def test_extract_no_role_without_kube_node_role():
 
 def test_process_skips_without_cluster_claim():
     """Pipeline skips entirely when no clusterClaim.json exists."""
-    sink = MagicMock()
-    pipeline = TestClusterMetricsPipeline(sink)
+    pipeline, sink, gcs, _ = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = None
@@ -187,10 +205,19 @@ def test_process_skips_without_cluster_claim():
     sink.push.assert_not_called()
 
 
+def test_process_skips_without_cache():
+    """Pipeline skips when disk cache is disabled."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+    gcs.has_cache = False
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    assert pipeline.process(ctx) == 0
+    ctx.fetch_artifact.assert_not_called()
+
+
 def test_process_no_test_steps():
     """Pipeline returns 0 when no test step directories exist."""
-    sink = MagicMock()
-    pipeline = TestClusterMetricsPipeline(sink)
+    pipeline, sink, gcs, _ = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
@@ -201,41 +228,44 @@ def test_process_no_test_steps():
 
 def test_process_no_prometheus_tar():
     """Pipeline returns 0 when step exists but prometheus.tar doesn't."""
-    sink = MagicMock()
-    pipeline = TestClusterMetricsPipeline(sink)
+    pipeline, sink, gcs, _ = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.return_value = ["my-step"]
-    ctx.fetch_artifact_binary.return_value = None  # prometheus.tar not found
+    ctx.artifact_cache_path.return_value = None  # prometheus.tar not found
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-def test_process_with_promtool(mock_promtool):
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_process_with_promtool(mock_sentinel, mock_promtool, tmp_path):
     """Pipeline submits promtool work to async pool; drain() completes it."""
     mock_promtool.return_value = [
         '{__name__="cluster:cpu_usage_cores:sum", prometheus="k8s"} 4.2 1710000000000',
     ]
-    sink = MagicMock()
-    pipeline = TestClusterMetricsPipeline(sink)
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    # Create a minimal valid tar on disk
+    import io
+    import tarfile
+    tar_file = tmp_path / "prometheus.tar"
+    with tarfile.open(str(tar_file), mode="w") as tf:
+        data = b"fake tsdb data"
+        info = tarfile.TarInfo(name="wal/00000001")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.build.build_id = "123"
     ctx.build.pr = "42"
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
-    # Create a minimal valid tar in memory
-    import io
-    import tarfile
-    buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w") as tf:
-        data = b"fake tsdb data"
-        info = tarfile.TarInfo(name="wal/00000001")
-        info.size = len(data)
-        tf.addfile(info, io.BytesIO(data))
-    ctx.fetch_artifact_binary.return_value = buf.getvalue()
+    ctx.artifact_cache_path.return_value = tar_file
+    ctx.artifact_gcs_path.return_value = "pr-logs/pull/org_repo/42/job/123/artifacts/my-e2e-step/gather-extra/artifacts/metrics/prometheus.tar"
+
     count = pipeline.process(ctx)
     assert count == 0  # Returns immediately; work is async
     pipeline.drain()  # Wait for the promtool pool to finish
@@ -244,3 +274,126 @@ def test_process_with_promtool(mock_promtool):
     assert len(pushed) == 1
     assert "ci_test_cluster_cluster_cpu_usage_cores_sum" in pushed[0]
     assert 'test_step="my-e2e-step"' in pushed[0]
+    # Verify .metrics cache was written
+    gcs.write_processed.assert_called_once()
+    # Verify sentinel was pushed
+    mock_sentinel.assert_called_once()
+
+
+# --- .metrics cache tests ---
+
+def test_cache_hit(tmp_path):
+    """Pipeline serves metrics from .metrics cache without promtool."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    cached_content = f"# version={pipeline.version}\n" \
+        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000\n'
+    gcs.read_processed.return_value = cached_content
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
+    ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
+    ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    sink.push.assert_called_once()
+    pushed = sink.push.call_args[0][0]
+    assert len(pushed) == 1
+    assert "ci_test_cluster_cluster_cpu_usage_cores_sum" in pushed[0]
+    # Should NOT try to download the tar
+    ctx.artifact_cache_path.assert_not_called()
+
+
+def test_cache_stale_version(tmp_path):
+    """Pipeline reprocesses when .metrics version doesn't match."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    stale_content = "# version=old\n" \
+        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000\n'
+    gcs.read_processed.return_value = stale_content
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
+    ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
+    ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
+    ctx.artifact_cache_path.return_value = None  # tar not available
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    # Stale cache was rejected, tried to fetch tar (returned None)
+    ctx.artifact_cache_path.assert_called_once()
+    sink.push.assert_not_called()
+
+
+def test_cache_empty_metrics():
+    """Pipeline handles empty .metrics cache (skipped tar) gracefully."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    # Empty .metrics = tar was skipped (oversized, etc.)
+    cached_content = f"# version={pipeline.version}\n"
+    gcs.read_processed.return_value = cached_content
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
+    ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
+    ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    # No push for empty metrics
+    sink.push.assert_not_called()
+    ctx.artifact_cache_path.assert_not_called()
+
+
+# --- Unit tests for cache read/write helpers ---
+
+def test_read_cached_metrics_hit(tmp_path):
+    """read_processed returns content when version matches."""
+    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    gcs_path = "some/path/prometheus.tar"
+    version = "1.1"
+
+    _write_cached_metrics(gcs, gcs_path, version, ["metric1 1.0", "metric2 2.0"])
+    result = _read_cached_metrics(gcs, gcs_path, version)
+    assert result == ["metric1 1.0", "metric2 2.0"]
+
+
+def test_read_cached_metrics_stale(tmp_path):
+    """read_processed returns None when version doesn't match."""
+    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    gcs_path = "some/path/prometheus.tar"
+
+    _write_cached_metrics(gcs, gcs_path, "old", ["metric1 1.0"])
+    result = _read_cached_metrics(gcs, gcs_path, "new")
+    assert result is None
+
+
+def test_read_cached_metrics_empty(tmp_path):
+    """read_processed returns empty list for skipped tars."""
+    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    gcs_path = "some/path/prometheus.tar"
+    version = "1.1"
+
+    _write_cached_metrics(gcs, gcs_path, version, [])
+    result = _read_cached_metrics(gcs, gcs_path, version)
+    assert result == []
+
+
+def test_read_cached_metrics_missing(tmp_path):
+    """read_processed returns None when no .metrics file exists."""
+    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    result = _read_cached_metrics(gcs, "nonexistent/path", "1.0")
+    assert result is None

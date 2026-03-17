@@ -28,6 +28,9 @@ class Pipeline(Protocol):
     @property
     def name(self) -> str: ...
 
+    @property
+    def version(self) -> str: ...
+
     def process(self, ctx: BuildContext) -> int: ...
 
 

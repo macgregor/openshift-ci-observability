@@ -105,7 +105,7 @@ def cmd_health(args):
     max_lat = vm_scalar(
         f"max(last_over_time(ci_pod_scheduling_latency_seconds[{window}]))"
     )
-    builds = vm_scalar(f"count(last_over_time(ci_build_scraped[{window}]))")
+    builds = vm_scalar(f'count(last_over_time(ci_pipeline_scraped{{pipeline="metrics"}}[{window}]))')
     emit({
         "window": window,
         "builds_ingested": int(builds),

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Optional
 
 from scraper.models import Build, JobLabels
@@ -70,28 +71,38 @@ class BuildContext:
     def fetch_artifact(self, relative_path: str) -> Optional[str]:
         if relative_path in self._artifact_cache:
             return self._artifact_cache[relative_path]
-        full_path = (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
-                     f"{self._build.build_id}/{relative_path}")
-        result = self._gcs.fetch_object(full_path)
+        result = self._gcs.fetch_object(self._full_path(relative_path))
         self._artifact_cache[relative_path] = result
         return result
 
     def list_artifact_dirs(self, relative_prefix: str) -> list[str]:
-        full_prefix = (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
-                       f"{self._build.build_id}/{relative_prefix}")
+        full_prefix = self._full_path(relative_prefix)
         return [p.split(relative_prefix)[-1].rstrip("/")
                 for p in self._gcs.list_prefixes(full_prefix)]
 
     def head_artifact(self, relative_path: str) -> bool:
-        full_path = (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
-                     f"{self._build.build_id}/{relative_path}")
-        return self._gcs.head_object(full_path)
+        return self._gcs.head_object(self._full_path(relative_path))
 
     def fetch_artifact_binary(self, relative_path: str) -> Optional[bytes]:
         if relative_path in self._binary_cache:
             return self._binary_cache[relative_path]
-        full_path = (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
-                     f"{self._build.build_id}/{relative_path}")
-        result = self._gcs.fetch_binary(full_path)
+        result = self._gcs.fetch_binary(self._full_path(relative_path))
         self._binary_cache[relative_path] = result
         return result
+
+    def artifact_cache_path(self, relative_path: str) -> Optional[Path]:
+        """Download artifact to disk cache and return its Path (None if 404 or no cache)."""
+        full_path = self._full_path(relative_path)
+        return self._gcs.ensure_cached(full_path)
+
+    def artifact_gcs_path(self, relative_path: str) -> str:
+        """Return the full GCS path for an artifact."""
+        return self._full_path(relative_path)
+
+    @property
+    def gcs(self) -> GCSClient:
+        return self._gcs
+
+    def _full_path(self, relative_path: str) -> str:
+        return (f"{self._build.base_path}/{self._build.pr}/{self._build.job}/"
+                f"{self._build.build_id}/{relative_path}")

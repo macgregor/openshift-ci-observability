@@ -2,6 +2,7 @@
 import json
 import logging
 
+from scraper import SHARED_VERSION
 from scraper.models import Sink
 from scraper.context import BuildContext
 
@@ -10,6 +11,8 @@ log = logging.getLogger("scraper")
 
 class LogPipeline:
     name = "logs"
+    version = f"{SHARED_VERSION}.1"
+    _pushes_logs = True
 
     def __init__(self, sink: Sink):
         self.sink = sink
@@ -39,8 +42,9 @@ class LogPipeline:
                 if isinstance(v, (str, int, float, bool)):
                     scalars[k] = v
 
-            # Labels win over log scalars; _time, _msg, source always set
-            record = {**scalars, **ctx.labels, "_time": time_val, "_msg": msg_val, "source": "ci-operator"}
+            # Labels win over log scalars; _time, _msg, source, pipeline always set
+            record = {**scalars, **ctx.labels, "_time": time_val, "_msg": msg_val,
+                      "source": "ci-operator", "pipeline": "logs"}
             records.append(json.dumps(record))
 
         self.sink.push(records)

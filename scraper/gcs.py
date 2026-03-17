@@ -177,6 +177,74 @@ class GCSClient:
         self._cache_write(path, content)
         return content
 
+    @property
+    def has_cache(self) -> bool:
+        return self._cache_dir is not None
+
+    def ensure_cached(self, path: str) -> Optional[Path]:
+        """Ensure a GCS object is on disk. Returns the cache Path, or None if 404/no cache."""
+        if self._cache_dir is None:
+            return None
+        cp = self._cache_path(path)
+        if cp.exists():
+            return cp
+        miss = cp.with_suffix(cp.suffix + ".miss")
+        if miss.exists():
+            return None
+        # Stream to disk
+        url = f"{GCS_BASE}/{self.bucket}/{path}"
+        log.debug("GET %s (stream-to-disk)", url)
+        resp = self.session.get(url, timeout=300, stream=True)
+        if resp.status_code == 404:
+            self._cache_write_miss(path)
+            return None
+        resp.raise_for_status()
+        cp.parent.mkdir(parents=True, exist_ok=True)
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=cp.parent)
+        try:
+            with os.fdopen(tmp_fd, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=256 * 1024):
+                    f.write(chunk)
+            os.rename(tmp_path, cp)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+        return cp
+
+    def read_processed(self, gcs_path: str) -> Optional[str]:
+        """Read a .metrics sibling file for the given GCS path."""
+        if self._cache_dir is None:
+            return None
+        metrics_path = self._cache_path(gcs_path + ".metrics")
+        if metrics_path is not None and metrics_path.exists():
+            return metrics_path.read_text(encoding="utf-8")
+        return None
+
+    def write_processed(self, gcs_path: str, content: str):
+        """Atomic-write a .metrics sibling file for the given GCS path."""
+        if self._cache_dir is None:
+            return
+        metrics_path = self._cache_path(gcs_path + ".metrics")
+        metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=metrics_path.parent)
+        try:
+            os.write(tmp_fd, content.encode("utf-8"))
+            os.close(tmp_fd)
+            os.rename(tmp_path, metrics_path)
+        except Exception:
+            try:
+                os.close(tmp_fd)
+            except OSError:
+                pass
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
     def _last_component(self, prefix: str) -> str:
         return prefix.rstrip("/").split("/")[-1]
 

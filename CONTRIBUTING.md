@@ -46,9 +46,15 @@ make wipe-all    # delete DB + cache
 make wipe-cache  # delete cache only
 ```
 
-Scraper state is stored in VictoriaMetrics itself (via a sentinel metric), so wiping the database automatically resets state. VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
+Scraper state is stored in VictoriaMetrics itself (via per-pipeline sentinel metrics), so wiping the database automatically resets state. VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
 
-**When to wipe:** Changes to scraping logic (new pipelines, modified metric extraction, new artifact parsing) require a DB wipe to reprocess existing builds with the updated code. The scraper skips builds already present in VictoriaMetrics, so existing builds won't pick up new data without a wipe. You don't need to clear the GCS cache for this -- the cached artifacts are the raw inputs, not the processed output.
+**When to wipe:** Most code changes no longer require a DB wipe. Each pipeline has a `version` string (composed of `SHARED_VERSION` + a pipeline-specific suffix in `scraper/__init__.py` and each pipeline file). When you change extraction logic:
+
+1. Bump the affected pipeline's version suffix (e.g., `version = f"{SHARED_VERSION}.2"`)
+2. `make build && make restart`
+3. The scraper detects the version mismatch and reprocesses only that pipeline for all builds
+
+Bump `SHARED_VERSION` in `scraper/__init__.py` to reprocess all pipelines at once. A DB wipe (`make wipe-db`) is only needed if you want to purge old metric data that's no longer emitted by the new code, since changed metrics age out via retention otherwise.
 
 **Cache growth:** The GCS cache grows as builds are processed and is never automatically pruned. This is intentional -- cached artifacts remain available for re-ingestion even after GCS applies its own retention policy (~90 days), so you can retain historical data longer than the source bucket. Run `make wipe-cache` periodically if disk space is a concern, or `podman exec ci-obs-scraper-backfill du -sh /cache` to check current size. To disable caching entirely, set `GCS_NO_CACHE=true` in `.env`.
 

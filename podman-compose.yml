@@ -80,7 +80,7 @@ services:
       - WINDOW=${BACKFILL_WINDOW:-90d}
       - POLL_INTERVAL=${POLL_INTERVAL:-300}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - WORKERS=${BACKFILL_WORKERS:-16}
+      - WORKERS=${BACKFILL_WORKERS:-64}
       - GCS_CACHE_DIR=/cache
       - GCS_NO_CACHE=${GCS_NO_CACHE:-}
     volumes:

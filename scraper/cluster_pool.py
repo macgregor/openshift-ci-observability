@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import datetime
 
+from scraper import SHARED_VERSION
 from scraper.context import BuildContext
 from scraper.metrics import format_prometheus_line
 from scraper.models import Sink
@@ -126,6 +127,7 @@ def extract_cluster_pool_metrics(claim_data, deployment_data, job_labels):
 
 class ClusterPoolPipeline:
     name = "cluster_pool"
+    version = f"{SHARED_VERSION}.1"
 
     def __init__(self, sink: Sink):
         self.sink = sink

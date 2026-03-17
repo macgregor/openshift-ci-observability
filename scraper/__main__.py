@@ -85,9 +85,9 @@ def main():
         LogPipeline(vl_sink),
         JunitPipeline(vm_sink, vl_sink),
         ClusterPoolPipeline(vm_sink),
-        TestClusterMetricsPipeline(vm_sink),
+        TestClusterMetricsPipeline(vm_sink, gcs, session, args.vm_url),
     ]
-    scraper = Scraper(gcs, session, args.vm_url, pipelines, args.workers)
+    scraper = Scraper(gcs, session, args.vm_url, args.vl_url, pipelines, args.workers)
 
     org_repo = args.repo.replace("/", "_")
     base_path = f"pr-logs/pull/{org_repo}"

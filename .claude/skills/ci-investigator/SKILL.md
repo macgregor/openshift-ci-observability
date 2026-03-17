@@ -29,7 +29,7 @@ Investigate OpenShift CI failures by querying VictoriaMetrics (metrics) and Vict
 | VictoriaLogs | `http://localhost:9428` | LogsQL via `/select/logsql/query` |
 | Grafana | `http://localhost:3000` | Dashboards (visual verification) |
 
-**Status:** !`curl -s http://localhost:8428/api/v1/query --data-urlencode 'query=count(last_over_time(ci_build_scraped[90d]))' 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'VM up -- {d[\"data\"][\"result\"][0][\"value\"][1]} builds ingested')" || echo "VictoriaMetrics not reachable -- start services with 'make up'"`
+**Status:** !`curl -s http://localhost:8428/api/v1/query --data-urlencode 'query=count(last_over_time(ci_pipeline_scraped{pipeline="metrics"}[90d]))' 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'VM up -- {d[\"data\"][\"result\"][0][\"value\"][1]} builds ingested')" || echo "VictoriaMetrics not reachable -- start services with 'make up'"`
 !`curl -sf http://localhost:9428/health >/dev/null 2>&1 && echo "VictoriaLogs up" || echo "VictoriaLogs not reachable"`
 
 **External links:**
@@ -75,7 +75,7 @@ The scraper extracts all numeric fields from `ci-operator-metrics.json` as Prome
 | `ci_pods_completion_latency{pod_phase}` | Pod completion time. `pod_phase` = Succeeded/Failed. |
 | `ci_junit_step_duration_seconds{step_name, status}` | Per-step duration from JUnit XML. `status` = passed/failed/skipped. `step_name` = human-readable step description. |
 | `ci_junit_test_duration_seconds{test_name, suite, status, test_variant, leaf}` | Per-test-case duration from JUnit XML. `test_name` = Go test path. `test_variant` = e2e variant. `leaf="true"` for leaf tests (no children). |
-| `ci_build_scraped` | Sentinel: value=1 for each processed build. Use to check data exists. |
+| `ci_pipeline_scraped{pipeline, pipeline_v}` | Per-pipeline sentinel: value=1 for each processed pipeline+build. Use `pipeline="metrics"` to check build data exists. |
 
 **Common labels** (on all metrics): `org`, `repo`, `branch`, `job_name`, `build_id`, `pr_number`, `pr_sha`, `author`
 **Step-level labels**: `source` (step name), `level` (severity), `name` (insight entry name), `success`

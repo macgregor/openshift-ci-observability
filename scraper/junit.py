@@ -4,6 +4,7 @@ import logging
 import re
 from xml.etree import ElementTree as ET
 
+from scraper import SHARED_VERSION
 from scraper.context import BuildContext
 from scraper.metrics import format_prometheus_line
 from scraper.models import Sink
@@ -68,6 +69,8 @@ def filter_leaf_tests(cases: list[dict]) -> list[dict]:
 
 class JunitPipeline:
     name = "junit"
+    version = f"{SHARED_VERSION}.1"
+    _pushes_logs = True
 
     def __init__(self, metrics_sink: Sink, logs_sink: Sink):
         self.metrics_sink = metrics_sink
@@ -119,6 +122,7 @@ class JunitPipeline:
                     "_time": timestamp,
                     "_msg": case["failure_message"],
                     "source": "junit_step",
+                    "pipeline": "junit",
                     "step_name": case["name"],
                     "status": "failed",
                     "duration_seconds": round(duration, 3),
@@ -166,6 +170,7 @@ class JunitPipeline:
                         "_time": timestamp,
                         "_msg": case["failure_message"],
                         "source": "junit_test",
+                        "pipeline": "junit",
                         "test_name": case["name"],
                         "status": "failed",
                         "test_variant": test_name,
