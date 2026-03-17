@@ -117,13 +117,15 @@ Each build directory (`{build_path}/`) contains Prow-produced metadata and an `a
 - **`ci-operator.log`** — JSON lines, one entry per log statement from ci-operator. Fields include `time`, `msg`, `level` (info/debug/error/warning/trace), and `component`. Typically 40-600KB.
 - **`junit_operator.xml`** — JUnit XML aggregating test results from ci-operator-managed steps. One testcase per step with duration and pass/fail status. Failed steps include a failure message. Typically 2-10KB.
 - **`{test-name}/{step}/artifacts/junit_report.xml`** — per-step JUnit results. The `e2e` step's JUnit is typically the richest, containing individual test case pass/fail with duration. Test names discovered from "Run multi-stage test {X}" entries in `junit_operator.xml`.
+- **`build-resources/clusterClaim.json`**, **`clusterDeployment.json`** — cluster pool lifecycle data: claim timing, pool name, namespace, and cluster deployment status. Used to track pool checkout duration and cluster provisioning.
+- **`{test-name}/gather-extra/artifacts/metrics/prometheus.tar`** — Prometheus TSDB dump from the test cluster. Contains WAL segments and head chunks with cluster utilization metrics (CPU, memory, node roles). Typically 60-500MB.
 
 **Available for future use:**
 - **`ci-operator-step-graph.json`** — DAG of step dependencies with execution status. Typically 50-150KB. Useful for visualizing pipeline structure and step ordering.
 - **`metadata.json`** — repo, commit, work namespace, and pod name. Small.
 - **`build-logs/{image}.log`** — text build output for each container image built by ci-operator. One file per image (e.g., `src-amd64.log`, `opendatahub-operator-bundle.log`).
-- **`build-resources/`** — JSON snapshots of K8s resources in the ci-operator work namespace at completion: builds, events, imagestreams, pods, clusterClaim, clusterDeployment, templateinstances. Useful for debugging resource-level failures.
-- **`{test-name}/gather-extra/artifacts/`** — post-test cluster diagnostics. Contains JSON dumps of cluster resources (events, pods, nodes, configmaps, CSVs, etc.), audit logs, and `oc` command output. Can be very large (10-30MB for the full gather).
+- **`build-resources/`** (other files) — JSON snapshots of K8s resources in the ci-operator work namespace at completion: builds, events, imagestreams, pods, templateinstances. Useful for debugging resource-level failures.
+- **`{test-name}/gather-extra/artifacts/`** (other files) — post-test cluster diagnostics. Contains JSON dumps of cluster resources (events, pods, nodes, configmaps, CSVs, etc.), audit logs, and `oc` command output. Can be very large (10-30MB for the full gather).
 
 ## XML API Navigation
 

@@ -25,13 +25,6 @@ log = logging.getLogger("scraper")
 # comes from 16 workers all replaying WALs simultaneously.
 _PROMTOOL_WORKERS = 4
 
-# Skip prometheus.tar files larger than this.  CI test clusters dump the full
-# Prometheus TSDB as a tar archive.  promtool must replay the WAL to extract
-# our target metrics, which is CPU-intensive and scales linearly with WAL size.
-# Large tars frequently contain corrupted WALs (truncated by the CI kill
-# signal) that burn CPU for minutes before returning zero data.
-_MAX_PROMETHEUS_TAR_BYTES = 150 * 1024 * 1024
-
 METRICS = [
     "cluster:cpu_usage_cores:sum",
     "cluster:capacity_cpu_cores:sum",
@@ -228,7 +221,7 @@ def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_li
 
 class TestClusterMetricsPipeline:
     name = "test_cluster_metrics"
-    version = f"{SHARED_VERSION}.1"
+    version = f"{SHARED_VERSION}.2"
     pushes_own_sentinel = True
 
     def __init__(self, sink: Sink, gcs: GCSClient,
@@ -278,17 +271,6 @@ class TestClusterMetricsPipeline:
         # Slow path: ensure tar is on disk
         tar_path = ctx.artifact_cache_path(artifact_path)
         if tar_path is None:
-            return
-
-        tar_size = tar_path.stat().st_size
-        if tar_size > _MAX_PROMETHEUS_TAR_BYTES:
-            log.info("Skipping prometheus.tar for build %s step %s: "
-                     "%dMB exceeds %dMB limit",
-                     ctx.build.build_id, step_name,
-                     tar_size // (1024 * 1024),
-                     _MAX_PROMETHEUS_TAR_BYTES // (1024 * 1024))
-            # Write empty .metrics so we don't re-check next time
-            _write_cached_metrics(self._gcs, gcs_path, self.version, [])
             return
 
         step_labels = {**ctx.labels, "test_step": step_name}

@@ -16,7 +16,7 @@ Review documentation for accuracy against the current codebase, internal consist
 **Target:** `$ARGUMENTS` (file path or directory; defaults to all committed `.md` files if omitted)
 
 **Project context:**
-- Key source files: !`ls scraper/scrape.py podman-compose.yml Containerfile.scraper .env.example 2>/dev/null`
+- Key source files: !`ls podman-compose.yml Containerfile.scraper .env.example 2>/dev/null`
 - Dashboard files: !`ls grafana/provisioning/dashboards/json/*.json 2>/dev/null`
 - Documentation files: !`find . -name '*.md' -not -path './docs/plans/*' -not -path './.claude/*' -not -path './node_modules/*' | sort`
 - Git status: !`git diff --name-only HEAD~5 2>/dev/null | head -20`

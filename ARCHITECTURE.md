@@ -138,6 +138,7 @@ Build processing state is stored in VictoriaMetrics itself via per-pipeline sent
 
 ```
 ci_pipeline_scraped{build_id="123", pipeline="metrics", pipeline_v="1.1"} 1
+ci_pipeline_scraped{build_id="123", pipeline="test_cluster_metrics", pipeline_v="1.2"} 1
 ```
 
 At the start of each scrape cycle, the scraper queries for known build_ids per pipeline at the current version. A build is skipped only if ALL pipelines have processed it at their current version. If any pipeline's version has changed, only that pipeline reprocesses -- no `make wipe-db` needed.
