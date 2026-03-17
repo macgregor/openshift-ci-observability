@@ -10,6 +10,23 @@
   "templating": {
     "list": [
       {
+        "name": "repo",
+        "label": "Repository",
+        "type": "query",
+        "query": "query_result(group by (repo) (count_over_time(ci_build_duration_seconds[$__range:])))",
+        "regex": "/repo=\"([^\"]+)\"/",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
         "name": "job_type",
         "label": "Job Type",
         "type": "query",
@@ -18,7 +35,11 @@
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 1
       },
@@ -26,12 +47,16 @@
         "name": "pr_number",
         "label": "PR",
         "type": "query",
-        "query": "query_result(group by (pr_number) (count_over_time(ci_junit_test_duration_seconds{job_name=~\"$job_type\"}[$__range:])))",
+        "query": "query_result(group by (pr_number) (count_over_time(ci_junit_test_duration_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:])))",
         "regex": "/pr_number=\"([^\"]+)\"/",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 3
       },
@@ -40,18 +65,26 @@
         "label": "Test",
         "description": "Filter by test name substring (e.g. kserve, monitoring)",
         "type": "textbox",
-        "current": { "selected": false, "text": "", "value": "" }
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        }
       },
       {
         "name": "test_variant",
         "label": "Test Variant",
         "type": "query",
-        "query": "query_result(group by (test_variant) (count_over_time(ci_junit_test_duration_seconds{job_name=~\"$job_type\",pr_number=~\"$pr_number\"}[$__range:])))",
+        "query": "query_result(group by (test_variant) (count_over_time(ci_junit_test_duration_seconds{job_name=~\"$job_type\",pr_number=~\"$pr_number\",repo=~\"$repo\"}[$__range:])))",
         "regex": "/test_variant=\"([^\"]+)\"/",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 1
       }
@@ -62,14 +95,24 @@
       "id": 50,
       "title": "Dashboard Guide",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "collapsed": true,
       "panels": [
         {
           "id": 51,
           "title": "",
           "type": "text",
-          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 1
+          },
           "options": {
             "mode": "markdown",
             "content": "### How to use this dashboard\n\nThis dashboard shows test-case-level results from JUnit XML artifacts.\n\n**Filters:**\n- **Job Type** -- narrow to specific CI jobs.\n- **PR** -- filter to a specific pull request.\n- **Test Variant** -- filter to a specific e2e test variant.\n\n**Panels:**\n- **Row 1 (Health):** at-a-glance test pass rate, unique failing tests, suite duration, and build count.\n- **Row 2 (Trends):** pass rate and suite duration over time.\n- **Row 3 (Breakdown):** most frequently failing tests and slowest tests.\n- **Row 4 (Investigation):** detailed test results table and step failure messages from VictoriaLogs.\n\n**Tips:**\n- Start with the pass rate stat. If it's green, tests are healthy.\n- Check \"Top Failing Tests\" to find flaky or broken tests.\n- Use \"Slowest Tests\" to identify performance regressions.\n- Expand the Investigation row for per-build details."
@@ -81,17 +124,27 @@
       "id": 100,
       "title": "Health Summary",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
       "collapsed": false
     },
     {
       "id": 10,
       "title": "Test Pass Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 2 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 2
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}))[$__range:])) / count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}))[$__range:])) * 100",
+          "expr": "count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])) / count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])) * 100",
           "instant": false,
           "refId": "A"
         }
@@ -102,15 +155,28 @@
           "decimals": 1,
           "thresholds": {
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 90 },
-              { "color": "green", "value": 98 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 90
+              },
+              {
+                "color": "green",
+                "value": 98
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -119,10 +185,15 @@
       "id": 11,
       "title": "Unique Failing Tests",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 2 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 2
+      },
       "targets": [
         {
-          "expr": "count(count by (test_name) (count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}))[$__range:])))",
+          "expr": "count(count by (test_name) (count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])))",
           "instant": false,
           "refId": "A"
         }
@@ -131,16 +202,29 @@
         "defaults": {
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "red", "value": 15 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
             ]
           },
           "noValue": "0"
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -149,10 +233,15 @@
       "id": 12,
       "title": "Avg Suite Duration",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 2 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 2
+      },
       "targets": [
         {
-          "expr": "avg(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}[$__range])))",
+          "expr": "avg(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])))",
           "instant": false,
           "refId": "A"
         }
@@ -161,11 +250,18 @@
         "defaults": {
           "unit": "s",
           "decimals": 0,
-          "color": { "mode": "fixed", "fixedColor": "blue" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -174,21 +270,33 @@
       "id": 13,
       "title": "Builds With Test Data",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 2 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 2
+      },
       "targets": [
         {
-          "expr": "count(count by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}[$__range])))",
+          "expr": "count(count by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])))",
           "instant": false,
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "blue" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -197,17 +305,27 @@
       "id": 200,
       "title": "Trends",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
       "collapsed": false
     },
     {
       "id": 20,
       "title": "Test Pass Rate Over Time",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}))[$__interval:])) / count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}))[$__interval:])) * 100",
+          "expr": "count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__interval:])) / count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__interval:])) * 100",
           "legendFormat": "Pass Rate",
           "refId": "A",
           "interval": "6h"
@@ -225,12 +343,20 @@
             "pointSize": 5,
             "showPoints": "auto"
           },
-          "color": { "mode": "fixed", "fixedColor": "green" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
         }
       },
       "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
@@ -238,22 +364,27 @@
       "title": "Suite Duration Over Time",
       "description": "Test suite execution time per build (min/avg/max).",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
       "targets": [
         {
-          "expr": "avg(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}[$__interval])))",
+          "expr": "avg(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__interval])))",
           "legendFormat": "Avg",
           "refId": "A",
           "interval": "6h"
         },
         {
-          "expr": "min(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}[$__interval])))",
+          "expr": "min(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__interval])))",
           "legendFormat": "Min",
           "refId": "B",
           "interval": "6h"
         },
         {
-          "expr": "max(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}[$__interval])))",
+          "expr": "max(max by (build_id) (last_over_time(ci_junit_test_duration_seconds{pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__interval])))",
           "legendFormat": "Max",
           "refId": "C",
           "interval": "6h"
@@ -272,37 +403,92 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Avg" },
+            "matcher": {
+              "id": "byName",
+              "options": "Avg"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Min" },
+            "matcher": {
+              "id": "byName",
+              "options": "Min"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Max" },
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
       "id": 300,
       "title": "Breakdown",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
       "collapsed": false
     },
     {
@@ -310,10 +496,15 @@
       "title": "Top Failing Tests",
       "description": "Test cases with the most failures across builds.",
       "type": "bargauge",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 16 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
       "targets": [
         {
-          "expr": "topk(15, count by (test_name) (count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}))[$__range:])))",
+          "expr": "topk(15, count by (test_name) (count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])))",
           "legendFormat": "{{test_name}}",
           "instant": true,
           "refId": "A"
@@ -335,7 +526,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "orientation": "horizontal",
         "displayMode": "basic",
         "showUnfilled": true,
@@ -348,10 +543,15 @@
       "title": "Slowest Tests",
       "description": "Test cases by average duration across builds.",
       "type": "bargauge",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 16 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
       "targets": [
         {
-          "expr": "topk(15, avg by (test_name) (last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}[$__range])))",
+          "expr": "topk(15, avg by (test_name) (last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])))",
           "legendFormat": "{{test_name}}",
           "instant": true,
           "refId": "A"
@@ -373,7 +573,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "orientation": "horizontal",
         "displayMode": "basic",
         "showUnfilled": true,
@@ -385,7 +589,12 @@
       "id": 400,
       "title": "Investigation",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
       "collapsed": true,
       "panels": [
         {
@@ -393,10 +602,15 @@
           "title": "Test Results",
           "description": "Individual test case results with duration and status.",
           "type": "table",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 27 },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
           "targets": [
             {
-              "expr": "last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\"}[$__range])",
+              "expr": "last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -406,9 +620,39 @@
             {
               "id": "organize",
               "options": {
-                "excludeByName": { "Time": true, "__name__": true, "branch": true, "author": true, "suite": true, "leaf": true, "job_name": true },
-                "renameByName": { "test_name": "Test", "status": "Status", "Value": "Duration", "build_id": "Build ID", "pr_number": "PR", "pr_sha": "Commit", "job_name": "Job", "test_variant": "Variant", "org": "org", "repo": "repo" },
-                "indexByName": { "test_name": 0, "status": 1, "Value": 2, "build_id": 3, "pr_number": 4, "pr_sha": 5, "job_name": 6, "test_variant": 7, "org": 8, "repo": 9 }
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "branch": true,
+                  "author": true,
+                  "suite": true,
+                  "leaf": true,
+                  "job_name": true
+                },
+                "renameByName": {
+                  "test_name": "Test",
+                  "status": "Status",
+                  "Value": "Duration",
+                  "build_id": "Build ID",
+                  "pr_number": "PR",
+                  "pr_sha": "Commit",
+                  "job_name": "Job",
+                  "test_variant": "Variant",
+                  "org": "org",
+                  "repo": "repo"
+                },
+                "indexByName": {
+                  "test_name": 0,
+                  "status": 1,
+                  "Value": 2,
+                  "build_id": 3,
+                  "pr_number": 4,
+                  "pr_sha": 5,
+                  "job_name": 6,
+                  "test_variant": 7,
+                  "org": 8,
+                  "repo": 9
+                }
               }
             }
           ],
@@ -416,58 +660,154 @@
             "defaults": {},
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Duration" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Duration"
+                },
                 "properties": [
-                  { "id": "unit", "value": "s" },
-                  { "id": "custom.width", "value": 80 }
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Status" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Status"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 75 },
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  },
                   {
                     "id": "mappings",
                     "value": [
-                      { "type": "value", "options": { "passed": { "text": "Passed", "color": "green" } } },
-                      { "type": "value", "options": { "failed": { "text": "Failed", "color": "red" } } },
-                      { "type": "value", "options": { "skipped": { "text": "Skipped", "color": "yellow" } } }
+                      {
+                        "type": "value",
+                        "options": {
+                          "passed": {
+                            "text": "Passed",
+                            "color": "green"
+                          }
+                        }
+                      },
+                      {
+                        "type": "value",
+                        "options": {
+                          "failed": {
+                            "text": "Failed",
+                            "color": "red"
+                          }
+                        }
+                      },
+                      {
+                        "type": "value",
+                        "options": {
+                          "skipped": {
+                            "text": "Skipped",
+                            "color": "yellow"
+                          }
+                        }
+                      }
                     ]
                   }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "PR" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "PR"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 80 },
-                  { "id": "links", "value": [{ "title": "GitHub PR", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}", "targetBlank": true }] }
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "GitHub PR",
+                        "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Build ID" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Build ID"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 175 },
-                  { "id": "links", "value": [{ "title": "Prow Job", "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}", "targetBlank": true }] }
+                  {
+                    "id": "custom.width",
+                    "value": 175
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Prow Job",
+                        "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Commit" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commit"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 115 }
+                  {
+                    "id": "custom.width",
+                    "value": 115
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "org" },
-                "properties": [{ "id": "custom.hidden", "value": true }]
+                "matcher": {
+                  "id": "byName",
+                  "options": "org"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
               },
               {
-                "matcher": { "id": "byName", "options": "repo" },
-                "properties": [{ "id": "custom.hidden", "value": true }]
+                "matcher": {
+                  "id": "byName",
+                  "options": "repo"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
               }
             ]
           },
           "options": {
-            "sortBy": [{ "displayName": "Duration", "desc": true }]
+            "sortBy": [
+              {
+                "displayName": "Duration",
+                "desc": true
+              }
+            ]
           }
         },
         {
@@ -475,11 +815,18 @@
           "title": "Step Failure Messages",
           "description": "Step-level failure messages from JUnit XML.",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 37 },
-          "datasource": { "type": "victoriametrics-logs-datasource" },
+          "gridPos": {
+            "h": 12,
+            "w": 24,
+            "x": 0,
+            "y": 37
+          },
+          "datasource": {
+            "type": "victoriametrics-logs-datasource"
+          },
           "targets": [
             {
-              "expr": "source:junit_step AND status:failed AND pr_number:~\"${pr_number:pipe}\"",
+              "expr": "repo:~\"${repo:pipe}\" AND source:junit_step AND status:failed AND pr_number:~\"${pr_number:pipe}\"",
               "refId": "A"
             }
           ],

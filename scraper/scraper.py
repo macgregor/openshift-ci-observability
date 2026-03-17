@@ -33,11 +33,14 @@ def _fetch_known_for_pipeline(session: requests.Session, vm_url: str,
 
 def push_pipeline_sentinel(session: requests.Session, vm_url: str,
                            pipeline_name: str, pipeline_version: str,
-                           build_id: str):
+                           build_id: str, repo: str = ""):
     """Push a per-pipeline sentinel metric to mark a pipeline+build as processed."""
+    labels = {"build_id": build_id, "pipeline": pipeline_name, "pipeline_v": pipeline_version}
+    if repo:
+        labels["repo"] = repo
     line = format_prometheus_line(
         "ci_pipeline_scraped",
-        {"build_id": build_id, "pipeline": pipeline_name, "pipeline_v": pipeline_version},
+        labels,
         1, None,
     )
     if line:
@@ -177,6 +180,7 @@ class Scraper:
                     push_pipeline_sentinel(
                         self.session, self.vm_url,
                         pipeline.name, pipeline.version, build_id,
+                        repo=ctx.labels.get("repo", ""),
                     )
             except Exception:
                 log.error("Pipeline %s failed for build %s", pipeline.name, build_id, exc_info=True)

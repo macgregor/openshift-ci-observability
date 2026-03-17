@@ -10,10 +10,27 @@
   "templating": {
     "list": [
       {
+        "name": "repo",
+        "label": "Repository",
+        "type": "query",
+        "query": "query_result(group by (repo) (count_over_time(ci_build_duration_seconds[$__range:])))",
+        "regex": "/repo=\"([^\"]+)\"/",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
         "name": "job_type",
         "label": "Job Type",
         "type": "query",
-        "query": "query_result(group by (job_name) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\"}[$__range:])))",
+        "query": "query_result(group by (job_name) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",repo=~\"$repo\"}[$__range:])))",
         "regex": "/job_name=\"([^\"]+)\"/",
         "multi": true,
         "includeAll": true,
@@ -64,14 +81,24 @@
       "id": 50,
       "title": "Dashboard Guide",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "collapsed": false
     },
     {
       "id": 51,
       "title": "",
       "type": "text",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
       "options": {
         "mode": "markdown",
         "content": "### How to use this dashboard\n\n**Summary stats** (below) show at-a-glance health for the selected time range. Click **Failed Runs** to open the CI Investigation dashboard for detailed failure analysis.\n\n**Filters:** **Job Type** narrows to specific CI jobs. **Outcome** toggles between Success, Failure, or both.\n\n**Activity** -- pipeline run volume and success rate trends. **Duration** -- execution time envelope and retests per commit. **Steps & Infrastructure** -- step time breakdown and pod scheduling overhead. **Failure Patterns** -- which steps fail most and pod phase breakdown. **Cluster Pool** -- claim wait times, idle time, and install duration for Hive cluster pools. For individual build investigation, use the CI Investigation dashboard."
@@ -81,17 +108,27 @@
       "id": 52,
       "title": "Summary",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
       "collapsed": false
     },
     {
       "id": 10,
       "title": "Failed Runs",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 7 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 7
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",job_name=~\"$job_type\"}))[$__range:]))",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:]))",
           "instant": false,
           "refId": "A"
         }
@@ -110,15 +147,28 @@
           },
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "red", "value": 50 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -128,10 +178,15 @@
       "title": "Avg Retests / Commit",
       "description": "Average number of pipeline runs per (PR, SHA) pair. Higher = more retries needed.",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 7 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 7
+      },
       "targets": [
         {
-          "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:])))",
+          "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])))",
           "instant": false,
           "refId": "A"
         }
@@ -141,15 +196,28 @@
           "decimals": 1,
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 3 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -158,10 +226,15 @@
       "id": 12,
       "title": "Success Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 7 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 7
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__range:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:])) * 100",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])) * 100",
           "instant": false,
           "refId": "A"
         }
@@ -172,15 +245,28 @@
           "decimals": 1,
           "thresholds": {
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "green", "value": 80 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -189,10 +275,15 @@
       "id": 13,
       "title": "Active PRs",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 7 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 7
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__range:]))",
+          "expr": "count(count_over_time((group by (pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:]))",
           "instant": false,
           "refId": "A"
         }
@@ -206,7 +297,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -215,7 +310,12 @@
       "id": 100,
       "title": "Activity",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
       "collapsed": false
     },
     {
@@ -223,16 +323,21 @@
       "title": "Active Pipelines",
       "description": "Concurrent pipeline runs per bucket. Use to gauge cluster pool pressure.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:]))",
           "legendFormat": "Pipeline Runs",
           "refId": "A",
           "interval": "3h"
         },
         {
-          "expr": "count(count_over_time((group by (pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
+          "expr": "count(count_over_time((group by (pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:]))",
           "legendFormat": "Active PRs",
           "refId": "B",
           "interval": "3h"
@@ -245,32 +350,72 @@
             "drawStyle": "bars",
             "fillOpacity": 60,
             "lineWidth": 1,
-            "stacking": { "mode": "none" }
+            "stacking": {
+              "mode": "none"
+            }
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Active PRs" },
+            "matcher": {
+              "id": "byName",
+              "options": "Active PRs"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-              { "id": "custom.drawStyle", "value": "line" },
-              { "id": "custom.fillOpacity", "value": 0 },
-              { "id": "custom.lineWidth", "value": 2 },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.axisLabel", "value": "PRs" }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PRs"
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Pipeline Runs" },
+            "matcher": {
+              "id": "byName",
+              "options": "Pipeline Runs"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "semi-dark-green", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
@@ -278,10 +423,15 @@
       "title": "Success Rate",
       "description": "Percentage of pipeline runs that succeed. Drops indicate systemic issues or flaky tests.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])) * 100",
           "legendFormat": "Success %",
           "refId": "A",
           "interval": "3h"
@@ -302,24 +452,45 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "green", "value": 80 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
             ]
           },
-          "color": { "mode": "thresholds" }
+          "color": {
+            "mode": "thresholds"
+          }
         }
       },
       "options": {
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
       "id": 200,
       "title": "Duration",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
       "collapsed": false
     },
     {
@@ -327,22 +498,27 @@
       "title": "Pipeline Duration",
       "description": "End-to-end execution time. Min/avg/max envelope shows spread.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
       "targets": [
         {
-          "expr": "max(max_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
+          "expr": "max(max_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:]))",
           "legendFormat": "Max",
           "refId": "A",
           "interval": "3h"
         },
         {
-          "expr": "avg(avg_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
+          "expr": "avg(avg_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:]))",
           "legendFormat": "Avg",
           "refId": "B",
           "interval": "3h"
         },
         {
-          "expr": "min(min_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:]))",
+          "expr": "min(min_over_time((max by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:]))",
           "legendFormat": "Min",
           "refId": "C",
           "interval": "3h"
@@ -361,31 +537,85 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Max" },
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Avg" },
+            "matcher": {
+              "id": "byName",
+              "options": "Avg"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
-              { "id": "custom.lineWidth", "value": 3 }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Min" },
+            "matcher": {
+              "id": "byName",
+              "options": "Min"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
@@ -393,16 +623,21 @@
       "title": "Retests per Commit",
       "description": "How many times the same commit (pr+sha) runs the same job. High values = flaky tests or infra issues requiring retests.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 23 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
       "targets": [
         {
-          "expr": "max(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])))",
+          "expr": "max(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])))",
           "legendFormat": "Max",
           "refId": "A",
           "interval": "3h"
         },
         {
-          "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\"}))[$__interval:])))",
+          "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])))",
           "legendFormat": "Avg",
           "refId": "B",
           "interval": "3h"
@@ -421,31 +656,72 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Max" },
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Avg" },
+            "matcher": {
+              "id": "byName",
+              "options": "Avg"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
-              { "id": "custom.lineWidth", "value": 3 }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
       "id": 300,
       "title": "Steps & Infrastructure",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
       "collapsed": false
     },
     {
@@ -453,10 +729,15 @@
       "title": "Step Duration by Type",
       "description": "Average duration of each ci-operator step. Identifies which steps dominate pipeline runtime.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 34 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
       "targets": [
         {
-          "expr": "avg by (source) (avg_over_time(ci_step_duration_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "avg by (source) (avg_over_time(ci_step_duration_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "{{source}}",
           "refId": "A",
           "interval": "3h"
@@ -469,13 +750,24 @@
             "drawStyle": "bars",
             "fillOpacity": 80,
             "lineWidth": 1,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           }
         }
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean"] }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean"
+          ]
+        }
       }
     },
     {
@@ -483,28 +775,33 @@
       "title": "Infrastructure Overhead",
       "description": "Pod scheduling and initialization latency. High values indicate cluster resource pressure.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 34 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
       "targets": [
         {
-          "expr": "avg(avg_over_time(ci_pod_scheduling_latency_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "avg(avg_over_time(ci_pod_scheduling_latency_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Scheduling (avg)",
           "refId": "A",
           "interval": "3h"
         },
         {
-          "expr": "max(max_over_time(ci_pod_scheduling_latency_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "max(max_over_time(ci_pod_scheduling_latency_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Scheduling (max)",
           "refId": "B",
           "interval": "3h"
         },
         {
-          "expr": "avg(avg_over_time(ci_pods_initialization_latency{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "avg(avg_over_time(ci_pods_initialization_latency{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Initialization (avg)",
           "refId": "C",
           "interval": "3h"
         },
         {
-          "expr": "max(max_over_time(ci_pods_initialization_latency{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "max(max_over_time(ci_pods_initialization_latency{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Initialization (max)",
           "refId": "D",
           "interval": "3h"
@@ -523,35 +820,76 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byRegexp", "options": ".*max.*" },
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*max.*"
+            },
             "properties": [
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byRegexp", "options": "Scheduling.*" },
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Scheduling.*"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byRegexp", "options": "Initialization.*" },
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Initialization.*"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
       "id": 350,
       "title": "Failure Patterns",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
       "collapsed": false
     },
     {
@@ -559,10 +897,15 @@
       "title": "Step Failure Leaderboard",
       "description": "Which ci-operator steps fail most often. High counts indicate flaky steps or infrastructure issues at specific phases.",
       "type": "bargauge",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 45 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
       "targets": [
         {
-          "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\"}))[$__range:])))",
+          "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])))",
           "legendFormat": "{{source}}",
           "instant": true,
           "refId": "A"
@@ -577,7 +920,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "orientation": "horizontal",
         "displayMode": "basic",
         "showUnfilled": true
@@ -588,10 +935,15 @@
       "title": "Pod Phase Breakdown",
       "description": "Distribution of pod outcomes. High Failed ratio suggests infrastructure pressure.",
       "type": "piechart",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 45 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
       "targets": [
         {
-          "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name, pod_phase) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\"}))[$__range:]))",
+          "expr": "count by (pod_phase) (count_over_time((group by (build_id, pod_name, pod_phase) (ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\",repo=~\"$repo\"}))[$__range:]))",
           "legendFormat": "{{pod_phase}}",
           "instant": true,
           "refId": "A"
@@ -601,22 +953,50 @@
         "defaults": {},
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Succeeded" },
+            "matcher": {
+              "id": "byName",
+              "options": "Succeeded"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Failed" },
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
-        "legend": { "displayMode": "table", "placement": "right", "calcs": ["percent"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "percent"
+          ]
+        },
         "pieType": "donut"
       }
     },
@@ -624,7 +1004,12 @@
       "id": 400,
       "title": "Cluster Pool",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 55 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 55
+      },
       "collapsed": false
     },
     {
@@ -632,10 +1017,15 @@
       "title": "Avg Claim Wait",
       "description": "Average time builds wait for a cluster from the pool. High values indicate pool saturation.",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 56 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 56
+      },
       "targets": [
         {
-          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\"}[$__range:]))",
+          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]))",
           "instant": false,
           "refId": "A"
         }
@@ -646,15 +1036,28 @@
           "decimals": 0,
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 300 },
-              { "color": "red", "value": 600 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 300
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -664,10 +1067,15 @@
       "title": "Max Claim Wait",
       "description": "Worst-case cluster claim wait time. Spikes indicate pool exhaustion.",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 56 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 56
+      },
       "targets": [
         {
-          "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\"}[$__range:]))",
+          "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]))",
           "instant": false,
           "refId": "A"
         }
@@ -678,15 +1086,28 @@
           "decimals": 0,
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 600 },
-              { "color": "red", "value": 1200 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 600
+              },
+              {
+                "color": "red",
+                "value": 1200
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -696,10 +1117,15 @@
       "title": "Avg Cluster Idle Time",
       "description": "How long clusters sit idle in the pool before being claimed. Long idle times mean the pool is over-provisioned.",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 56 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 56
+      },
       "targets": [
         {
-          "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\"}[$__range:]))",
+          "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]))",
           "instant": false,
           "refId": "A"
         }
@@ -715,7 +1141,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -725,10 +1155,15 @@
       "title": "Pool Claims",
       "description": "Number of cluster claims in the selected time range.",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 56 },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 56
+      },
       "targets": [
         {
-          "expr": "count(last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\"}[$__range:]))",
+          "expr": "count(last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]))",
           "instant": false,
           "refId": "A"
         }
@@ -742,7 +1177,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -752,22 +1191,27 @@
       "title": "Claim Wait Time",
       "description": "Cluster claim wait time trend. Rising wait times indicate growing pool contention.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 60 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 60
+      },
       "targets": [
         {
-          "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Max",
           "refId": "A",
           "interval": "3h"
         },
         {
-          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Avg",
           "refId": "B",
           "interval": "3h"
         },
         {
-          "expr": "quantile(0.9, last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "quantile(0.9, last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "p90",
           "refId": "C",
           "interval": "3h"
@@ -786,30 +1230,75 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Max" },
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Avg" },
+            "matcher": {
+              "id": "byName",
+              "options": "Avg"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
-              { "id": "custom.lineWidth", "value": 3 }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "p90" },
+            "matcher": {
+              "id": "byName",
+              "options": "p90"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
@@ -817,22 +1306,27 @@
       "title": "Cluster Lifecycle",
       "description": "Install duration and idle time. Install duration is how long the cluster took to provision. Idle time is how long it sat in the pool before being claimed.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 60 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 60
+      },
       "targets": [
         {
-          "expr": "avg(avg_over_time(ci_cluster_install_duration_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "avg(avg_over_time(ci_cluster_install_duration_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Install (avg)",
           "refId": "A",
           "interval": "3h"
         },
         {
-          "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Idle (avg)",
           "refId": "B",
           "interval": "3h"
         },
         {
-          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\"}[$__interval:]))",
+          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
           "legendFormat": "Claim Wait (avg)",
           "refId": "C",
           "interval": "3h"
@@ -851,35 +1345,73 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Install (avg)" },
+            "matcher": {
+              "id": "byName",
+              "options": "Install (avg)"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Idle (avg)" },
+            "matcher": {
+              "id": "byName",
+              "options": "Idle (avg)"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Claim Wait (avg)" },
+            "matcher": {
+              "id": "byName",
+              "options": "Claim Wait (avg)"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi", "sort": "desc" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
       "id": 600,
       "title": "Test Cluster Utilization",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
       "collapsed": true,
       "panels": [
         {
@@ -887,10 +1419,15 @@
           "title": "Avg CPU Utilization",
           "description": "Average worker node CPU utilization across Hive-claimed test clusters. Based on actual Prometheus TSDB data from the ephemeral clusters where e2e tests run.",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 71 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 71
+          },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -901,15 +1438,28 @@
               "decimals": 0,
               "thresholds": {
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 60 },
-                  { "color": "red", "value": 85 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 60
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
                 ]
               }
             }
           },
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
             "colorMode": "value",
             "graphMode": "area"
           }
@@ -919,10 +1469,15 @@
           "title": "Avg Memory Utilization",
           "description": "Average worker node memory utilization across Hive-claimed test clusters. Includes cache/buffers (reclaimable under pressure).",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 71 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 71
+          },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -933,15 +1488,28 @@
               "decimals": 0,
               "thresholds": {
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 60 },
-                  { "color": "red", "value": 85 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 60
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
                 ]
               }
             }
           },
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
             "colorMode": "value",
             "graphMode": "area"
           }
@@ -951,16 +1519,21 @@
           "title": "Test Cluster CPU Usage vs Capacity",
           "description": "CPU usage cores vs capacity across test clusters over time. Gap between lines shows headroom.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 75 },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 75
+          },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\"}[$__interval:]))",
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "CPU Usage (avg)",
               "refId": "A",
               "interval": "3h"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "Worker CPU Capacity (avg)",
               "refId": "B",
               "interval": "3h"
@@ -979,23 +1552,56 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "CPU Usage (avg)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU Usage (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Worker CPU Capacity (avg)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Worker CPU Capacity (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "list", "placement": "bottom" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
         },
         {
@@ -1003,16 +1609,21 @@
           "title": "Test Cluster Memory Usage vs Capacity",
           "description": "Memory usage vs capacity across test clusters over time.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 75 },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 75
+          },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\"}[$__interval:]))",
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "Memory Usage (avg)",
               "refId": "A",
               "interval": "3h"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "Worker Memory Capacity (avg)",
               "refId": "B",
               "interval": "3h"
@@ -1031,23 +1642,56 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Memory Usage (avg)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Memory Usage (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Worker Memory Capacity (avg)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Worker Memory Capacity (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "list", "placement": "bottom" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
         }
       ]
@@ -1056,7 +1700,12 @@
       "id": 500,
       "title": "Build Cluster Utilization",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
       "collapsed": true,
       "panels": [
         {
@@ -1064,10 +1713,15 @@
           "title": "Avg CPU Utilization",
           "description": "Average CPU utilization across build cluster nodes. These are the shared CI infrastructure nodes where ci-operator runs, not the test clusters.",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 86 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 86
+          },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\"}[$__range:]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\"}[$__range:]) * 100)",
+              "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]) * 100)",
               "instant": false,
               "refId": "A"
             }
@@ -1078,15 +1732,28 @@
               "decimals": 0,
               "thresholds": {
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 60 },
-                  { "color": "red", "value": 85 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 60
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
                 ]
               }
             }
           },
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
             "colorMode": "value",
             "graphMode": "area"
           }
@@ -1096,10 +1763,15 @@
           "title": "Avg Memory Utilization",
           "description": "Average memory utilization across build cluster nodes.",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 86 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 86
+          },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\"}[$__range:]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\"}[$__range:]) * 100)",
+              "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:]) * 100)",
               "instant": false,
               "refId": "A"
             }
@@ -1110,15 +1782,28 @@
               "decimals": 0,
               "thresholds": {
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 60 },
-                  { "color": "red", "value": 85 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 60
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
                 ]
               }
             }
           },
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
             "colorMode": "value",
             "graphMode": "area"
           }
@@ -1128,10 +1813,15 @@
           "title": "Node CPU Utilization",
           "description": "CPU utilization per build cluster node over time.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 90 },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 90
+          },
           "targets": [
             {
-              "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\"}[$__interval:]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\"}[$__interval:]) * 100)",
+              "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]) * 100)",
               "legendFormat": "{{node}}",
               "refId": "A",
               "interval": "3h"
@@ -1151,8 +1841,17 @@
             }
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean"] }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean"
+              ]
+            }
           }
         },
         {
@@ -1160,10 +1859,15 @@
           "title": "Node Memory Utilization",
           "description": "Memory utilization per build cluster node over time.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 90 },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 90
+          },
           "targets": [
             {
-              "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\"}[$__interval:]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\"}[$__interval:]) * 100)",
+              "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval:]) * 100)",
               "legendFormat": "{{node}}",
               "refId": "A",
               "interval": "3h"
@@ -1183,8 +1887,17 @@
             }
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean"] }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "mean"
+              ]
+            }
           }
         }
       ]

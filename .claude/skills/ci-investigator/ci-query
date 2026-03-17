@@ -23,6 +23,7 @@ from collections import Counter
 VM_URL = os.environ.get("VM_URL", "http://localhost:8428")
 VL_URL = os.environ.get("VL_URL", "http://localhost:9428")
 LOOKBACK = "90d"
+REPO_FILTER = ""  # set by --repo flag; empty means all repos
 
 # Shorthand for the long metric name used in most build-outcome queries
 _OUTCOME = "ci_test_platform_insights_additional_context_duration_seconds"
@@ -30,8 +31,34 @@ _OUTCOME = "ci_test_platform_insights_additional_context_duration_seconds"
 
 # --- Helpers ---
 
+import re
+
+def _inject_repo(promql):
+    """Inject repo filter into all PromQL label selectors."""
+    if not REPO_FILTER:
+        return promql
+    label = f'repo="{REPO_FILTER}"'
+    def add(m):
+        inside = m.group(1)
+        if 'repo=' in inside:
+            return m.group(0)
+        return '{' + inside + ',' + label + '}' if inside.strip() else '{' + label + '}'
+    result = re.sub(r'\{([^}]*)\}', add, promql)
+    # Handle bare metric names with no {} selector (e.g. "metric_name[5m]" or "metric_name)")
+    result = re.sub(r'(ci_\w+)(\[|(?=\)))', rf'\1{{{label}}}\2', result)
+    return result
+
+
+def _inject_repo_logsql(logsql):
+    """Inject repo filter into a LogsQL query."""
+    if not REPO_FILTER:
+        return logsql
+    return f'repo:"{REPO_FILTER}" AND {logsql}'
+
+
 def vm_query(query):
     """Run a PromQL instant query. Returns list of result dicts."""
+    query = _inject_repo(query)
     url = f"{VM_URL}/api/v1/query"
     data = urllib.parse.urlencode({"query": query}).encode()
     try:
@@ -54,6 +81,7 @@ def vm_scalar(query):
 
 def vl_query(query, limit=50):
     """Run a LogsQL query. Returns list of dicts."""
+    query = _inject_repo_logsql(query)
     params = urllib.parse.urlencode({"query": query, "limit": limit})
     url = f"{VL_URL}/select/logsql/query?{params}"
     try:
@@ -618,16 +646,10 @@ def cmd_classify_sa_failures(args):
                 "build_id": bid,
                 "pr_number": e.get("pr_number", ""),
                 "must_gather_sa": False,
-                "install_sa": False,
             }
         msg = e.get("_msg", "")
         if "openshift-must-gather" in msg:
             builds[bid]["must_gather_sa"] = True
-        elif any(
-            ns in msg
-            for ns in ("opendatahub-operator", "redhat-ods-operator")
-        ):
-            builds[bid]["install_sa"] = True
     cluster_wide = 0
     namespace_only = 0
     for info in builds.values():
@@ -1121,7 +1143,9 @@ COMMANDS = {
 
 
 def cmd_help(_args):
-    print("Usage: ci-query <command> [args...]")
+    print("Usage: ci-query [--repo <repo>] <command> [args...]")
+    print()
+    print("  --repo <repo>  Filter all queries to a specific repo (e.g. cluster-monitoring-operator)")
     print()
     max_name = max(len(n) for n in COMMANDS)
     max_usage = max(len(u) for _, u, _ in COMMANDS.values())
@@ -1131,7 +1155,17 @@ def cmd_help(_args):
 
 
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+    argv = sys.argv[1:]
+    # Parse --repo flag before command dispatch
+    if "--repo" in argv:
+        idx = argv.index("--repo")
+        if idx + 1 < len(argv):
+            REPO_FILTER = argv[idx + 1]
+            argv = argv[:idx] + argv[idx + 2:]
+        else:
+            emit_error("--repo requires a value")
+            sys.exit(1)
+    cmd = argv[0] if argv else "help"
     if cmd in ("help", "--help", "-h"):
         cmd_help([])
         sys.exit(0)
@@ -1139,4 +1173,4 @@ if __name__ == "__main__":
         emit_error(f"Unknown command: {cmd}")
         cmd_help([])
         sys.exit(1)
-    COMMANDS[cmd][0](sys.argv[2:])
+    COMMANDS[cmd][0](argv[1:])

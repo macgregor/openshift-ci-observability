@@ -10,15 +10,36 @@
   "templating": {
     "list": [
       {
+        "name": "repo",
+        "label": "Repository",
+        "type": "query",
+        "query": "query_result(group by (repo) (count_over_time(ci_build_duration_seconds[$__range:])))",
+        "regex": "/repo=\"([^\"]+)\"/",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "sort": 1
+      },
+      {
         "name": "job_type",
         "label": "Job Type",
         "type": "query",
-        "query": "query_result(group by (job_name) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\"}[$__range:])))",
+        "query": "query_result(group by (job_name) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",repo=~\"$repo\"}[$__range:])))",
         "regex": "/job_name=\"([^\"]+)\"/",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 1
       },
@@ -26,12 +47,16 @@
         "name": "pr_number",
         "label": "PR",
         "type": "query",
-        "query": "query_result(group by (pr_number) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}[$__range:])))",
+        "query": "query_result(group by (pr_number) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:])))",
         "regex": "/pr_number=\"([^\"]+)\"/",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 3
       },
@@ -39,12 +64,16 @@
         "name": "build_id",
         "label": "Build",
         "type": "query",
-        "query": "query_result(group by (build_id) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}[$__range:])))",
+        "query": "query_result(group by (build_id) (count_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:])))",
         "regex": "/build_id=\"([^\"]+)\"/",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 3
       },
@@ -57,7 +86,11 @@
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
         "refresh": 2,
         "sort": 1
       }
@@ -68,45 +101,72 @@
       "id": 50,
       "title": "Dashboard Guide",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "collapsed": false
     },
     {
       "id": 51,
       "title": "",
       "type": "text",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
-          "options": {
-            "mode": "markdown",
-            "content": "### How to use this dashboard\n\nThis dashboard helps investigate CI failures at two levels:\n\n**General investigation** (all filters set to \"All\"):\n1. Check summary stats for overall CI health.\n2. Look at **Top Failing PRs** to find which PRs have the most failures. Select a PR from the **PR** dropdown to drill down.\n3. Compare **PR Success Rate vs Global** to see if failures are systemic or isolated.\n4. Check **Step Failure Leaderboard** to see which ci-operator steps fail most.\n5. Look at **Longest/Shortest Runs** for outlier builds.\n\n**Specific PR investigation** (set the PR filter):\n1. All panels update to show only that PR's data.\n2. Compare your PR's success rate against the global baseline.\n3. See which steps are failing in your builds.\n4. Expand **Build Detail** for full build history and error logs.\n\n**Links:** Click PR numbers for GitHub PRs, commit SHAs for GitHub commits, and Build IDs for Prow job pages.\n\n**Filters:**\n- **Job Type** -- narrow to specific CI jobs.\n- **PR** -- leave as \"All\" for general investigation, or select specific PRs.\n- **Build** -- narrow to specific build IDs."
-          }
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### How to use this dashboard\n\nThis dashboard helps investigate CI failures at two levels:\n\n**General investigation** (all filters set to \"All\"):\n1. Check summary stats for overall CI health.\n2. Look at **Top Failing PRs** to find which PRs have the most failures. Select a PR from the **PR** dropdown to drill down.\n3. Compare **PR Success Rate vs Global** to see if failures are systemic or isolated.\n4. Check **Step Failure Leaderboard** to see which ci-operator steps fail most.\n5. Look at **Longest/Shortest Runs** for outlier builds.\n\n**Specific PR investigation** (set the PR filter):\n1. All panels update to show only that PR's data.\n2. Compare your PR's success rate against the global baseline.\n3. See which steps are failing in your builds.\n4. Expand **Build Detail** for full build history and error logs.\n\n**Links:** Click PR numbers for GitHub PRs, commit SHAs for GitHub commits, and Build IDs for Prow job pages.\n\n**Filters:**\n- **Job Type** -- narrow to specific CI jobs.\n- **PR** -- leave as \"All\" for general investigation, or select specific PRs.\n- **Build** -- narrow to specific build IDs."
+      }
     },
     {
       "id": 100,
       "title": "Context",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
       "collapsed": false
     },
     {
       "id": 10,
       "title": "Total Builds",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 8 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}))[$__range:]))",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:]))",
           "instant": false,
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "blue" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -115,10 +175,15 @@
       "id": 11,
       "title": "Success Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 8 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}))[$__range:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}))[$__range:])) * 100",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])) * 100",
           "instant": false,
           "refId": "A"
         }
@@ -129,15 +194,28 @@
           "decimals": 1,
           "thresholds": {
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "green", "value": 80 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -146,10 +224,15 @@
       "id": 12,
       "title": "Avg Retries / Commit",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 8 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
       "targets": [
         {
-          "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}))[$__range:])))",
+          "expr": "avg(sum by (pr_number, pr_sha) (count_over_time((group by (build_id, pr_number, pr_sha) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])))",
           "instant": false,
           "refId": "A"
         }
@@ -159,15 +242,28 @@
           "decimals": 1,
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 3 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "area"
       }
@@ -176,7 +272,12 @@
       "id": 200,
       "title": "Identify Problems",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
       "collapsed": false
     },
     {
@@ -184,10 +285,15 @@
       "title": "Top Failing PRs",
       "description": "PRs with the most failed builds. Click a bar to filter this dashboard to that PR.",
       "type": "bargauge",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 13 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
       "targets": [
         {
-          "expr": "topk(20, count by (pr_number) (count_over_time((group by (build_id, pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}))[$__range:])) and on() (count(count by (pr_number) (count_over_time((group by (build_id, pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}))[$__range:]))) > 1))",
+          "expr": "topk(20, count by (pr_number) (count_over_time((group by (build_id, pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])) and on() (count(count by (pr_number) (count_over_time((group by (build_id, pr_number) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"false\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:]))) > 1))",
           "legendFormat": "PR {{pr_number}}",
           "instant": true,
           "refId": "A"
@@ -209,7 +315,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "orientation": "horizontal",
         "displayMode": "basic",
         "showUnfilled": true,
@@ -222,16 +332,21 @@
       "title": "PR Success Rate vs Global",
       "description": "Compare a specific PR's success rate to the overall system. If both are low, it's systemic. If only yours is low, investigate your code.",
       "type": "timeseries",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 13 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])) * 100",
           "legendFormat": "Global",
           "refId": "A",
           "interval": "3h"
         },
         {
-          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",job_name=~\"$job_type\"}))[$__interval:])) * 100",
+          "expr": "count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=\"true\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])) / count(count_over_time((group by (build_id) (ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__interval:])) * 100",
           "legendFormat": "Selected PRs",
           "refId": "B",
           "interval": "3h"
@@ -252,30 +367,61 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Global" },
+            "matcher": {
+              "id": "byName",
+              "options": "Global"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byRegexp", "options": "Selected.*" },
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Selected.*"
+            },
             "properties": [
-              { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } },
-              { "id": "custom.lineWidth", "value": 3 }
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
             ]
           }
         ]
       },
       "options": {
-        "tooltip": { "mode": "multi" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
       "id": 300,
       "title": "Failure Analysis",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "collapsed": false
     },
     {
@@ -283,10 +429,15 @@
       "title": "Step Failure Leaderboard",
       "description": "Which ci-operator steps fail most often within the selected scope.",
       "type": "bargauge",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
       "targets": [
         {
-          "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}))[$__range:])))",
+          "expr": "topk(15, count by (source) (count_over_time((group by (build_id, source) (ci_step_duration_seconds{level=\"Error\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}))[$__range:])))",
           "legendFormat": "{{source}}",
           "instant": true,
           "refId": "A"
@@ -301,7 +452,11 @@
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "orientation": "horizontal",
         "displayMode": "basic",
         "showUnfilled": true
@@ -311,7 +466,12 @@
       "id": 350,
       "title": "Outliers",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
       "collapsed": false
     },
     {
@@ -319,10 +479,15 @@
       "title": "Longest Runs",
       "description": "Individual pipeline runs sorted by duration. Long runs may indicate stuck tests or infrastructure issues.",
       "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 33 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
       "targets": [
         {
-          "expr": "topk(20, max_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}[$__range]))",
+          "expr": "topk(20, max_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -332,9 +497,34 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "name": true, "branch": true, "timestamp": true, "author": true },
-            "renameByName": { "pr_number": "PR", "pr_sha": "Commit", "job_name": "Job", "build_id": "Build ID", "success": "Outcome", "Value": "Duration", "org": "org", "repo": "repo" },
-            "indexByName": { "pr_number": 0, "pr_sha": 1, "job_name": 2, "success": 3, "Value": 4, "build_id": 5, "org": 6, "repo": 7 }
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "name": true,
+              "branch": true,
+              "timestamp": true,
+              "author": true
+            },
+            "renameByName": {
+              "pr_number": "PR",
+              "pr_sha": "Commit",
+              "job_name": "Job",
+              "build_id": "Build ID",
+              "success": "Outcome",
+              "Value": "Duration",
+              "org": "org",
+              "repo": "repo"
+            },
+            "indexByName": {
+              "pr_number": 0,
+              "pr_sha": 1,
+              "job_name": 2,
+              "success": 3,
+              "Value": 4,
+              "build_id": 5,
+              "org": 6,
+              "repo": 7
+            }
           }
         }
       ],
@@ -342,58 +532,155 @@
         "defaults": {},
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Duration" },
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
             "properties": [
-              { "id": "unit", "value": "s" },
-              { "id": "custom.width", "value": 80 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "PR" },
-            "properties": [
-              { "id": "custom.width", "value": 80 },
-              { "id": "links", "value": [{ "title": "GitHub PR", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}", "targetBlank": true }] }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Commit" },
-            "properties": [
-              { "id": "custom.width", "value": 115 },
-              { "id": "links", "value": [{ "title": "GitHub Commit", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}", "targetBlank": true }] }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Outcome" },
-            "properties": [
-              { "id": "custom.width", "value": 75 },
               {
-                "id": "mappings",
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PR"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "links",
                 "value": [
-                  { "type": "value", "options": { "true": { "text": "Success", "color": "green" } } },
-                  { "type": "value", "options": { "false": { "text": "Failure", "color": "red" } } }
+                  {
+                    "title": "GitHub PR",
+                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
+                    "targetBlank": true
+                  }
                 ]
               }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Build ID" },
+            "matcher": {
+              "id": "byName",
+              "options": "Commit"
+            },
             "properties": [
-              { "id": "custom.width", "value": 175 },
-              { "id": "links", "value": [{ "title": "Prow Job", "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}", "targetBlank": true }] }
+              {
+                "id": "custom.width",
+                "value": 115
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "GitHub Commit",
+                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "org" },
-            "properties": [{ "id": "custom.hidden", "value": true }]
+            "matcher": {
+              "id": "byName",
+              "options": "Outcome"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 75
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": {
+                        "text": "Success",
+                        "color": "green"
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "false": {
+                        "text": "Failure",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "repo" },
-            "properties": [{ "id": "custom.hidden", "value": true }]
+            "matcher": {
+              "id": "byName",
+              "options": "Build ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 175
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Prow Job",
+                    "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "org"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repo"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
           }
         ]
       },
       "options": {
-        "sortBy": [{ "displayName": "Duration", "desc": true }]
+        "sortBy": [
+          {
+            "displayName": "Duration",
+            "desc": true
+          }
+        ]
       }
     },
     {
@@ -401,10 +688,15 @@
       "title": "Shortest Runs",
       "description": "Runs that completed unusually fast. Short failed runs often indicate infrastructure failures rather than test failures.",
       "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 33 },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
       "targets": [
         {
-          "expr": "bottomk(20, min_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}[$__range]))",
+          "expr": "bottomk(20, min_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -414,9 +706,34 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "name": true, "branch": true, "timestamp": true, "author": true },
-            "renameByName": { "pr_number": "PR", "pr_sha": "Commit", "job_name": "Job", "build_id": "Build ID", "success": "Outcome", "Value": "Duration", "org": "org", "repo": "repo" },
-            "indexByName": { "pr_number": 0, "pr_sha": 1, "job_name": 2, "success": 3, "Value": 4, "build_id": 5, "org": 6, "repo": 7 }
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "name": true,
+              "branch": true,
+              "timestamp": true,
+              "author": true
+            },
+            "renameByName": {
+              "pr_number": "PR",
+              "pr_sha": "Commit",
+              "job_name": "Job",
+              "build_id": "Build ID",
+              "success": "Outcome",
+              "Value": "Duration",
+              "org": "org",
+              "repo": "repo"
+            },
+            "indexByName": {
+              "pr_number": 0,
+              "pr_sha": 1,
+              "job_name": 2,
+              "success": 3,
+              "Value": 4,
+              "build_id": 5,
+              "org": 6,
+              "repo": 7
+            }
           }
         }
       ],
@@ -424,65 +741,167 @@
         "defaults": {},
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Duration" },
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
             "properties": [
-              { "id": "unit", "value": "s" },
-              { "id": "custom.width", "value": 80 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "PR" },
-            "properties": [
-              { "id": "custom.width", "value": 80 },
-              { "id": "links", "value": [{ "title": "GitHub PR", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}", "targetBlank": true }] }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Commit" },
-            "properties": [
-              { "id": "custom.width", "value": 115 },
-              { "id": "links", "value": [{ "title": "GitHub Commit", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}", "targetBlank": true }] }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Outcome" },
-            "properties": [
-              { "id": "custom.width", "value": 75 },
               {
-                "id": "mappings",
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "PR"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "links",
                 "value": [
-                  { "type": "value", "options": { "true": { "text": "Success", "color": "green" } } },
-                  { "type": "value", "options": { "false": { "text": "Failure", "color": "red" } } }
+                  {
+                    "title": "GitHub PR",
+                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
+                    "targetBlank": true
+                  }
                 ]
               }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Build ID" },
+            "matcher": {
+              "id": "byName",
+              "options": "Commit"
+            },
             "properties": [
-              { "id": "custom.width", "value": 175 },
-              { "id": "links", "value": [{ "title": "Prow Job", "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}", "targetBlank": true }] }
+              {
+                "id": "custom.width",
+                "value": 115
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "GitHub Commit",
+                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "org" },
-            "properties": [{ "id": "custom.hidden", "value": true }]
+            "matcher": {
+              "id": "byName",
+              "options": "Outcome"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 75
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": {
+                        "text": "Success",
+                        "color": "green"
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "false": {
+                        "text": "Failure",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "repo" },
-            "properties": [{ "id": "custom.hidden", "value": true }]
+            "matcher": {
+              "id": "byName",
+              "options": "Build ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 175
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Prow Job",
+                    "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "org"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "repo"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
           }
         ]
       },
       "options": {
-        "sortBy": [{ "displayName": "Duration", "desc": false }]
+        "sortBy": [
+          {
+            "displayName": "Duration",
+            "desc": false
+          }
+        ]
       }
     },
     {
       "id": 400,
       "title": "Build Detail",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
       "collapsed": true,
       "panels": [
         {
@@ -490,10 +909,15 @@
           "title": "Build History",
           "description": "All builds matching the current filters. Shows pass/fail pattern across commits.",
           "type": "table",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 44 },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 44
+          },
           "targets": [
             {
-              "expr": "last_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\"}[$__range])",
+              "expr": "last_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -503,70 +927,194 @@
             {
               "id": "organize",
               "options": {
-                "excludeByName": { "Time": true, "__name__": true, "name": true, "branch": true, "timestamp": true, "author": true },
-                "renameByName": { "pr_number": "PR", "pr_sha": "Commit", "job_name": "Job", "build_id": "Build ID", "success": "Outcome", "Value": "Duration", "org": "org", "repo": "repo" },
-                "indexByName": { "pr_number": 0, "pr_sha": 1, "job_name": 2, "success": 3, "Value": 4, "build_id": 5, "org": 6, "repo": 7 }
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "name": true,
+                  "branch": true,
+                  "timestamp": true,
+                  "author": true
+                },
+                "renameByName": {
+                  "pr_number": "PR",
+                  "pr_sha": "Commit",
+                  "job_name": "Job",
+                  "build_id": "Build ID",
+                  "success": "Outcome",
+                  "Value": "Duration",
+                  "org": "org",
+                  "repo": "repo"
+                },
+                "indexByName": {
+                  "pr_number": 0,
+                  "pr_sha": 1,
+                  "job_name": 2,
+                  "success": 3,
+                  "Value": 4,
+                  "build_id": 5,
+                  "org": 6,
+                  "repo": 7
+                }
               }
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "custom": { "filterable": false }
+              "custom": {
+                "filterable": false
+              }
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Duration" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Duration"
+                },
                 "properties": [
-                  { "id": "unit", "value": "s" },
-                  { "id": "custom.width", "value": 80 }
-                ]
-              },
-              {
-                "matcher": { "id": "byName", "options": "PR" },
-                "properties": [
-                  { "id": "custom.width", "value": 60 },
-                  { "id": "links", "value": [{ "title": "GitHub PR", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}", "targetBlank": true }] }
-                ]
-              },
-              {
-                "matcher": { "id": "byName", "options": "Commit" },
-                "properties": [
-                  { "id": "custom.width", "value": 115 },
-                  { "id": "links", "value": [{ "title": "GitHub Commit", "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}", "targetBlank": true }] }
-                ]
-              },
-              {
-                "matcher": { "id": "byName", "options": "Outcome" },
-                "properties": [
-                  { "id": "custom.width", "value": 75 },
                   {
-                    "id": "mappings",
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "PR"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 60
+                  },
+                  {
+                    "id": "links",
                     "value": [
-                      { "type": "value", "options": { "true": { "text": "Success", "color": "green" } } },
-                      { "type": "value", "options": { "false": { "text": "Failure", "color": "red" } } }
+                      {
+                        "title": "GitHub PR",
+                        "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
+                        "targetBlank": true
+                      }
                     ]
                   }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Build ID" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commit"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 175 },
-                  { "id": "links", "value": [{ "title": "Prow Job", "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}", "targetBlank": true }] }
+                  {
+                    "id": "custom.width",
+                    "value": 115
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "GitHub Commit",
+                        "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "org" },
-                "properties": [{ "id": "custom.hidden", "value": true }]
+                "matcher": {
+                  "id": "byName",
+                  "options": "Outcome"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "true": {
+                            "text": "Success",
+                            "color": "green"
+                          }
+                        }
+                      },
+                      {
+                        "type": "value",
+                        "options": {
+                          "false": {
+                            "text": "Failure",
+                            "color": "red"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               {
-                "matcher": { "id": "byName", "options": "repo" },
-                "properties": [{ "id": "custom.hidden", "value": true }]
+                "matcher": {
+                  "id": "byName",
+                  "options": "Build ID"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 175
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Prow Job",
+                        "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "org"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "repo"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
               }
             ]
           },
           "options": {
-            "sortBy": [{ "displayName": "Build ID", "desc": true }]
+            "sortBy": [
+              {
+                "displayName": "Build ID",
+                "desc": true
+              }
+            ]
           }
         },
         {
@@ -574,11 +1122,18 @@
           "title": "Errors & Warnings",
           "description": "Pipeline-level errors and warnings from ci-operator logs for the selected scope.",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 12, "x": 0, "y": 54 },
-          "datasource": { "type": "victoriametrics-logs-datasource" },
+          "gridPos": {
+            "h": 12,
+            "w": 12,
+            "x": 0,
+            "y": 54
+          },
+          "datasource": {
+            "type": "victoriametrics-logs-datasource"
+          },
           "targets": [
             {
-              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND (level:error OR level:warning)",
+              "expr": "repo:~\"${repo:pipe}\" AND pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND (level:error OR level:warning)",
               "refId": "A"
             }
           ],
@@ -595,11 +1150,18 @@
           "title": "Step Failures",
           "description": "Step-level failures from ci-operator logs for the selected scope.",
           "type": "logs",
-          "gridPos": { "h": 12, "w": 12, "x": 12, "y": 54 },
-          "datasource": { "type": "victoriametrics-logs-datasource" },
+          "gridPos": {
+            "h": 12,
+            "w": 12,
+            "x": 12,
+            "y": 54
+          },
+          "datasource": {
+            "type": "victoriametrics-logs-datasource"
+          },
           "targets": [
             {
-              "expr": "pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND level:error AND _msg:~\"failed|Failed\"",
+              "expr": "repo:~\"${repo:pipe}\" AND pr_number:~\"$pr_number\" AND build_id:~\"$build_id\" AND level:error AND _msg:~\"failed|Failed\"",
               "refId": "A"
             }
           ],
@@ -617,7 +1179,12 @@
       "id": 500,
       "title": "Test Cluster Utilization",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 67
+      },
       "collapsed": true,
       "panels": [
         {
@@ -625,10 +1192,15 @@
           "title": "Avg CPU Utilization",
           "description": "Average worker node CPU utilization across test clusters for the selected scope. Low values indicate workers are over-provisioned.",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 68 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 68
+          },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -639,15 +1211,28 @@
               "decimals": 0,
               "thresholds": {
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 60 },
-                  { "color": "red", "value": 85 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 60
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
                 ]
               }
             }
           },
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
             "colorMode": "value",
             "graphMode": "area"
           }
@@ -657,10 +1242,15 @@
           "title": "Avg Memory Utilization",
           "description": "Average worker node memory utilization across test clusters for the selected scope. Includes cache/buffers (reclaimable under pressure).",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 68 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 68
+          },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range:])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range:])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range:])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -671,15 +1261,28 @@
               "decimals": 0,
               "thresholds": {
                 "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 60 },
-                  { "color": "red", "value": 85 }
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 60
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
                 ]
               }
             }
           },
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
             "colorMode": "value",
             "graphMode": "area"
           }
@@ -689,22 +1292,34 @@
           "title": "Builds with Data",
           "description": "Number of builds in scope that have test cluster Prometheus data. Builds that fail before the gather-extra step won't have data.",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 68 },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 68
+          },
           "targets": [
             {
-              "expr": "count(group by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range:])))",
+              "expr": "count(group by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range:])))",
               "instant": false,
               "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "color": { "mode": "fixed", "fixedColor": "blue" },
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              },
               "noValue": "0"
             }
           },
           "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
             "colorMode": "value",
             "graphMode": "area"
           }
@@ -714,16 +1329,21 @@
           "title": "CPU Usage vs Capacity",
           "description": "Test cluster CPU: actual usage vs total capacity. The gap between lines shows over-provisioning headroom.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 72 },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 72
+          },
           "targets": [
             {
-              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "Usage {{build_id}}",
               "refId": "A",
               "interval": "3h"
             },
             {
-              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "Capacity {{build_id}}",
               "refId": "B",
               "interval": "3h"
@@ -742,23 +1362,56 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byRegexp", "options": "Usage.*" },
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "Usage.*"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byRegexp", "options": "Capacity.*" },
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "Capacity.*"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "list", "placement": "bottom" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
         },
         {
@@ -766,16 +1419,21 @@
           "title": "Memory Usage vs Capacity",
           "description": "Test cluster memory: actual usage vs total capacity.",
           "type": "timeseries",
-          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 72 },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 72
+          },
           "targets": [
             {
-              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__interval:]))",
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "Usage {{build_id}}",
               "refId": "A",
               "interval": "3h"
             },
             {
-              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__interval:]))",
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval:]))",
               "legendFormat": "Capacity {{build_id}}",
               "refId": "B",
               "interval": "3h"
@@ -794,23 +1452,56 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byRegexp", "options": "Usage.*" },
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "Usage.*"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byRegexp", "options": "Capacity.*" },
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "Capacity.*"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "list", "placement": "bottom" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
         },
         {
@@ -818,28 +1509,33 @@
           "title": "Per-Build Utilization",
           "description": "CPU and memory utilization per build. Helps identify builds with unusual resource consumption.",
           "type": "table",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 82 },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 82
+          },
           "targets": [
             {
-              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "cpu_usage"
             },
             {
-              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range]))",
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "cpu_capacity"
             },
             {
-              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\"}[$__range]))",
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "mem_usage"
             },
             {
-              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\"}[$__range]))",
+              "expr": "avg by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "mem_capacity"
@@ -852,7 +1548,10 @@
             {
               "id": "organize",
               "options": {
-                "excludeByName": { "Time": true, "__name__": true },
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true
+                },
                 "renameByName": {
                   "pr_number": "PR",
                   "job_name": "Job",
@@ -878,51 +1577,120 @@
             "defaults": {},
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "CPU Used (cores)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU Used (cores)"
+                },
                 "properties": [
-                  { "id": "decimals", "value": 1 },
-                  { "id": "custom.width", "value": 120 }
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Worker CPU Capacity (cores)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Worker CPU Capacity (cores)"
+                },
                 "properties": [
-                  { "id": "decimals", "value": 0 },
-                  { "id": "custom.width", "value": 140 }
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 140
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Memory Used" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Memory Used"
+                },
                 "properties": [
-                  { "id": "unit", "value": "bytes" },
-                  { "id": "custom.width", "value": 120 }
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Worker Memory Capacity" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Worker Memory Capacity"
+                },
                 "properties": [
-                  { "id": "unit", "value": "bytes" },
-                  { "id": "custom.width", "value": 130 }
+                  {
+                    "id": "unit",
+                    "value": "bytes"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 130
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "PR" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "PR"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 60 },
-                  { "id": "links", "value": [{ "title": "Investigate this PR", "url": "/d/ci-investigation/ci-investigation?var-pr_number=${__value.raw}&var-job_type=${job_type}&var-build_id=All&from=${__from}&to=${__to}" }] }
+                  {
+                    "id": "custom.width",
+                    "value": 60
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Investigate this PR",
+                        "url": "/d/ci-investigation/ci-investigation?var-pr_number=${__value.raw}&var-job_type=${job_type}&var-build_id=All&from=${__from}&to=${__to}"
+                      }
+                    ]
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Build ID" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Build ID"
+                },
                 "properties": [
-                  { "id": "custom.width", "value": 175 },
-                  { "id": "links", "value": [{ "title": "Filter to this build", "url": "/d/ci-investigation/ci-investigation?var-pr_number=${__data.fields.PR}&var-build_id=${__value.raw}&var-job_type=${job_type}&from=${__from}&to=${__to}" }] }
+                  {
+                    "id": "custom.width",
+                    "value": 175
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Filter to this build",
+                        "url": "/d/ci-investigation/ci-investigation?var-pr_number=${__data.fields.PR}&var-build_id=${__value.raw}&var-job_type=${job_type}&from=${__from}&to=${__to}"
+                      }
+                    ]
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "sortBy": [{ "displayName": "CPU Used (cores)", "desc": true }]
+            "sortBy": [
+              {
+                "displayName": "CPU Used (cores)",
+                "desc": true
+              }
+            ]
           }
         }
       ]

@@ -265,7 +265,8 @@ class TestClusterMetricsPipeline:
                 self.sink.push(cached)
                 log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
                          ctx.build.pr, ctx.build.build_id, step_name, len(cached))
-            self._push_sentinel(ctx.build.build_id, ctx.labels.get("build_id", ctx.build.build_id))
+            self._push_sentinel(ctx.build.build_id, ctx.labels.get("build_id", ctx.build.build_id),
+                                repo=ctx.labels.get("repo", ""))
             return
 
         # Slow path: ensure tar is on disk
@@ -295,7 +296,8 @@ class TestClusterMetricsPipeline:
                 log.info("PR %s build %s step %s: %d test_cluster_metrics "
                          "(wal=%dMB, timeout=%ds)",
                          pr, build_id, step_name, len(metrics), wal_mb, timeout)
-            self._push_sentinel(build_id, step_labels.get("build_id", build_id))
+            self._push_sentinel(build_id, step_labels.get("build_id", build_id),
+                                repo=step_labels.get("repo", ""))
         except (tarfile.TarError, OSError) as e:
             log.warning("Failed to process prometheus.tar for build %s step %s: %s",
                         build_id, step_name, e)
@@ -305,12 +307,12 @@ class TestClusterMetricsPipeline:
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
-    def _push_sentinel(self, build_id, label_build_id):
+    def _push_sentinel(self, build_id, label_build_id, repo=""):
         """Push per-pipeline sentinel metric from pool worker."""
         from scraper.scraper import push_pipeline_sentinel
         push_pipeline_sentinel(
             self._session, self._vm_url,
-            self.name, self.version, label_build_id,
+            self.name, self.version, label_build_id, repo=repo,
         )
 
     def drain(self):
