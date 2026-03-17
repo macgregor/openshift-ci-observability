@@ -101,7 +101,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "### Reading this dashboard\n\nClick **Failed Runs** to jump to the [CI Investigation](/d/ci-investigation) dashboard for failure analysis. If your repo uses Hive cluster pools, the **Cluster Pool** and **Test Cluster Utilization** rows show pool health and resource usage -- these rows will be empty for repos that provision clusters inline."
+        "content": "### Reading this dashboard\n\nClick **Failed Runs** to jump to the [CI Investigation](/d/ci-investigation) dashboard for failure analysis. If your repo uses Hive cluster pools, the **Cluster Provisioning** rows show pool or IPI health depending on provisioning method, and **Test Cluster Utilization** shows resource usage. These rows will be empty for provisioning methods that the repo does not use."
       }
     },
     {
@@ -1002,7 +1002,7 @@
     },
     {
       "id": 400,
-      "title": "Cluster Pool",
+      "title": "Cluster Provisioning (Pools)",
       "type": "row",
       "gridPos": {
         "h": 1,
@@ -1010,7 +1010,8 @@
         "x": 0,
         "y": 55
       },
-      "collapsed": false
+      "collapsed": false,
+      "description": "Hive cluster pool metrics. Empty if the repo uses IPI leases instead."
     },
     {
       "id": 16,
@@ -1403,6 +1404,237 @@
       }
     },
     {
+      "type": "row",
+      "title": "Cluster Provisioning (IPI / Leases)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "collapsed": false,
+      "id": 601
+    },
+    {
+      "type": "stat",
+      "title": "Avg IPI Install",
+      "description": "Average time for ipi-install-install to provision a cluster from scratch. This is the IPI equivalent of cluster pool claim wait.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 71
+      },
+      "targets": [
+        {
+          "expr": "avg(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__range:]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 2400,
+                "color": "yellow"
+              },
+              {
+                "value": 3600,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "id": 602
+    },
+    {
+      "type": "stat",
+      "title": "Max IPI Install",
+      "description": "Worst-case IPI install time. Spikes indicate infrastructure slowdowns.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 71
+      },
+      "targets": [
+        {
+          "expr": "max(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__range:]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 3000,
+                "color": "yellow"
+              },
+              {
+                "value": 4200,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "id": 603
+    },
+    {
+      "type": "stat",
+      "title": "Lease Quota Utilization",
+      "description": "Percentage of cloud quota leases in use at acquisition time. High values indicate quota pressure.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 71
+      },
+      "targets": [
+        {
+          "expr": "(1 - avg(last_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__range:])) / avg(last_over_time(ci_leases_leases_total{repo=~\"$repo\"}[$__range:]))) * 100",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 60,
+                "color": "yellow"
+              },
+              {
+                "value": 80,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "id": 604
+    },
+    {
+      "type": "stat",
+      "title": "Avg Deprovision",
+      "description": "Average time to tear down the IPI cluster after tests complete.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 71
+      },
+      "targets": [
+        {
+          "expr": "avg(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-deprovision-deprovision.*\",repo=~\"$repo\"}[$__range:]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              {
+                "value": null,
+                "color": "green"
+              },
+              {
+                "value": 600,
+                "color": "yellow"
+              },
+              {
+                "value": 900,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "id": 605
+    },
+    {
+      "type": "timeseries",
+      "title": "IPI Install Duration",
+      "description": "IPI cluster install time over time. Rising trend indicates infrastructure degradation.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 75
+      },
+      "targets": [
+        {
+          "expr": "avg(avg_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__interval:]))",
+          "legendFormat": "Avg",
+          "refId": "A"
+        },
+        {
+          "expr": "max(max_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__interval:]))",
+          "legendFormat": "Max",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "id": 606
+    },
+    {
+      "type": "timeseries",
+      "title": "Lease Quota Remaining",
+      "description": "Available quota leases at acquisition time. Drops toward zero indicate quota exhaustion.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 75
+      },
+      "targets": [
+        {
+          "expr": "avg(avg_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__interval:]))",
+          "legendFormat": "Avg Remaining",
+          "refId": "A"
+        },
+        {
+          "expr": "min(min_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__interval:]))",
+          "legendFormat": "Min Remaining",
+          "refId": "B"
+        },
+        {
+          "expr": "avg(avg_over_time(ci_leases_leases_total{repo=~\"$repo\"}[$__interval:]))",
+          "legendFormat": "Total",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "id": 607
+    },
+    {
       "id": 600,
       "title": "Test Cluster Utilization",
       "type": "row",
@@ -1410,7 +1642,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 84
       },
       "collapsed": true,
       "panels": [
@@ -1423,7 +1655,7 @@
             "h": 4,
             "w": 6,
             "x": 0,
-            "y": 71
+            "y": 85
           },
           "targets": [
             {
@@ -1473,7 +1705,7 @@
             "h": 4,
             "w": 6,
             "x": 6,
-            "y": 71
+            "y": 85
           },
           "targets": [
             {
@@ -1523,7 +1755,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 89
           },
           "targets": [
             {
@@ -1613,7 +1845,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 75
+            "y": 89
           },
           "targets": [
             {
@@ -1704,7 +1936,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 99
       },
       "collapsed": true,
       "panels": [
@@ -1717,7 +1949,7 @@
             "h": 4,
             "w": 6,
             "x": 0,
-            "y": 86
+            "y": 100
           },
           "targets": [
             {
@@ -1767,7 +1999,7 @@
             "h": 4,
             "w": 6,
             "x": 6,
-            "y": 86
+            "y": 100
           },
           "targets": [
             {
@@ -1817,7 +2049,7 @@
             "h": 10,
             "w": 12,
             "x": 0,
-            "y": 90
+            "y": 104
           },
           "targets": [
             {
@@ -1863,7 +2095,7 @@
             "h": 10,
             "w": 12,
             "x": 12,
-            "y": 90
+            "y": 104
           },
           "targets": [
             {

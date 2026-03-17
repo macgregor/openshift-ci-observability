@@ -605,7 +605,60 @@ def cmd_test_failures(args):
             })
 
 
-# --- Cluster pool ---
+# --- Cluster provisioning ---
+
+def cmd_lease_health(args):
+    """Lease quota utilization and IPI install/deprovision times."""
+    window = args[0] if args else "7d"
+    _JUNIT_STEP = "ci_junit_step_duration_seconds"
+    # IPI install duration
+    avg_install = vm_scalar(
+        f'avg(last_over_time({_JUNIT_STEP}{{step_name=~".*ipi-install-install.*"}}[{window}]))'
+    )
+    max_install = vm_scalar(
+        f'max(last_over_time({_JUNIT_STEP}{{step_name=~".*ipi-install-install.*"}}[{window}]))'
+    )
+    # IPI deprovision duration
+    avg_deprov = vm_scalar(
+        f'avg(last_over_time({_JUNIT_STEP}{{step_name=~".*ipi-deprovision-deprovision.*"}}[{window}]))'
+    )
+    # Lease quota
+    avg_remaining = vm_scalar(
+        f"avg(last_over_time(ci_leases_leases_remaining_at_acquisition[{window}]))"
+    )
+    min_remaining = vm_scalar(
+        f"min(last_over_time(ci_leases_leases_remaining_at_acquisition[{window}]))"
+    )
+    avg_total = vm_scalar(
+        f"avg(last_over_time(ci_leases_leases_total[{window}]))"
+    )
+    builds = vm_scalar(
+        f"count(last_over_time(ci_leases_acquisition_duration_seconds[{window}]))"
+    )
+    if not builds and not avg_install:
+        emit({"error": "No lease or IPI data found (repo may use cluster pools instead)"})
+        return
+    result = {"window": window, "builds_with_leases": int(builds)}
+    if avg_total:
+        result["lease_quota_total"] = int(avg_total)
+        result["lease_quota_avg_remaining"] = int(avg_remaining)
+        result["lease_quota_min_remaining"] = int(min_remaining)
+        result["lease_quota_utilization_pct"] = round(
+            (1 - avg_remaining / avg_total) * 100, 1) if avg_total else 0
+    if avg_install:
+        result["ipi_install_avg_s"] = round(avg_install, 0)
+        result["ipi_install_max_s"] = round(max_install, 0)
+        result["ipi_deprovision_avg_s"] = round(avg_deprov, 0)
+    emit(result)
+    # Per-region breakdown if available
+    region_results = vm_query(
+        f"count by (region) (last_over_time("
+        f"ci_leases_acquisition_duration_seconds[{window}]))"
+    )
+    for r in sorted(region_results, key=lambda x: -val(x)):
+        region = r["metric"].get("region", "unknown")
+        emit({"region": region, "builds": int(val(r))})
+
 
 def cmd_pool_health(args):
     """Cluster pool claim wait times and idle time statistics."""
@@ -957,6 +1010,7 @@ COMMANDS = {
     "last-success":       (cmd_last_success,           "<job_pattern>",                 "Last successful build for a job"),
     "test-failures":      (cmd_test_failures,          "[job_pattern] [test_pattern] [limit]", "Failing tests filtered by job/test name"),
     "node-utilization":   (cmd_node_utilization,       "[window] [limit]",                     "Build cluster node CPU/memory utilization"),
+    "lease-health":       (cmd_lease_health,           "[window]",                             "Lease quota utilization and IPI install times"),
     "pool-health":        (cmd_pool_health,            "[window]",                             "Cluster pool claim wait and idle times"),
     "pool-builds":        (cmd_pool_builds,            "<build_id>",                           "Cluster pool details for a build"),
     "test-cluster-utilization": (cmd_test_cluster_utilization, "[window]",                     "Test cluster avg/max CPU and memory utilization"),

@@ -389,7 +389,27 @@ ci-query failure-hours 'quota exceeded' 7d
 
 ---
 
-## Cluster Pool
+## Cluster Provisioning
+
+### `lease-health [window]`
+
+Lease quota utilization and IPI install/deprovision times. For repos that provision clusters via IPI (installer-provisioned infrastructure) rather than claiming from a Hive pool.
+
+```
+ci-query lease-health         # 7d
+ci-query lease-health 30d
+```
+
+**Output:** Summary line with lease quota and IPI timing, then per-region breakdown.
+
+**Output fields (summary):** `window`, `builds_with_leases`, `lease_quota_total`, `lease_quota_avg_remaining`, `lease_quota_min_remaining`, `lease_quota_utilization_pct`, `ipi_install_avg_s`, `ipi_install_max_s`, `ipi_deprovision_avg_s`
+**Output fields (per-region):** `region`, `builds`
+
+**Interpretation:**
+- `lease_quota_utilization_pct` > 60% = quota pressure, builds may queue for leases
+- `lease_quota_min_remaining` == 0 = quota was fully exhausted at some point
+- `ipi_install_avg_s` > 3600 = IPI installs are unusually slow (typically 30-50 min)
+- Per-region breakdown helps identify if one region is more loaded than others
 
 ### `pool-health [window]`
 
