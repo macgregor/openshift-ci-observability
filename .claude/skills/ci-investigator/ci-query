@@ -997,6 +997,72 @@ def cmd_config_diff(args):
     })
 
 
+# --- Build Resources (K8s events, pods, deployments from test cluster) ---
+
+def cmd_cluster_events(args):
+    """K8s events from the test cluster for a build (Warning events first)."""
+    bid = require_arg(args, "build_id")
+    pattern = args[1] if len(args) > 1 else ""
+    limit = int(args[2]) if len(args) > 2 else 50
+    query = f"source:k8s_event AND scope:cluster AND build_id:{bid}"
+    if pattern:
+        query += f' AND _msg:~"{pattern}"'
+    entries = vl_query(query, limit)
+    # Sort: Warnings first, then by time
+    entries.sort(key=lambda e: ("0" if e.get("type") == "Warning" else "1", e.get("_time", "")))
+    for e in entries:
+        emit({
+            "_time": e.get("_time"),
+            "type": e.get("type"),
+            "reason": e.get("reason"),
+            "object_kind": e.get("object_kind"),
+            "object_name": e.get("object_name"),
+            "object_namespace": e.get("object_namespace"),
+            "_msg": e.get("_msg"),
+        })
+
+
+def cmd_cluster_pods(args):
+    """Pod and deployment status from the test cluster for a build."""
+    bid = require_arg(args, "build_id")
+    pattern = args[1] if len(args) > 1 else ""
+    limit = int(args[2]) if len(args) > 2 else 50
+
+    # Deployments first (compact summary)
+    dep_query = f"source:k8s_deployment AND scope:cluster AND build_id:{bid}"
+    if pattern:
+        dep_query += f' AND (deployment_name:~".*{pattern}.*" OR deployment_namespace:~".*{pattern}.*")'
+    for e in vl_query(dep_query, limit):
+        emit({
+            "kind": "Deployment",
+            "namespace": e.get("deployment_namespace"),
+            "name": e.get("deployment_name"),
+            "replicas": e.get("replicas"),
+            "ready_replicas": e.get("ready_replicas"),
+            "unavailable_replicas": e.get("unavailable_replicas"),
+            "_msg": e.get("_msg"),
+        })
+
+    # Pods with problems (non-Running or restarts > 0)
+    pod_query = f"source:k8s_pod AND scope:cluster AND build_id:{bid}"
+    if pattern:
+        pod_query += f' AND (pod_name:~".*{pattern}.*" OR pod_namespace:~".*{pattern}.*")'
+    for e in vl_query(pod_query, limit):
+        phase = e.get("phase", "")
+        restarts = e.get("restart_count", 0)
+        # Skip healthy running pods unless filtering
+        if not pattern and phase == "Running" and restarts == 0:
+            continue
+        emit({
+            "kind": "Pod",
+            "namespace": e.get("pod_namespace"),
+            "name": e.get("pod_name"),
+            "phase": phase,
+            "restart_count": restarts,
+            "_msg": e.get("_msg"),
+        })
+
+
 # --- Command registry ---
 
 COMMANDS = {
@@ -1033,6 +1099,8 @@ COMMANDS = {
     "test-cluster-build":       (cmd_test_cluster_build,      "<build_id>",                    "Test cluster utilization for a specific build"),
     "config-versions":          (cmd_config_versions,          "[window]",                     "Distinct config hashes with build counts"),
     "config-diff":              (cmd_config_diff,              "<hash1> <hash2>",              "Compare step graph between two config hashes"),
+    "cluster-events":           (cmd_cluster_events,           "<build_id> [pattern] [limit]", "K8s events from test cluster (Warnings first)"),
+    "cluster-pods":             (cmd_cluster_pods,             "<build_id> [pattern] [limit]", "Pod/deployment status from test cluster"),
 }
 
 
