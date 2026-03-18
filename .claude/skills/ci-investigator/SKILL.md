@@ -140,6 +140,8 @@ Narrow focus to the specific problem area:
 
 Key question: **Is this PR-specific or systemic?** Compare PR success rate vs global. If similar, the problem is upstream.
 
+**Commit-awareness for multi-commit PRs**: A PR with multiple commits has different code at each SHA. When reviewing builds across a PR, always track which commit (`pr_sha`) each build tested. Failures on early commits may have been fixed by later commits -- don't investigate stale failures or look for root causes in HEAD when the tested code was different. Group builds by SHA and focus on the *latest* commit's failures first. Only look at older commits if the same failure persists across SHAs. When cross-referencing with source code, check out the specific SHA that was tested, not HEAD or main.
+
 ### Phase 3: Investigate (Root Cause Trace)
 
 Trace the failure chain:
@@ -149,6 +151,8 @@ Trace the failure chain:
 3. **Is it consistent?** -- `step-consistency <pr_number>`, `flakiness <pr_number>`
 4. **Infrastructure or test?** -- `scheduling-latency <build_id>`, `pod-outcomes <build_id>`
 5. **What's the pattern?** -- Match against known failure signatures (see Classification)
+
+**Distinguish expected errors from real failures**: Test suites deliberately create error conditions -- failed pods, rejected requests, invalid configs -- to verify error handling. Errors in cluster events or logs do not automatically indicate a problem. Before attributing a failure to an error you found, verify the error is **correlated with the actual test failure**: does it appear in the failing step's time window? Does the test that failed exercise the component that errored? If a test sets up a degraded-condition scenario and you see degraded-condition events, that's the test working, not a root cause. Cross-reference errors against the specific test case that failed and its purpose.
 
 ### Phase 3b: Validate Hypothesis
 
