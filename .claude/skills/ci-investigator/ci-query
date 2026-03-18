@@ -23,7 +23,8 @@ from collections import Counter
 VM_URL = os.environ.get("VM_URL", "http://localhost:8428")
 VL_URL = os.environ.get("VL_URL", "http://localhost:9428")
 LOOKBACK = "90d"
-REPO_FILTER = ""  # set by --repo flag; empty means all repos
+REPO_FILTER = ""  # set by --repo flag or REPO env; empty means all repos
+ORG_FILTER = ""   # set alongside REPO_FILTER when org/repo format is used
 
 # Shorthand for the long metric name used in most build-outcome queries
 _OUTCOME = "ci_test_platform_insights_additional_context_duration_seconds"
@@ -33,27 +34,42 @@ _OUTCOME = "ci_test_platform_insights_additional_context_duration_seconds"
 
 import re
 
+
+def _parse_repo_spec(value):
+    """Parse 'org/repo' or 'repo' into (org, repo)."""
+    if "/" in value:
+        org, repo = value.split("/", 1)
+        return org, repo
+    return "", value
+
+
 def _inject_repo(promql):
-    """Inject repo filter into all PromQL label selectors."""
+    """Inject repo/org filter into all PromQL label selectors."""
     if not REPO_FILTER:
         return promql
-    label = f'repo="{REPO_FILTER}"'
+    parts = [f'repo="{REPO_FILTER}"']
+    if ORG_FILTER:
+        parts.append(f'org="{ORG_FILTER}"')
+    filter_labels = ",".join(parts)
     def add(m):
         inside = m.group(1)
         if 'repo=' in inside:
             return m.group(0)
-        return '{' + inside + ',' + label + '}' if inside.strip() else '{' + label + '}'
+        return '{' + inside + ',' + filter_labels + '}' if inside.strip() else '{' + filter_labels + '}'
     result = re.sub(r'\{([^}]*)\}', add, promql)
     # Handle bare metric names with no {} selector (e.g. "metric_name[5m]" or "metric_name)")
-    result = re.sub(r'(ci_\w+)(\[|(?=\)))', rf'\1{{{label}}}\2', result)
+    result = re.sub(r'(ci_\w+)(\[|(?=\)))', rf'\1{{{filter_labels}}}\2', result)
     return result
 
 
 def _inject_repo_logsql(logsql):
-    """Inject repo filter into a LogsQL query."""
+    """Inject repo/org filter into a LogsQL query."""
     if not REPO_FILTER:
         return logsql
-    return f'repo:"{REPO_FILTER}" AND {logsql}'
+    parts = [f'repo:"{REPO_FILTER}"']
+    if ORG_FILTER:
+        parts.append(f'org:"{ORG_FILTER}"')
+    return " AND ".join(parts) + f' AND {logsql}'
 
 
 def vm_query(query):
@@ -1021,9 +1037,12 @@ COMMANDS = {
 
 
 def cmd_help(_args):
+    repo_default = os.environ.get("REPO", "")
     print("Usage: ci-query [--repo <repo>] <command> [args...]")
     print()
-    print("  --repo <repo>  Filter all queries to a specific repo (e.g. cluster-monitoring-operator)")
+    print("  --repo <repo>  Filter by repo (org/repo or repo name). Defaults to REPO env var")
+    if repo_default:
+        print(f"                 Current default: {repo_default}")
     print()
     max_name = max(len(n) for n in COMMANDS)
     max_usage = max(len(u) for _, u, _ in COMMANDS.values())
@@ -1034,15 +1053,17 @@ def cmd_help(_args):
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
-    # Parse --repo flag before command dispatch
+    # Parse --repo flag before command dispatch (defaults to REPO env var)
     if "--repo" in argv:
         idx = argv.index("--repo")
         if idx + 1 < len(argv):
-            REPO_FILTER = argv[idx + 1]
+            ORG_FILTER, REPO_FILTER = _parse_repo_spec(argv[idx + 1])
             argv = argv[:idx] + argv[idx + 2:]
         else:
             emit_error("--repo requires a value")
             sys.exit(1)
+    elif os.environ.get("REPO"):
+        ORG_FILTER, REPO_FILTER = _parse_repo_spec(os.environ["REPO"])
     cmd = argv[0] if argv else "help"
     if cmd in ("help", "--help", "-h"):
         cmd_help([])

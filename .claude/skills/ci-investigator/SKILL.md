@@ -46,7 +46,7 @@ Investigate OpenShift CI failures by querying VictoriaMetrics (metrics) and Vict
 
 ## Query Tool
 
-All queries go through `.claude/skills/ci-investigator/ci-query [--repo <repo>] <command> [args...]`. This script outputs JSON lines (one JSON object per line). Run `ci-query help` for the full command list. Use `--repo` to filter to a specific repository (e.g. `--repo cluster-monitoring-operator`). Without it, all repos are queried.
+All queries go through `.claude/skills/ci-investigator/ci-query [--repo <repo>] <command> [args...]`. This script outputs JSON lines (one JSON object per line). Run `ci-query help` for the full command list. Use `--repo` to filter to a specific repository (e.g. `--repo cluster-monitoring-operator` or `--repo openshift/cluster-monitoring-operator`). Defaults to the `REPO` env var if set; without either, all repos are queried.
 
 See `query-recipes.md` for detailed usage of each subcommand with interpretation guidance.
 
