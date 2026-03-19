@@ -25,7 +25,7 @@ def _parse_iso_ts(val):
 def _extract_events(data, scope, job_labels):
     """Extract log records from a K8s EventList JSON."""
     records = []
-    items = data.get("items", []) if isinstance(data, dict) else []
+    items = (data.get("items") or []) if isinstance(data, dict) else []
     for item in items:
         obj = item.get("involvedObject", {})
         ts = (_parse_iso_ts(item.get("lastTimestamp"))
@@ -77,7 +77,7 @@ def _container_summary(container_statuses):
 def _extract_pods(data, scope, job_labels):
     """Extract log records from a K8s PodList JSON."""
     records = []
-    items = data.get("items", []) if isinstance(data, dict) else []
+    items = (data.get("items") or []) if isinstance(data, dict) else []
     for item in items:
         meta = item.get("metadata", {})
         status = item.get("status", {})
@@ -111,7 +111,7 @@ def _extract_pods(data, scope, job_labels):
 def _extract_deployments(data, scope, job_labels):
     """Extract log records from a K8s DeploymentList JSON."""
     records = []
-    items = data.get("items", []) if isinstance(data, dict) else []
+    items = (data.get("items") or []) if isinstance(data, dict) else []
     for item in items:
         meta = item.get("metadata", {})
         spec = item.get("spec", {})

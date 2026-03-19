@@ -70,6 +70,7 @@ def test_extract_events():
 def test_extract_events_empty():
     assert _extract_events({"items": []}, "build", LABELS) == []
     assert _extract_events({}, "build", LABELS) == []
+    assert _extract_events({"items": None}, "build", LABELS) == []
 
 
 SAMPLE_PODS = {
@@ -125,6 +126,7 @@ def test_extract_pods():
 
 def test_extract_pods_empty():
     assert _extract_pods({"items": []}, "build", LABELS) == []
+    assert _extract_pods({"items": None}, "build", LABELS) == []
 
 
 SAMPLE_DEPLOYMENTS = {
@@ -186,6 +188,7 @@ def test_extract_deployments():
 
 def test_extract_deployments_empty():
     assert _extract_deployments({"items": []}, "cluster", LABELS) == []
+    assert _extract_deployments({"items": None}, "cluster", LABELS) == []
 
 
 def test_all_records_have_pipeline_field():
