@@ -1659,7 +1659,7 @@
           },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) / avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) / avg(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -1709,7 +1709,7 @@
           },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) / avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__range])) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) / avg(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -1777,7 +1777,7 @@
               "interval": "3h"
             },
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval])))",
               "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
               "interval": "3h"
@@ -1929,7 +1929,7 @@
               "interval": "3h"
             },
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval])))",
               "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
               "interval": "3h"
