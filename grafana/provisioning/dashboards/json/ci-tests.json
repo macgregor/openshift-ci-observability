@@ -13,8 +13,8 @@
         "name": "repo",
         "label": "Repository",
         "type": "query",
-        "query": "query_result(group by (repo) (count_over_time(ci_build_duration_seconds[$__range:])))",
-        "regex": "/repo=\"([^\"]+)\"/",
+        "query": "label_values(ci_build_duration_seconds, repo)",
+        "regex": "",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
@@ -30,8 +30,8 @@
         "name": "job_type",
         "label": "Job Type",
         "type": "query",
-        "query": "query_result(group by (job_name) (count_over_time(ci_junit_test_duration_seconds[$__range:])))",
-        "regex": "/job_name=\"([^\"]+)\"/",
+        "query": "label_values(ci_junit_test_duration_seconds, job_name)",
+        "regex": "",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
@@ -47,8 +47,8 @@
         "name": "pr_number",
         "label": "PR",
         "type": "query",
-        "query": "query_result(group by (pr_number) (count_over_time(ci_junit_test_duration_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range:])))",
-        "regex": "/pr_number=\"([^\"]+)\"/",
+        "query": "label_values(ci_junit_test_duration_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}, pr_number)",
+        "regex": "",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
@@ -75,8 +75,8 @@
         "name": "test_variant",
         "label": "Test Variant",
         "type": "query",
-        "query": "query_result(group by (test_variant) (count_over_time(ci_junit_test_duration_seconds{job_name=~\"$job_type\",pr_number=~\"$pr_number\",repo=~\"$repo\"}[$__range:])))",
-        "regex": "/test_variant=\"([^\"]+)\"/",
+        "query": "label_values(ci_junit_test_duration_seconds{job_name=~\"$job_type\",pr_number=~\"$pr_number\",repo=~\"$repo\"}, test_variant)",
+        "regex": "",
         "multi": true,
         "includeAll": true,
         "allValue": ".+",
@@ -144,7 +144,7 @@
       },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])) / count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])) * 100",
+          "expr": "count(last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])) / count(last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])) * 100",
           "instant": false,
           "refId": "A"
         }
@@ -193,7 +193,7 @@
       },
       "targets": [
         {
-          "expr": "count(count by (test_name) (count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])))",
+          "expr": "count(count by (test_name) (last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])))",
           "instant": false,
           "refId": "A"
         }
@@ -325,7 +325,7 @@
       },
       "targets": [
         {
-          "expr": "count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__interval:])) / count(count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__interval:])) * 100",
+          "expr": "count(last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=\"passed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__interval])) / count(last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=~\"passed|failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__interval])) * 100",
           "legendFormat": "Pass Rate",
           "refId": "A",
           "interval": "6h"
@@ -504,7 +504,7 @@
       },
       "targets": [
         {
-          "expr": "topk(15, count by (test_name) (count_over_time((group by (build_id, test_name) (ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}))[$__range:])))",
+          "expr": "topk(15, count by (test_name) (last_over_time(ci_junit_test_duration_seconds{leaf=\"true\",status=\"failed\",test_name=~\".*$test_name.*\",pr_number=~\"$pr_number\",job_name=~\"$job_type\",test_variant=~\"$test_variant\",repo=~\"$repo\"}[$__range])))",
           "legendFormat": "{{test_name}}",
           "instant": true,
           "refId": "A"
