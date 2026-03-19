@@ -211,6 +211,21 @@ def _read_cached_metrics(gcs: GCSClient, gcs_path: str, version: str):
     return [line for line in rest.splitlines() if line]
 
 
+def _delete_cached_tar(gcs: GCSClient, gcs_path: str):
+    """Delete the raw prometheus.tar from the cache after .metrics extraction.
+
+    The .metrics file retains the processed output, so the large tar is no
+    longer needed.  Silently ignores missing files (already deleted or never
+    cached).
+    """
+    cp = gcs._cache_path(gcs_path)
+    if cp is not None and cp.exists():
+        try:
+            cp.unlink()
+        except OSError:
+            pass
+
+
 def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_lines: list[str]):
     """Write .metrics cache file with version header."""
     content = f"{_METRICS_CACHE_VERSION_PREFIX}{version}\n"
@@ -267,6 +282,8 @@ class TestClusterMetricsPipeline:
                          ctx.build.pr, ctx.build.build_id, step_name, len(cached))
             self._push_sentinel(ctx.build.build_id, ctx.labels.get("build_id", ctx.build.build_id),
                                 repo=ctx.labels.get("repo", ""))
+            # Clean up raw tar if it still exists (pre-deletion builds)
+            _delete_cached_tar(self._gcs, gcs_path)
             return
 
         # Slow path: ensure tar is on disk
@@ -291,6 +308,7 @@ class TestClusterMetricsPipeline:
             lines = _run_promtool(tmpdir, timeout=timeout)
             metrics = extract_test_cluster_metrics(lines, step_labels)
             _write_cached_metrics(self._gcs, gcs_path, self.version, metrics)
+            _delete_cached_tar(self._gcs, gcs_path)
             self.sink.push(metrics)
             if metrics:
                 log.info("PR %s build %s step %s: %d test_cluster_metrics "

@@ -92,7 +92,7 @@ The scraper uses a `ThreadPoolExecutor` shared by both discovery and build proce
 
 GCS artifacts are immutable once written, so the scraper caches fetched objects to a local directory (a podman volume shared between watch and backfill services). Cache entries use the GCS path as the filesystem path, mirroring the bucket layout. 404 responses are cached as `.miss` marker files to avoid re-probing missing artifacts.
 
-The TestClusterMetricsPipeline also caches processed output as `.metrics` sibling files next to the raw `prometheus.tar`. Each `.metrics` file contains a version header and the final Prometheus text format ready for pushing. On read, the version is compared against the pipeline's current version -- a mismatch means stale, and the file is reprocessed. This avoids redundant `promtool` WAL replay, which is the most expensive operation in the scraper.
+The TestClusterMetricsPipeline also caches processed output as `.metrics` sibling files next to where the raw `prometheus.tar` was downloaded. Each `.metrics` file contains a version header and the final Prometheus text format ready for pushing. On read, the version is compared against the pipeline's current version -- a mismatch means stale, and the file is reprocessed. This avoids redundant `promtool` WAL replay, which is the most expensive operation in the scraper. Once a `.metrics` file is successfully written, the raw `prometheus.tar` is deleted from the cache to reclaim disk space -- the WAL replay is far more expensive than the download, so keeping the extracted form is sufficient.
 
 `make wipe-db` clears the database but preserves the cache, enabling fast re-ingestion after scrape logic changes. `make wipe-all` clears both.
 

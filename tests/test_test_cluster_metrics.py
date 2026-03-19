@@ -7,6 +7,7 @@ from scraper.test_cluster_metrics import (
     parse_promtool_line,
     extract_test_cluster_metrics,
     _build_node_role_map,
+    _delete_cached_tar,
     _read_cached_metrics,
     _write_cached_metrics,
     _OUTPUT_NAMES,
@@ -397,3 +398,29 @@ def test_read_cached_metrics_missing(tmp_path):
     gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
     result = _read_cached_metrics(gcs, "nonexistent/path", "1.0")
     assert result is None
+
+
+# --- tar deletion tests ---
+
+def test_delete_cached_tar(tmp_path):
+    """Tar file is deleted after .metrics extraction."""
+    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    gcs_path = "some/path/prometheus.tar"
+    tar_file = tmp_path / gcs_path
+    tar_file.parent.mkdir(parents=True, exist_ok=True)
+    tar_file.write_bytes(b"fake tar data")
+
+    _delete_cached_tar(gcs, gcs_path)
+    assert not tar_file.exists()
+
+
+def test_delete_cached_tar_missing(tmp_path):
+    """No error when tar doesn't exist."""
+    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    _delete_cached_tar(gcs, "nonexistent/path/prometheus.tar")
+
+
+def test_delete_cached_tar_no_cache():
+    """No error when cache is disabled."""
+    gcs = GCSClient(requests.Session(), "bucket", cache_dir=None)
+    _delete_cached_tar(gcs, "some/path/prometheus.tar")
