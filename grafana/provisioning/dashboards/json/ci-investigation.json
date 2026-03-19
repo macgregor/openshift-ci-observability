@@ -1506,6 +1506,186 @@
           }
         },
         {
+          "id": 701,
+          "title": "Pod CPU Requests vs Capacity",
+          "description": "Sum of pod CPU requests compared to worker CPU capacity for selected builds. Shows overcommitment when requests exceed capacity.",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 92
+          },
+          "targets": [
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "{{build_id}} Requests",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\",label_node_role_kubernetes_io=\"\"}[$__interval]))",
+              "legendFormat": "{{build_id}} Capacity",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Requests"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Capacity"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          }
+        },
+        {
+          "id": 702,
+          "title": "Pod Memory Requests vs Capacity",
+          "description": "Sum of pod memory requests compared to worker memory capacity for selected builds.",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 92
+          },
+          "targets": [
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "{{build_id}} Requests",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\",label_node_role_kubernetes_io=\"\"}[$__interval]))",
+              "legendFormat": "{{build_id}} Capacity",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Requests"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Capacity"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          }
+        },
+        {
           "id": 65,
           "title": "Per-Build Utilization",
           "description": "CPU and memory utilization per build. Helps identify builds with unusual resource consumption.",

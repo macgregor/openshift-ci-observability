@@ -34,6 +34,9 @@ METRICS = [
     "node_memory_MemTotal_bytes",
     "machine_cpu_cores",
     "kube_node_role",
+    "kube_pod_container_resource_requests",
+    "kube_pod_container_resource_limits",
+    "container_memory_working_set_bytes",
 ]
 
 # Metrics that get emitted. kube_node_role is extracted only for the node→role mapping.
@@ -236,7 +239,7 @@ def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_li
 
 class TestClusterMetricsPipeline:
     name = "test_cluster_metrics"
-    version = f"{SHARED_VERSION}.2"
+    version = f"{SHARED_VERSION}.3"
     pushes_own_sentinel = True
 
     def __init__(self, sink: Sink, gcs: GCSClient,

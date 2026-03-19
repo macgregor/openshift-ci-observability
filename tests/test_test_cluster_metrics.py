@@ -102,6 +102,9 @@ def test_metric_name_conversion():
     assert _OUTPUT_NAMES["instance:node_memory_utilisation:ratio"] == "ci_test_cluster_instance_node_memory_utilisation_ratio"
     assert _OUTPUT_NAMES["node_memory_MemTotal_bytes"] == "ci_test_cluster_node_memory_memtotal_bytes"
     assert _OUTPUT_NAMES["machine_cpu_cores"] == "ci_test_cluster_machine_cpu_cores"
+    assert _OUTPUT_NAMES["kube_pod_container_resource_requests"] == "ci_test_cluster_kube_pod_container_resource_requests"
+    assert _OUTPUT_NAMES["kube_pod_container_resource_limits"] == "ci_test_cluster_kube_pod_container_resource_limits"
+    assert _OUTPUT_NAMES["container_memory_working_set_bytes"] == "ci_test_cluster_container_memory_working_set_bytes"
 
 
 def test_extract_test_cluster_metrics():
@@ -118,6 +121,30 @@ def test_extract_test_cluster_metrics():
     assert "3.14" in metrics[0]
     assert "ci_test_cluster_machine_cpu_cores" in metrics[1]
     assert 'pr_number="42"' in metrics[1]
+
+
+def test_extract_pod_resource_metrics():
+    lines = [
+        '{__name__="kube_pod_container_resource_requests", container="operator", namespace="redhat-ods-operator", node="ip-10-0-1-2.ec2.internal", pod="opendatahub-operator-0", resource="cpu", unit="core"} 0.5 1710000000000',
+        '{__name__="kube_pod_container_resource_requests", container="operator", namespace="redhat-ods-operator", node="ip-10-0-1-2.ec2.internal", pod="opendatahub-operator-0", resource="memory", unit="byte"} 536870912 1710000000000',
+        '{__name__="kube_pod_container_resource_limits", container="operator", namespace="redhat-ods-operator", node="ip-10-0-1-2.ec2.internal", pod="opendatahub-operator-0", resource="cpu", unit="core"} 1.0 1710000000000',
+        '{__name__="container_memory_working_set_bytes", container="operator", namespace="redhat-ods-operator", pod="opendatahub-operator-0", id="/kubepods/pod123/ctr456"} 268435456 1710000000000',
+    ]
+    job_labels = {"build_id": "99", "repo": "opendatahub-io/opendatahub-operator"}
+    metrics = extract_test_cluster_metrics(lines, job_labels)
+    assert len(metrics) == 4
+    # Verify metric names
+    names = [m.split("{")[0] for m in metrics]
+    assert names[0] == "ci_test_cluster_kube_pod_container_resource_requests"
+    assert names[1] == "ci_test_cluster_kube_pod_container_resource_requests"
+    assert names[2] == "ci_test_cluster_kube_pod_container_resource_limits"
+    assert names[3] == "ci_test_cluster_container_memory_working_set_bytes"
+    # Verify pod/namespace labels are preserved from prometheus
+    assert 'pod="opendatahub-operator-0"' in metrics[0]
+    assert 'namespace="redhat-ods-operator"' in metrics[0]
+    assert 'resource="cpu"' in metrics[0]
+    # Verify job labels are merged
+    assert 'build_id="99"' in metrics[0]
 
 
 def test_extract_ignores_unmatched_metrics():

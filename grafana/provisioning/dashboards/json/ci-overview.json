@@ -1925,6 +1925,186 @@
               "placement": "bottom"
             }
           }
+        },
+        {
+          "id": 601,
+          "title": "Pod CPU Requests vs Capacity",
+          "description": "Sum of pod CPU requests compared to worker node CPU capacity. When requests exceed capacity, the cluster is overcommitted. Based on kube-state-metrics data from prometheus.tar.",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 99
+          },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Pod CPU Requests (avg)",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Worker CPU Capacity (avg)",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pod CPU Requests (avg)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Worker CPU Capacity (avg)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          }
+        },
+        {
+          "id": 602,
+          "title": "Pod Memory Requests vs Capacity",
+          "description": "Sum of pod memory requests compared to worker node memory capacity. When requests exceed capacity, the cluster is overcommitted.",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 99
+          },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Pod Memory Requests (avg)",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Worker Memory Capacity (avg)",
+              "refId": "B",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pod Memory Requests (avg)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Worker Memory Capacity (avg)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          }
         }
       ]
     },
