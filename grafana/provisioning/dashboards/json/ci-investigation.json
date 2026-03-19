@@ -93,6 +93,24 @@
         },
         "refresh": 2,
         "sort": 1
+      },
+      {
+        "name": "role",
+        "label": "Node Role",
+        "description": "Filter test cluster pod metrics by node role (master/worker). Only affects Test Cluster Utilization panels.",
+        "type": "query",
+        "query": "label_values(ci_test_cluster_kube_pod_container_resource_requests, role)",
+        "regex": "",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 1,
+        "sort": 1
       }
     ]
   },
@@ -107,22 +125,24 @@
         "x": 0,
         "y": 0
       },
-      "collapsed": false
-    },
-    {
-      "id": 51,
-      "title": "",
-      "type": "text",
-      "gridPos": {
-        "h": 6,
-        "w": 24,
-        "x": 0,
-        "y": 1
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "### Reading this dashboard\n\nStart with all filters set to \"All\" to see the big picture, then select a **PR** to drill into a specific pull request. When a PR is selected, all panels scope to that PR -- compare its success rate against the global baseline to tell if failures are isolated or systemic.\n\nPR numbers, commit SHAs, and Build IDs in tables are clickable links to GitHub and Prow."
-      }
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 51,
+          "title": "",
+          "type": "text",
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 1
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### Reading this dashboard\n\nStart with all filters set to \"All\" to see the big picture, then select a **PR** to drill into a specific pull request. When a PR is selected, all panels scope to that PR -- compare its success rate against the global baseline to tell if failures are isolated or systemic.\n\nPR numbers, commit SHAs, and Build IDs in tables are clickable links to GitHub and Prow."
+          }
+        }
+      ]
     },
     {
       "id": 100,
@@ -473,425 +493,427 @@
         "x": 0,
         "y": 32
       },
-      "collapsed": false
-    },
-    {
-      "id": 31,
-      "title": "Longest Runs",
-      "description": "Individual pipeline runs sorted by duration. Long runs may indicate stuck tests or infrastructure issues.",
-      "type": "table",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 33
-      },
-      "targets": [
+      "collapsed": true,
+      "panels": [
         {
-          "expr": "topk(20, max_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "name": true,
-              "branch": true,
-              "timestamp": true,
-              "author": true
-            },
-            "renameByName": {
-              "pr_number": "PR",
-              "pr_sha": "Commit",
-              "job_name": "Job",
-              "build_id": "Build ID",
-              "success": "Outcome",
-              "Value": "Duration",
-              "org": "org",
-              "repo": "repo"
-            },
-            "indexByName": {
-              "pr_number": 0,
-              "pr_sha": 1,
-              "job_name": 2,
-              "success": 3,
-              "Value": 4,
-              "build_id": 5,
-              "org": 6,
-              "repo": 7
+          "id": 31,
+          "title": "Longest Runs",
+          "description": "Individual pipeline runs sorted by duration. Long runs may indicate stuck tests or infrastructure issues.",
+          "type": "table",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 33
+          },
+          "targets": [
+            {
+              "expr": "topk(20, max_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
             }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Duration"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "s"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "name": true,
+                  "branch": true,
+                  "timestamp": true,
+                  "author": true
+                },
+                "renameByName": {
+                  "pr_number": "PR",
+                  "pr_sha": "Commit",
+                  "job_name": "Job",
+                  "build_id": "Build ID",
+                  "success": "Outcome",
+                  "Value": "Duration",
+                  "org": "org",
+                  "repo": "repo"
+                },
+                "indexByName": {
+                  "pr_number": 0,
+                  "pr_sha": 1,
+                  "job_name": 2,
+                  "success": 3,
+                  "Value": 4,
+                  "build_id": 5,
+                  "org": 6,
+                  "repo": 7
+                }
               }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "PR"
-            },
-            "properties": [
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
               {
-                "id": "custom.width",
-                "value": 80
-              },
-              {
-                "id": "links",
-                "value": [
+                "matcher": {
+                  "id": "byName",
+                  "options": "Duration"
+                },
+                "properties": [
                   {
-                    "title": "GitHub PR",
-                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Commit"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 115
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "GitHub Commit",
-                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Outcome"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 75
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "true": {
-                        "text": "Success",
-                        "color": "green"
-                      }
-                    }
+                    "id": "unit",
+                    "value": "s"
                   },
                   {
-                    "type": "value",
-                    "options": {
-                      "false": {
-                        "text": "Failure",
-                        "color": "red"
-                      }
-                    }
+                    "id": "custom.width",
+                    "value": 80
                   }
                 ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Build ID"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 175
               },
               {
-                "id": "links",
-                "value": [
+                "matcher": {
+                  "id": "byName",
+                  "options": "PR"
+                },
+                "properties": [
                   {
-                    "title": "Prow Job",
-                    "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "org"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "repo"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "sortBy": [
-          {
-            "displayName": "Duration",
-            "desc": true
-          }
-        ]
-      }
-    },
-    {
-      "id": 32,
-      "title": "Shortest Runs",
-      "description": "Runs that completed unusually fast. Short failed runs often indicate infrastructure failures rather than test failures.",
-      "type": "table",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 33
-      },
-      "targets": [
-        {
-          "expr": "bottomk(20, min_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "name": true,
-              "branch": true,
-              "timestamp": true,
-              "author": true
-            },
-            "renameByName": {
-              "pr_number": "PR",
-              "pr_sha": "Commit",
-              "job_name": "Job",
-              "build_id": "Build ID",
-              "success": "Outcome",
-              "Value": "Duration",
-              "org": "org",
-              "repo": "repo"
-            },
-            "indexByName": {
-              "pr_number": 0,
-              "pr_sha": 1,
-              "job_name": 2,
-              "success": 3,
-              "Value": 4,
-              "build_id": 5,
-              "org": 6,
-              "repo": 7
-            }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Duration"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "s"
-              },
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "PR"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "GitHub PR",
-                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Commit"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 115
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "GitHub Commit",
-                    "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Outcome"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 75
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "true": {
-                        "text": "Success",
-                        "color": "green"
-                      }
-                    }
+                    "id": "custom.width",
+                    "value": 80
                   },
                   {
-                    "type": "value",
-                    "options": {
-                      "false": {
-                        "text": "Failure",
-                        "color": "red"
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "GitHub PR",
+                        "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
+                        "targetBlank": true
                       }
-                    }
+                    ]
                   }
                 ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Build ID"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 175
               },
               {
-                "id": "links",
-                "value": [
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commit"
+                },
+                "properties": [
                   {
-                    "title": "Prow Job",
-                    "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
-                    "targetBlank": true
+                    "id": "custom.width",
+                    "value": 115
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "GitHub Commit",
+                        "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Outcome"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "true": {
+                            "text": "Success",
+                            "color": "green"
+                          }
+                        }
+                      },
+                      {
+                        "type": "value",
+                        "options": {
+                          "false": {
+                            "text": "Failure",
+                            "color": "red"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Build ID"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 175
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Prow Job",
+                        "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "org"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "repo"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
                   }
                 ]
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "org"
-            },
-            "properties": [
+          "options": {
+            "sortBy": [
               {
-                "id": "custom.hidden",
-                "value": true
+                "displayName": "Duration",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": 32,
+          "title": "Shortest Runs",
+          "description": "Runs that completed unusually fast. Short failed runs often indicate infrastructure failures rather than test failures.",
+          "type": "table",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 33
+          },
+          "targets": [
+            {
+              "expr": "bottomk(20, min_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "name": true,
+                  "branch": true,
+                  "timestamp": true,
+                  "author": true
+                },
+                "renameByName": {
+                  "pr_number": "PR",
+                  "pr_sha": "Commit",
+                  "job_name": "Job",
+                  "build_id": "Build ID",
+                  "success": "Outcome",
+                  "Value": "Duration",
+                  "org": "org",
+                  "repo": "repo"
+                },
+                "indexByName": {
+                  "pr_number": 0,
+                  "pr_sha": 1,
+                  "job_name": 2,
+                  "success": 3,
+                  "Value": 4,
+                  "build_id": 5,
+                  "org": 6,
+                  "repo": 7
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Duration"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "PR"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "GitHub PR",
+                        "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/pull/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Commit"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 115
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "GitHub Commit",
+                        "url": "https://github.com/${__data.fields.org}/${__data.fields.repo}/commit/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Outcome"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 75
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "true": {
+                            "text": "Success",
+                            "color": "green"
+                          }
+                        }
+                      },
+                      {
+                        "type": "value",
+                        "options": {
+                          "false": {
+                            "text": "Failure",
+                            "color": "red"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Build ID"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 175
+                  },
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Prow Job",
+                        "url": "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${__data.fields.org}_${__data.fields.repo}/${__data.fields.PR}/${__data.fields.Job}/${__value.raw}",
+                        "targetBlank": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "org"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "repo"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
+                  }
+                ]
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "repo"
-            },
-            "properties": [
+          "options": {
+            "sortBy": [
               {
-                "id": "custom.hidden",
-                "value": true
+                "displayName": "Duration",
+                "desc": false
               }
             ]
           }
-        ]
-      },
-      "options": {
-        "sortBy": [
-          {
-            "displayName": "Duration",
-            "desc": false
-          }
-        ]
-      }
+        }
+      ]
     },
     {
       "id": 400,
@@ -1375,37 +1397,112 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Usage (avg)" },
-                "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
-              },
-              {
-                "matcher": { "id": "byName", "options": "Usage (min)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Usage (max)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (min)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byRegexp", "options": ".*Capacity.*" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (max)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineWidth", "value": 3 },
-                  { "id": "custom.spanNulls", "value": true },
-                  { "id": "custom.hideFrom", "value": { "legend": true, "tooltip": false, "viz": false } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Capacity.*"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "list", "placement": "bottom" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
         },
         {
@@ -1458,37 +1555,112 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Usage (avg)" },
-                "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
-              },
-              {
-                "matcher": { "id": "byName", "options": "Usage (min)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Usage (max)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (min)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byRegexp", "options": ".*Capacity.*" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (max)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineWidth", "value": 3 },
-                  { "id": "custom.spanNulls", "value": true },
-                  { "id": "custom.hideFrom", "value": { "legend": true, "tooltip": false, "viz": false } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Capacity.*"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "list", "placement": "bottom" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
         },
         {
@@ -1504,19 +1676,19 @@
           },
           "targets": [
             {
-              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (avg)",
               "refId": "A",
               "interval": "5m"
             },
             {
-              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (min)",
               "refId": "C",
               "interval": "5m"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (max)",
               "refId": "D",
               "interval": "5m"
@@ -1541,37 +1713,112 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Requests (avg)" },
-                "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
-              },
-              {
-                "matcher": { "id": "byName", "options": "Requests (min)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Requests (max)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (min)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byRegexp", "options": ".*Capacity.*" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (max)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineWidth", "value": 3 },
-                  { "id": "custom.spanNulls", "value": true },
-                  { "id": "custom.hideFrom", "value": { "legend": true, "tooltip": false, "viz": false } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Capacity.*"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
                 ]
               }
             ]
           },
           "options": {
-            "tooltip": { "mode": "multi", "sort": "desc" },
-            "legend": { "displayMode": "list", "placement": "bottom" }
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
         },
         {
@@ -1587,19 +1834,19 @@
           },
           "targets": [
             {
-              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (avg)",
               "refId": "A",
               "interval": "5m"
             },
             {
-              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (min)",
               "refId": "C",
               "interval": "5m"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (max)",
               "refId": "D",
               "interval": "5m"
@@ -1624,30 +1871,99 @@
             },
             "overrides": [
               {
-                "matcher": { "id": "byName", "options": "Requests (avg)" },
-                "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
-              },
-              {
-                "matcher": { "id": "byName", "options": "Requests (min)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (avg)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byName", "options": "Requests (max)" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (min)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
-                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
                 ]
               },
               {
-                "matcher": { "id": "byRegexp", "options": ".*Capacity.*" },
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (max)"
+                },
                 "properties": [
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } },
-                  { "id": "custom.lineWidth", "value": 3 },
-                  { "id": "custom.spanNulls", "value": true },
-                  { "id": "custom.hideFrom", "value": { "legend": true, "tooltip": false, "viz": false } }
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": ".*Capacity.*"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
+                    }
+                  }
                 ]
               }
             ]

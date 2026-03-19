@@ -73,6 +73,24 @@
             "selected": true
           }
         ]
+      },
+      {
+        "name": "role",
+        "label": "Node Role",
+        "description": "Filter test cluster pod metrics by node role (master/worker). Only affects Test Cluster Utilization panels.",
+        "type": "query",
+        "query": "label_values(ci_test_cluster_kube_pod_container_resource_requests, role)",
+        "regex": "",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 1,
+        "sort": 1
       }
     ]
   },
@@ -87,22 +105,24 @@
         "x": 0,
         "y": 0
       },
-      "collapsed": false
-    },
-    {
-      "id": 51,
-      "title": "",
-      "type": "text",
-      "gridPos": {
-        "h": 6,
-        "w": 24,
-        "x": 0,
-        "y": 1
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "### Reading this dashboard\n\nClick **Failed Runs** to jump to the [CI Investigation](/d/ci-investigation) dashboard for failure analysis. If your repo uses Hive cluster pools, the **Cluster Provisioning** rows show pool or IPI health depending on provisioning method, and **Test Cluster Utilization** shows resource usage. These rows will be empty for provisioning methods that the repo does not use."
-      }
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 51,
+          "title": "",
+          "type": "text",
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 1
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### Reading this dashboard\n\nClick **Failed Runs** to jump to the [CI Investigation](/d/ci-investigation) dashboard for failure analysis. If your repo uses Hive cluster pools, the **Cluster Provisioning** rows show pool or IPI health depending on provisioning method, and **Test Cluster Utilization** shows resource usage. These rows will be empty for provisioning methods that the repo does not use."
+          }
+        }
+      ]
     },
     {
       "id": 52,
@@ -890,115 +910,117 @@
         "x": 0,
         "y": 87
       },
-      "collapsed": false
-    },
-    {
-      "id": 14,
-      "title": "Top Failing Steps",
-      "description": "Steps with the most failures across builds. High counts suggest flaky steps or infrastructure issues.",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 88
-      },
-      "targets": [
+      "collapsed": true,
+      "panels": [
         {
-          "expr": "topk(15, count by (source) (last_over_time(ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])))",
-          "legendFormat": "{{source}}",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "red"
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "orientation": "horizontal",
-        "displayMode": "basic",
-        "showUnfilled": true
-      }
-    },
-    {
-      "id": 15,
-      "title": "Pod Phase Breakdown",
-      "description": "Distribution of pod exit states (Succeeded, Failed, etc). High failure ratio suggests infrastructure problems rather than test failures.",
-      "type": "piechart",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 98
-      },
-      "targets": [
-        {
-          "expr": "count by (pod_phase) (last_over_time(ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\",repo=~\"$repo\"}[$__range]))",
-          "legendFormat": "{{pod_phase}}",
-          "instant": true,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Succeeded"
+          "id": 14,
+          "title": "Top Failing Steps",
+          "description": "Steps with the most failures across builds. High counts suggest flaky steps or infrastructure issues.",
+          "type": "bargauge",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 88
+          },
+          "targets": [
+            {
+              "expr": "topk(15, count by (source) (last_over_time(ci_step_duration_seconds{level=\"Error\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])))",
+              "legendFormat": "{{source}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "red"
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
             },
-            "properties": [
+            "orientation": "horizontal",
+            "displayMode": "basic",
+            "showUnfilled": true
+          }
+        },
+        {
+          "id": 15,
+          "title": "Pod Phase Breakdown",
+          "description": "Distribution of pod exit states (Succeeded, Failed, etc). High failure ratio suggests infrastructure problems rather than test failures.",
+          "type": "piechart",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 98
+          },
+          "targets": [
+            {
+              "expr": "count by (pod_phase) (last_over_time(ci_pods_completion_latency{job_name=~\"$job_type\",pod_phase=~\".+\",repo=~\"$repo\"}[$__range]))",
+              "legendFormat": "{{pod_phase}}",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
               {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
+                "matcher": {
+                  "id": "byName",
+                  "options": "Succeeded"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Failed"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Failed"
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
             },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "percent"
+              ]
+            },
+            "pieType": "donut"
           }
-        ]
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "percent"
-          ]
-        },
-        "pieType": "donut"
-      }
+        }
+      ]
     },
     {
       "id": 400,
@@ -1010,398 +1032,400 @@
         "x": 0,
         "y": 108
       },
-      "collapsed": false,
-      "description": "Hive cluster pool metrics. Empty if the repo uses IPI leases instead."
-    },
-    {
-      "id": 16,
-      "title": "Avg Claim Wait",
-      "description": "Average time builds wait for a cluster from the pool. High values indicate pool saturation.",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 109
-      },
-      "targets": [
+      "collapsed": true,
+      "description": "Hive cluster pool metrics. Empty if the repo uses IPI leases instead.",
+      "panels": [
         {
-          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
-          "instant": false,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 0,
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 300
-              },
-              {
-                "color": "red",
-                "value": 600
+          "id": 16,
+          "title": "Avg Claim Wait",
+          "description": "Average time builds wait for a cluster from the pool. High values indicate pool saturation.",
+          "type": "stat",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 109
+          },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 0,
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 300
+                  },
+                  {
+                    "color": "red",
+                    "value": 600
+                  }
+                ]
               }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "area"
-      }
-    },
-    {
-      "id": 17,
-      "title": "Max Claim Wait",
-      "description": "Worst-case cluster claim wait time. Spikes indicate pool exhaustion.",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 113
-      },
-      "targets": [
-        {
-          "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
-          "instant": false,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 0,
-          "thresholds": {
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 600
-              },
-              {
-                "color": "red",
-                "value": 1200
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "area"
-      }
-    },
-    {
-      "id": 18,
-      "title": "Avg Cluster Idle Time",
-      "description": "How long clusters sit idle in the pool before being claimed. Long idle times mean the pool is over-provisioned.",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 117
-      },
-      "targets": [
-        {
-          "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
-          "instant": false,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "area"
-      }
-    },
-    {
-      "id": 19,
-      "title": "Pool Claims",
-      "description": "Number of cluster claims in the selected time range.",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 121
-      },
-      "targets": [
-        {
-          "expr": "count(last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-          "instant": false,
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "blue"
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "sum"
-          ]
-        },
-        "colorMode": "value",
-        "graphMode": "area"
-      }
-    },
-    {
-      "id": 20,
-      "title": "Claim Wait Time",
-      "description": "Cluster claim wait time trend. Rising wait times indicate growing pool contention.",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 125
-      },
-      "targets": [
-        {
-          "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Max",
-          "refId": "A",
-          "interval": "3h"
-        },
-        {
-          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Avg",
-          "refId": "B",
-          "interval": "3h"
-        },
-        {
-          "expr": "quantile(0.9, last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "p90",
-          "refId": "C",
-          "interval": "3h"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 0,
-            "pointSize": 5,
-            "showPoints": "auto"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Max"
+            }
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
             },
-            "properties": [
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 17,
+          "title": "Max Claim Wait",
+          "description": "Worst-case cluster claim wait time. Spikes indicate pool exhaustion.",
+          "type": "stat",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 113
+          },
+          "targets": [
+            {
+              "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 0,
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 600
+                  },
+                  {
+                    "color": "red",
+                    "value": 1200
+                  }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 18,
+          "title": "Avg Cluster Idle Time",
+          "description": "How long clusters sit idle in the pool before being claimed. Long idle times mean the pool is over-provisioned.",
+          "type": "stat",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 117
+          },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]))",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 0,
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 19,
+          "title": "Pool Claims",
+          "description": "Number of cluster claims in the selected time range.",
+          "type": "stat",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 121
+          },
+          "targets": [
+            {
+              "expr": "count(last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "instant": false,
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "blue"
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "sum"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 20,
+          "title": "Claim Wait Time",
+          "description": "Cluster claim wait time trend. Rising wait times indicate growing pool contention.",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 125
+          },
+          "targets": [
+            {
+              "expr": "max(max_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Max",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Avg",
+              "refId": "B",
+              "interval": "3h"
+            },
+            {
+              "expr": "quantile(0.9, last_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "p90",
+              "refId": "C",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 0,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
               {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [
+                        10,
+                        10
+                      ]
+                    }
+                  }
+                ]
               },
               {
-                "id": "custom.lineStyle",
-                "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
-                }
+                "matcher": {
+                  "id": "byName",
+                  "options": "Avg"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "p90"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Avg"
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
             },
-            "properties": [
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
+          }
+        },
+        {
+          "id": 21,
+          "title": "Cluster Lifecycle",
+          "description": "Install duration and idle time. Install duration is how long the cluster took to provision. Idle time is how long it sat in the pool before being claimed.",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 135
+          },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_cluster_install_duration_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Install (avg)",
+              "refId": "A",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Idle (avg)",
+              "refId": "B",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Claim Wait (avg)",
+              "refId": "C",
+              "interval": "3h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
               {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
+                "matcher": {
+                  "id": "byName",
+                  "options": "Install (avg)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
               },
               {
-                "id": "custom.lineWidth",
-                "value": 3
+                "matcher": {
+                  "id": "byName",
+                  "options": "Idle (avg)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Claim Wait (avg)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p90"
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
             },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            }
           }
-        ]
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
         }
-      }
-    },
-    {
-      "id": 21,
-      "title": "Cluster Lifecycle",
-      "description": "Install duration and idle time. Install duration is how long the cluster took to provision. Idle time is how long it sat in the pool before being claimed.",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 135
-      },
-      "targets": [
-        {
-          "expr": "avg(avg_over_time(ci_cluster_install_duration_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Install (avg)",
-          "refId": "A",
-          "interval": "3h"
-        },
-        {
-          "expr": "avg(avg_over_time(ci_cluster_idle_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Idle (avg)",
-          "refId": "B",
-          "interval": "3h"
-        },
-        {
-          "expr": "avg(avg_over_time(ci_cluster_claim_wait_seconds{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Claim Wait (avg)",
-          "refId": "C",
-          "interval": "3h"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "pointSize": 5,
-            "showPoints": "auto"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Install (avg)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Idle (avg)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Claim Wait (avg)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        },
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
+      ]
     },
     {
       "type": "row",
@@ -1412,227 +1436,229 @@
         "x": 0,
         "y": 145
       },
-      "collapsed": false,
-      "id": 601
-    },
-    {
-      "type": "stat",
-      "title": "Avg IPI Install",
-      "description": "Average time for ipi-install-install to provision a cluster from scratch. This is the IPI equivalent of cluster pool claim wait.",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 146
-      },
-      "targets": [
+      "collapsed": true,
+      "id": 601,
+      "panels": [
         {
-          "expr": "avg(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__range]))",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "steps": [
-              {
-                "value": null,
-                "color": "green"
-              },
-              {
-                "value": 2400,
-                "color": "yellow"
-              },
-              {
-                "value": 3600,
-                "color": "red"
+          "type": "stat",
+          "title": "Avg IPI Install",
+          "description": "Average time for ipi-install-install to provision a cluster from scratch. This is the IPI equivalent of cluster pool claim wait.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 146
+          },
+          "targets": [
+            {
+              "expr": "avg(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__range]))",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "steps": [
+                  {
+                    "value": null,
+                    "color": "green"
+                  },
+                  {
+                    "value": 2400,
+                    "color": "yellow"
+                  },
+                  {
+                    "value": 3600,
+                    "color": "red"
+                  }
+                ]
               }
-            ]
-          }
-        }
-      },
-      "id": 602
-    },
-    {
-      "type": "stat",
-      "title": "Max IPI Install",
-      "description": "Worst-case IPI install time. Spikes indicate infrastructure slowdowns.",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 150
-      },
-      "targets": [
-        {
-          "expr": "max(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__range]))",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "steps": [
-              {
-                "value": null,
-                "color": "green"
-              },
-              {
-                "value": 3000,
-                "color": "yellow"
-              },
-              {
-                "value": 4200,
-                "color": "red"
-              }
-            ]
-          }
-        }
-      },
-      "id": 603
-    },
-    {
-      "type": "stat",
-      "title": "Lease Quota Utilization",
-      "description": "Percentage of cloud quota leases in use at acquisition time. High values indicate quota pressure.",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 154
-      },
-      "targets": [
-        {
-          "expr": "(1 - avg(last_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__range])) / avg(last_over_time(ci_leases_leases_total{repo=~\"$repo\"}[$__range]))) * 100",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "thresholds": {
-            "steps": [
-              {
-                "value": null,
-                "color": "green"
-              },
-              {
-                "value": 60,
-                "color": "yellow"
-              },
-              {
-                "value": 80,
-                "color": "red"
-              }
-            ]
-          }
-        }
-      },
-      "id": 604
-    },
-    {
-      "type": "stat",
-      "title": "Avg Deprovision",
-      "description": "Average time to tear down the IPI cluster after tests complete.",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 158
-      },
-      "targets": [
-        {
-          "expr": "avg(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-deprovision-deprovision.*\",repo=~\"$repo\"}[$__range]))",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "thresholds": {
-            "steps": [
-              {
-                "value": null,
-                "color": "green"
-              },
-              {
-                "value": 600,
-                "color": "yellow"
-              },
-              {
-                "value": 900,
-                "color": "red"
-              }
-            ]
-          }
-        }
-      },
-      "id": 605
-    },
-    {
-      "type": "timeseries",
-      "title": "IPI Install Duration",
-      "description": "IPI cluster install time over time. Rising trend indicates infrastructure degradation.",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 162
-      },
-      "targets": [
-        {
-          "expr": "avg(avg_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Avg",
-          "refId": "A"
+            }
+          },
+          "id": 602
         },
         {
-          "expr": "max(max_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Max",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        }
-      },
-      "id": 606
-    },
-    {
-      "type": "timeseries",
-      "title": "Lease Quota Remaining",
-      "description": "Available quota leases at acquisition time. Drops toward zero indicate quota exhaustion.",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 170
-      },
-      "targets": [
-        {
-          "expr": "avg(avg_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Avg Remaining",
-          "refId": "A"
+          "type": "stat",
+          "title": "Max IPI Install",
+          "description": "Worst-case IPI install time. Spikes indicate infrastructure slowdowns.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 150
+          },
+          "targets": [
+            {
+              "expr": "max(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__range]))",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "steps": [
+                  {
+                    "value": null,
+                    "color": "green"
+                  },
+                  {
+                    "value": 3000,
+                    "color": "yellow"
+                  },
+                  {
+                    "value": 4200,
+                    "color": "red"
+                  }
+                ]
+              }
+            }
+          },
+          "id": 603
         },
         {
-          "expr": "min(min_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Min Remaining",
-          "refId": "B"
+          "type": "stat",
+          "title": "Lease Quota Utilization",
+          "description": "Percentage of cloud quota leases in use at acquisition time. High values indicate quota pressure.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 154
+          },
+          "targets": [
+            {
+              "expr": "(1 - avg(last_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__range])) / avg(last_over_time(ci_leases_leases_total{repo=~\"$repo\"}[$__range]))) * 100",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "thresholds": {
+                "steps": [
+                  {
+                    "value": null,
+                    "color": "green"
+                  },
+                  {
+                    "value": 60,
+                    "color": "yellow"
+                  },
+                  {
+                    "value": 80,
+                    "color": "red"
+                  }
+                ]
+              }
+            }
+          },
+          "id": 604
         },
         {
-          "expr": "avg(avg_over_time(ci_leases_leases_total{repo=~\"$repo\"}[$__interval]))",
-          "legendFormat": "Total",
-          "refId": "C"
+          "type": "stat",
+          "title": "Avg Deprovision",
+          "description": "Average time to tear down the IPI cluster after tests complete.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 158
+          },
+          "targets": [
+            {
+              "expr": "avg(last_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-deprovision-deprovision.*\",repo=~\"$repo\"}[$__range]))",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "steps": [
+                  {
+                    "value": null,
+                    "color": "green"
+                  },
+                  {
+                    "value": 600,
+                    "color": "yellow"
+                  },
+                  {
+                    "value": 900,
+                    "color": "red"
+                  }
+                ]
+              }
+            }
+          },
+          "id": 605
+        },
+        {
+          "type": "timeseries",
+          "title": "IPI Install Duration",
+          "description": "IPI cluster install time over time. Rising trend indicates infrastructure degradation.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 162
+          },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Avg",
+              "refId": "A"
+            },
+            {
+              "expr": "max(max_over_time(ci_junit_step_duration_seconds{step_name=~\".*ipi-install-install.*\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Max",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            }
+          },
+          "id": 606
+        },
+        {
+          "type": "timeseries",
+          "title": "Lease Quota Remaining",
+          "description": "Available quota leases at acquisition time. Drops toward zero indicate quota exhaustion.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 170
+          },
+          "targets": [
+            {
+              "expr": "avg(avg_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Avg Remaining",
+              "refId": "A"
+            },
+            {
+              "expr": "min(min_over_time(ci_leases_leases_remaining_at_acquisition{repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Min Remaining",
+              "refId": "B"
+            },
+            {
+              "expr": "avg(avg_over_time(ci_leases_leases_total{repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Total",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            }
+          },
+          "id": 607
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        }
-      },
-      "id": 607
+      ]
     },
     {
       "id": 600,
@@ -1827,7 +1853,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
@@ -1849,7 +1878,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
@@ -1979,7 +2011,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
@@ -2001,7 +2036,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
@@ -2063,19 +2101,19 @@
           },
           "targets": [
             {
-              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (avg)",
               "refId": "A",
               "interval": "5m"
             },
             {
-              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (min)",
               "refId": "C",
               "interval": "5m"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (max)",
               "refId": "D",
               "interval": "5m"
@@ -2131,7 +2169,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
@@ -2153,7 +2194,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
@@ -2215,19 +2259,19 @@
           },
           "targets": [
             {
-              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (avg)",
               "refId": "A",
               "interval": "5m"
             },
             {
-              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (min)",
               "refId": "C",
               "interval": "5m"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Requests (max)",
               "refId": "D",
               "interval": "5m"
@@ -2283,7 +2327,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
@@ -2305,7 +2352,10 @@
                     "id": "custom.lineStyle",
                     "value": {
                       "fill": "dash",
-                      "dash": [10, 10]
+                      "dash": [
+                        10,
+                        10
+                      ]
                     }
                   }
                 ]
