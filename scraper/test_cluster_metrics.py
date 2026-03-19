@@ -60,6 +60,14 @@ _PER_POD_METRICS = {
     "container_memory_working_set_bytes",
 }
 
+# Cluster-level metrics that have label_node_role_kubernetes_io from the OCP
+# recording rule.  We normalize it to the same "role" label used on per-node
+# and per-pod metrics so dashboards can filter consistently.
+_CLUSTER_METRICS_WITH_NATIVE_ROLE = {
+    "cluster:capacity_cpu_cores:sum",
+    "cluster:capacity_memory_bytes:sum",
+}
+
 # Artifact directories that are never test steps.
 _SKIP_DIRS = {"build-logs", "build-resources", "release"}
 
@@ -205,6 +213,10 @@ def extract_test_cluster_metrics(lines, job_labels):
             role = role_map.get(node_key, "")
             if role:
                 combined_labels["role"] = role
+        # Normalize native label_node_role_kubernetes_io to "role" on cluster metrics
+        if metric_name in _CLUSTER_METRICS_WITH_NATIVE_ROLE:
+            native = prom_labels.get("label_node_role_kubernetes_io", "")
+            combined_labels["role"] = "master" if native == "master" else "worker"
         formatted = format_prometheus_line(output_name, combined_labels, value, ts)
         if formatted:
             metrics.append(formatted)
@@ -250,7 +262,7 @@ def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_li
 
 class TestClusterMetricsPipeline:
     name = "test_cluster_metrics"
-    version = f"{SHARED_VERSION}.5"
+    version = f"{SHARED_VERSION}.6"
     pushes_own_sentinel = True
 
     def __init__(self, sink: Sink, gcs: GCSClient,

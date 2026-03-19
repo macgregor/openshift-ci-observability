@@ -1223,7 +1223,7 @@
           },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range])) / avg(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range]))) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range])) / avg(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[$__range]))) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -1273,7 +1273,7 @@
           },
           "targets": [
             {
-              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range])) / avg(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range]))) * 100",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range])) / avg(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[$__range]))) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -1378,7 +1378,7 @@
               "interval": "3h"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__interval])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[$__interval])))",
               "legendFormat": "Worker Capacity (max)",
               "refId": "B",
               "interval": "3h"
@@ -1536,7 +1536,7 @@
               "interval": "3h"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__interval])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[$__interval])))",
               "legendFormat": "Worker Capacity (max)",
               "refId": "B",
               "interval": "3h"
@@ -1694,7 +1694,7 @@
               "interval": "5m"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
               "interval": "5m"
@@ -1852,7 +1852,7 @@
               "interval": "5m"
             },
             {
-              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[5m])))",
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[5m])))",
               "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
               "interval": "5m"
@@ -1998,7 +1998,7 @@
               "refId": "cpu_usage"
             },
             {
-              "expr": "sum by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "cpu_capacity"
@@ -2010,7 +2010,7 @@
               "refId": "mem_usage"
             },
             {
-              "expr": "sum by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (build_id, pr_number, job_name) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{pr_number=~\"$pr_number\",build_id=~\"$build_id\",job_name=~\"$job_type\",test_step=~\"$test_step\",role=~\"$role\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "refId": "mem_capacity"
