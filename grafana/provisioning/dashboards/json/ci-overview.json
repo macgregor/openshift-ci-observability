@@ -1759,14 +1759,26 @@
           },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "CPU Usage (avg)",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Usage (avg)",
               "refId": "A",
               "interval": "3h"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "Worker CPU Capacity (avg)",
+              "expr": "min(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Usage (min)",
+              "refId": "C",
+              "interval": "3h"
+            },
+            {
+              "expr": "max(last_over_time(ci_test_cluster_cluster_cpu_usage_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Usage (max)",
+              "refId": "D",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
               "interval": "3h"
             }
@@ -1777,7 +1789,7 @@
               "custom": {
                 "drawStyle": "line",
                 "lineWidth": 2,
-                "fillOpacity": 15,
+                "fillOpacity": 0,
                 "pointSize": 5,
                 "showPoints": "auto"
               }
@@ -1786,7 +1798,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "CPU Usage (avg)"
+                  "options": "Usage (avg)"
                 },
                 "properties": [
                   {
@@ -1801,7 +1813,51 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Worker CPU Capacity (avg)"
+                  "options": "Usage (min)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (max)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cluster Capacity (max)"
                 },
                 "properties": [
                   {
@@ -1812,13 +1868,19 @@
                     }
                   },
                   {
-                    "id": "custom.lineStyle",
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
                     "value": {
-                      "fill": "dash",
-                      "dash": [
-                        10,
-                        10
-                      ]
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
                     }
                   }
                 ]
@@ -1849,14 +1911,26 @@
           },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "Memory Usage (avg)",
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Usage (avg)",
               "refId": "A",
               "interval": "3h"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "Worker Memory Capacity (avg)",
+              "expr": "min(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Usage (min)",
+              "refId": "C",
+              "interval": "3h"
+            },
+            {
+              "expr": "max(last_over_time(ci_test_cluster_cluster_memory_usage_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Usage (max)",
+              "refId": "D",
+              "interval": "3h"
+            },
+            {
+              "expr": "avg(last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
+              "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
               "interval": "3h"
             }
@@ -1867,7 +1941,7 @@
               "custom": {
                 "drawStyle": "line",
                 "lineWidth": 2,
-                "fillOpacity": 15,
+                "fillOpacity": 0,
                 "pointSize": 5,
                 "showPoints": "auto"
               }
@@ -1876,7 +1950,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Memory Usage (avg)"
+                  "options": "Usage (avg)"
                 },
                 "properties": [
                   {
@@ -1891,7 +1965,51 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Worker Memory Capacity (avg)"
+                  "options": "Usage (min)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Usage (max)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cluster Capacity (max)"
                 },
                 "properties": [
                   {
@@ -1902,13 +2020,19 @@
                     }
                   },
                   {
-                    "id": "custom.lineStyle",
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
                     "value": {
-                      "fill": "dash",
-                      "dash": [
-                        10,
-                        10
-                      ]
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
                     }
                   }
                 ]
@@ -1929,7 +2053,7 @@
         {
           "id": 601,
           "title": "Pod CPU Requests vs Capacity",
-          "description": "Sum of pod CPU requests compared to worker node CPU capacity. When requests exceed capacity, the cluster is overcommitted. Based on kube-state-metrics data from prometheus.tar.",
+          "description": "Total concurrent pod CPU requests (summed per build at each scrape) compared to total cluster CPU capacity. Uses a 5m window so only running pods are counted.",
           "type": "timeseries",
           "gridPos": {
             "h": 10,
@@ -1939,16 +2063,28 @@
           },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "Pod CPU Requests (avg)",
+              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Requests (avg)",
               "refId": "A",
-              "interval": "3h"
+              "interval": "5m"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "Worker CPU Capacity (avg)",
+              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Requests (min)",
+              "refId": "C",
+              "interval": "5m"
+            },
+            {
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"cpu\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Requests (max)",
+              "refId": "D",
+              "interval": "5m"
+            },
+            {
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_cpu_cores_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
-              "interval": "3h"
+              "interval": "5m"
             }
           ],
           "fieldConfig": {
@@ -1957,7 +2093,7 @@
               "custom": {
                 "drawStyle": "line",
                 "lineWidth": 2,
-                "fillOpacity": 15,
+                "fillOpacity": 0,
                 "pointSize": 5,
                 "showPoints": "auto"
               }
@@ -1966,7 +2102,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Pod CPU Requests (avg)"
+                  "options": "Requests (avg)"
                 },
                 "properties": [
                   {
@@ -1981,7 +2117,51 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Worker CPU Capacity (avg)"
+                  "options": "Requests (min)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (max)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cluster Capacity (max)"
                 },
                 "properties": [
                   {
@@ -1992,13 +2172,19 @@
                     }
                   },
                   {
-                    "id": "custom.lineStyle",
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
                     "value": {
-                      "fill": "dash",
-                      "dash": [
-                        10,
-                        10
-                      ]
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
                     }
                   }
                 ]
@@ -2019,7 +2205,7 @@
         {
           "id": 602,
           "title": "Pod Memory Requests vs Capacity",
-          "description": "Sum of pod memory requests compared to worker node memory capacity. When requests exceed capacity, the cluster is overcommitted.",
+          "description": "Total concurrent pod memory requests (summed per build at each scrape) compared to total cluster memory capacity. Uses a 5m window so only running pods are counted.",
           "type": "timeseries",
           "gridPos": {
             "h": 10,
@@ -2029,16 +2215,28 @@
           },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "Pod Memory Requests (avg)",
+              "expr": "avg(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Requests (avg)",
               "refId": "A",
-              "interval": "3h"
+              "interval": "5m"
             },
             {
-              "expr": "avg(avg_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",label_node_role_kubernetes_io=\"\",repo=~\"$repo\"}[$__interval]))",
-              "legendFormat": "Worker Memory Capacity (avg)",
+              "expr": "min(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Requests (min)",
+              "refId": "C",
+              "interval": "5m"
+            },
+            {
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_kube_pod_container_resource_requests{resource=\"memory\",job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Requests (max)",
+              "refId": "D",
+              "interval": "5m"
+            },
+            {
+              "expr": "max(sum by (build_id) (last_over_time(ci_test_cluster_cluster_capacity_memory_bytes_sum{job_name=~\"$job_type\",repo=~\"$repo\"}[5m])))",
+              "legendFormat": "Cluster Capacity (max)",
               "refId": "B",
-              "interval": "3h"
+              "interval": "5m"
             }
           ],
           "fieldConfig": {
@@ -2047,7 +2245,7 @@
               "custom": {
                 "drawStyle": "line",
                 "lineWidth": 2,
-                "fillOpacity": 15,
+                "fillOpacity": 0,
                 "pointSize": 5,
                 "showPoints": "auto"
               }
@@ -2056,7 +2254,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Pod Memory Requests (avg)"
+                  "options": "Requests (avg)"
                 },
                 "properties": [
                   {
@@ -2071,7 +2269,51 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Worker Memory Capacity (avg)"
+                  "options": "Requests (min)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests (max)"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "fill": "dash",
+                      "dash": [10, 10]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cluster Capacity (max)"
                 },
                 "properties": [
                   {
@@ -2082,13 +2324,19 @@
                     }
                   },
                   {
-                    "id": "custom.lineStyle",
+                    "id": "custom.lineWidth",
+                    "value": 3
+                  },
+                  {
+                    "id": "custom.spanNulls",
+                    "value": true
+                  },
+                  {
+                    "id": "custom.hideFrom",
                     "value": {
-                      "fill": "dash",
-                      "dash": [
-                        10,
-                        10
-                      ]
+                      "legend": true,
+                      "tooltip": false,
+                      "viz": false
                     }
                   }
                 ]

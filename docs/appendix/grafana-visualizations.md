@@ -319,6 +319,42 @@ The VL stats API endpoints work correctly and return Prometheus-compatible forma
 
 **Empty variable gotcha:** `${pr_number:regex}` with empty textbox produces `""` which matches only empty strings. Use `.*$pr_number.*` instead for optional filtering.
 
+### Range Selector Pitfalls: `$__interval` vs `$__range` vs fixed ranges
+
+The range selector inside `last_over_time(metric[RANGE])` controls how far back VictoriaMetrics looks for samples. Choosing the wrong range silently produces incorrect results.
+
+**`$__interval`** -- Grafana's auto-computed step size (typically `panel_width / time_range`). For a 7-day range on a standard panel, this is ~3 hours. Use for **time series panels with cluster-level metrics** where each build produces one sample and you want to bucket builds into time windows.
+
+**`$__range`** -- The full dashboard time range (e.g. `7d`). Use for **stat panels** where you want a single value aggregated across the entire window (`last_over_time(metric[$__range])`).
+
+**Fixed short range (e.g. `[5m]`)** -- Use when you need point-in-time accuracy from **per-object metrics like `kube_pod_container_resource_requests`**. Pair with a matching `"interval": "5m"` on the query target.
+
+**Why this matters -- the deleted-pod problem:**
+
+Per-pod metrics (from kube-state-metrics) only have samples while the pod exists. When a pod is deleted, its last sample stays in the TSDB. With `last_over_time(metric[3h])`, the query picks up the last sample for EVERY pod that existed in the last 3 hours -- including pods deleted 2.5 hours ago. Summing gives a total that never existed simultaneously.
+
+```
+# WRONG: sums requests from all pods that ever existed in the 3h window
+sum by (build_id) (last_over_time(kube_pod_requests[3h]))
+# Result: 117 cores (cumulative, never existed simultaneously)
+
+# CORRECT: 5m window only picks up currently-running pods
+sum by (build_id) (last_over_time(kube_pod_requests[5m]))
+# Result: 17.5 cores (concurrent, matches what the scheduler sees)
+```
+
+The 5-minute window should exceed the Prometheus scrape interval (typically 15-30s) so every running pod has a recent sample, but be short enough that deleted pods have aged out.
+
+**Decision guide:**
+
+| Metric type | Panel type | Range selector | Step (`interval`) |
+|------------|-----------|----------------|-------------------|
+| Cluster-level aggregates (`cluster:*:sum`) | Time series | `[$__interval]` | `"3h"` |
+| Cluster-level aggregates | Stat | `[$__range]` | (not applicable) |
+| Per-build point-in-time (`ci_step_duration`) | Time series | `[$__interval]` | `"3h"` |
+| Per-object gauges (`kube_pod_*`, `container_*`) | Time series | `[5m]` | `"5m"` |
+| Per-object gauges | Stat | `[5m]` with outer `$__range` logic | `"5m"` |
+
 ### Plugin Config: options vs fieldConfig
 
 Plugin settings live in either `options` (panel-level) or `fieldConfig.defaults.custom` (field-level). Check the plugin's `types.ts` to know which.
