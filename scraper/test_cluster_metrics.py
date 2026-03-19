@@ -53,6 +53,13 @@ _PER_NODE_METRICS = {
     "machine_cpu_cores",
 }
 
+# Per-pod metrics enriched with role via their node label and kube_node_role.
+_PER_POD_METRICS = {
+    "kube_pod_container_resource_requests",
+    "kube_pod_container_resource_limits",
+    "container_memory_working_set_bytes",
+}
+
 # Artifact directories that are never test steps.
 _SKIP_DIRS = {"build-logs", "build-resources", "release"}
 
@@ -173,8 +180,9 @@ def _build_node_role_map(parsed_lines):
 def extract_test_cluster_metrics(lines, job_labels):
     """Convert promtool dump lines to Prometheus text format with job labels.
 
-    Per-node metrics are enriched with a ``role`` label (master/worker) derived
-    from ``kube_node_role`` entries in the same TSDB dump.
+    Per-node and per-pod metrics are enriched with a ``role`` label
+    (master/worker) derived from ``kube_node_role`` entries in the same TSDB
+    dump.  For per-pod metrics the ``node`` label is used to look up the role.
     """
     # Parse all lines first so we can build the node→role map before emitting.
     parsed = []
@@ -191,8 +199,8 @@ def extract_test_cluster_metrics(lines, job_labels):
         if output_name is None:
             continue
         combined_labels = {**job_labels, **{k: v for k, v in prom_labels.items() if k not in _DROP_LABELS}}
-        # Enrich per-node metrics with role from kube_node_role
-        if metric_name in _PER_NODE_METRICS and role_map:
+        # Enrich per-node and per-pod metrics with role from kube_node_role
+        if (metric_name in _PER_NODE_METRICS or metric_name in _PER_POD_METRICS) and role_map:
             node_key = prom_labels.get("node") or prom_labels.get("instance", "")
             role = role_map.get(node_key, "")
             if role:
@@ -242,7 +250,7 @@ def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_li
 
 class TestClusterMetricsPipeline:
     name = "test_cluster_metrics"
-    version = f"{SHARED_VERSION}.4"
+    version = f"{SHARED_VERSION}.5"
     pushes_own_sentinel = True
 
     def __init__(self, sink: Sink, gcs: GCSClient,

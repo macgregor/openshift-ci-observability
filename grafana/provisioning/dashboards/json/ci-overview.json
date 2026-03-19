@@ -1749,7 +1749,7 @@
         {
           "id": 28,
           "title": "Test Cluster CPU Usage vs Capacity",
-          "description": "CPU usage cores vs capacity across test clusters over time. Gap between lines shows headroom.",
+          "description": "CPU usage vs total cluster capacity (master + worker nodes) across test clusters. Gap between lines shows headroom.",
           "type": "timeseries",
           "gridPos": {
             "h": 10,
@@ -1901,7 +1901,7 @@
         {
           "id": 29,
           "title": "Test Cluster Memory Usage vs Capacity",
-          "description": "Memory usage vs capacity across test clusters over time.",
+          "description": "Memory usage vs total cluster capacity (master + worker nodes) across test clusters.",
           "type": "timeseries",
           "gridPos": {
             "h": 10,
@@ -2053,7 +2053,7 @@
         {
           "id": 601,
           "title": "Pod CPU Requests vs Capacity",
-          "description": "Total concurrent pod CPU requests (summed per build at each scrape) compared to total cluster CPU capacity. Uses a 5m window so only running pods are counted.",
+          "description": "Total concurrent pod CPU requests across all nodes (master + worker) compared to total cluster capacity. Uses a 5m lookback so only running pods are counted.",
           "type": "timeseries",
           "gridPos": {
             "h": 10,
@@ -2205,7 +2205,7 @@
         {
           "id": 602,
           "title": "Pod Memory Requests vs Capacity",
-          "description": "Total concurrent pod memory requests (summed per build at each scrape) compared to total cluster memory capacity. Uses a 5m window so only running pods are counted.",
+          "description": "Total concurrent pod memory requests across all nodes (master + worker) compared to total cluster capacity. Uses a 5m lookback so only running pods are counted.",
           "type": "timeseries",
           "gridPos": {
             "h": 10,
