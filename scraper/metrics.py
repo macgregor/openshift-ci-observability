@@ -25,7 +25,9 @@ def flatten_numeric_fields(obj, prefix=""):
 def extract_string_fields(entry):
     labels = {}
     skip_keys = {"additional_context", "message", "locator", "condition_transition_times",
-                 "labels", "resources", "usage_stats", "watch_history", "workloads"}
+                 "labels", "resources", "usage_stats", "watch_history", "workloads",
+                 "timestamp", "completion_time", "start_time", "from", "to", "poll_started",
+                 "machine_id", "boot_id", "system_uuid"}
     for key, value in entry.items():
         if key in skip_keys:
             continue
@@ -231,7 +233,7 @@ def convert_to_metrics(data, job_labels):
 
 class MetricsPipeline:
     name = "metrics"
-    version = f"{SHARED_VERSION}.1"
+    version = f"{SHARED_VERSION}.3"
 
     def __init__(self, sink: Sink):
         self.sink = sink

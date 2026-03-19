@@ -79,6 +79,16 @@ class Scraper:
         # Skip builds where ALL pipelines already processed at current version
         all_known = set.intersection(*known.values()) if known else set()
 
+        # Bulk-delete stale logs for pipelines that will reprocess all builds.
+        # One delete task per pipeline is far cheaper than one per build, since
+        # VictoriaLogs rewrites all stored logs for each delete task.
+        for p in self.pipelines:
+            if not getattr(p, '_pushes_logs', False):
+                continue
+            if not known.get(p.name):
+                # No builds at current version -- all builds will be reprocessed.
+                self._bulk_delete_pipeline_logs(p.name)
+
         log.info("Listing PRs from %s", base_path)
         prs = self.gcs.list_prs(base_path)
         prs.sort(key=lambda x: int(x) if x.isdigit() else 0, reverse=True)
@@ -176,7 +186,7 @@ class Scraper:
                 count = pipeline.process(ctx)
                 counts[pipeline.name] = count
                 if not getattr(pipeline, 'pushes_own_sentinel', False):
-                    self._delete_stale_logs_if_needed(pipeline, build_id)
+                    self._delete_stale_logs_if_needed(pipeline, build_id, known)
                     push_pipeline_sentinel(
                         self.session, self.vm_url,
                         pipeline.name, pipeline.version, build_id,
@@ -191,15 +201,36 @@ class Scraper:
 
         return bool(counts)
 
-    def _delete_stale_logs_if_needed(self, pipeline, build_id: str):
+    def _bulk_delete_pipeline_logs(self, pipeline_name: str):
+        """Delete all log entries for a pipeline in one task."""
+        try:
+            resp = self.session.post(
+                f"{self.vl_url}/delete/run_task",
+                params={"filter": f'pipeline:"{pipeline_name}"'},
+                timeout=10,
+            )
+            if resp.status_code in (200, 204):
+                log.info("Bulk-deleted stale logs for pipeline %s", pipeline_name)
+            else:
+                log.debug("VictoriaLogs bulk delete returned %d for pipeline %s",
+                          resp.status_code, pipeline_name)
+        except Exception:
+            log.debug("Failed to bulk-delete logs for pipeline %s",
+                      pipeline_name, exc_info=True)
+
+    def _delete_stale_logs_if_needed(self, pipeline, build_id: str, known: dict):
         """Delete old log entries before re-pushing on version change."""
         if not getattr(pipeline, '_pushes_logs', False):
             return
+        # Skip if bulk delete already handled this pipeline (no known builds
+        # means all builds are being reprocessed via bulk delete).
+        if not known.get(pipeline.name):
+            return
         try:
-            query = f'build_id:"{build_id}" AND pipeline:"{pipeline.name}"'
+            filter_expr = f'build_id:"{build_id}" AND pipeline:"{pipeline.name}"'
             resp = self.session.post(
-                f"{self.vl_url}/delete/logsql/query",
-                params={"query": query},
+                f"{self.vl_url}/delete/run_task",
+                params={"filter": filter_expr},
                 timeout=10,
             )
             if resp.status_code not in (200, 204):

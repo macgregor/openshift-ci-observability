@@ -20,10 +20,10 @@ from scraper.models import Sink
 log = logging.getLogger("scraper")
 
 # Prometheus TSDB processing gets its own thread pool to avoid starving the main
-# scraper pool.  WAL replay is CPU/IO-intensive and benefits from limited
-# concurrency -- 4 workers keeps throughput high without the contention that
-# comes from 16 workers all replaying WALs simultaneously.
-_PROMTOOL_WORKERS = 4
+# scraper pool.  WAL replay is CPU/IO-intensive and uses ~3-5x the WAL size in
+# memory (e.g. a 400 MB WAL can use ~1.5 GB RAM).  With the scraper container's
+# 4 GB memory limit, 2 concurrent replays is the safe maximum.
+_PROMTOOL_WORKERS = 2
 
 METRICS = [
     "cluster:cpu_usage_cores:sum",
@@ -55,6 +55,9 @@ _PER_NODE_METRICS = {
 
 # Artifact directories that are never test steps.
 _SKIP_DIRS = {"build-logs", "build-resources", "release"}
+
+# Labels from promtool dump that add cardinality without being queried by dashboards.
+_DROP_LABELS = {"boot_id", "machine_id", "system_uuid", "endpoint", "metrics_path", "service", "job"}
 
 _PROMETHEUS_TAR_SUFFIX = "gather-extra/artifacts/metrics/prometheus.tar"
 
@@ -187,7 +190,7 @@ def extract_test_cluster_metrics(lines, job_labels):
         output_name = _OUTPUT_NAMES.get(metric_name)
         if output_name is None:
             continue
-        combined_labels = {**job_labels, **prom_labels}
+        combined_labels = {**job_labels, **{k: v for k, v in prom_labels.items() if k not in _DROP_LABELS}}
         # Enrich per-node metrics with role from kube_node_role
         if metric_name in _PER_NODE_METRICS and role_map:
             node_key = prom_labels.get("node") or prom_labels.get("instance", "")
@@ -239,7 +242,7 @@ def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_li
 
 class TestClusterMetricsPipeline:
     name = "test_cluster_metrics"
-    version = f"{SHARED_VERSION}.3"
+    version = f"{SHARED_VERSION}.4"
     pushes_own_sentinel = True
 
     def __init__(self, sink: Sink, gcs: GCSClient,
@@ -251,6 +254,7 @@ class TestClusterMetricsPipeline:
         self._pool = ThreadPoolExecutor(
             max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
         )
+        self._cleanup_stale_tars()
 
     def process(self, ctx: BuildContext) -> int:
         if not self._gcs.has_cache:
@@ -335,6 +339,32 @@ class TestClusterMetricsPipeline:
             self._session, self._vm_url,
             self.name, self.version, label_build_id, repo=repo,
         )
+
+    def _cleanup_stale_tars(self):
+        """Delete prometheus.tar files that already have a .metrics sibling.
+
+        Normally the tar is deleted right after .metrics is written, but OOM kills
+        or crashes can leave orphans.  Any tar with a .metrics sibling is safe to
+        remove — if the build needs reprocessing (version change), the tar will be
+        re-downloaded from GCS.  Builds that aged out of the discovery window will
+        never be reprocessed, so their tars are pure dead weight.
+        """
+        cache_dir = getattr(self._gcs, '_cache_dir', None)
+        if cache_dir is None:
+            return
+        deleted = 0
+        for dirpath, _dirnames, filenames in os.walk(cache_dir):
+            if "prometheus.tar" not in filenames:
+                continue
+            if "prometheus.tar.metrics" not in filenames:
+                continue
+            try:
+                (Path(dirpath) / "prometheus.tar").unlink()
+                deleted += 1
+            except OSError:
+                pass
+        if deleted:
+            log.info("Cleaned up %d stale prometheus.tar files from cache", deleted)
 
     def drain(self):
         """Wait for all outstanding prometheus processing to complete."""

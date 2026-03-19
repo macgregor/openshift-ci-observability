@@ -2133,7 +2133,7 @@
           },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]) * 100)",
+              "expr": "avg(last_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) / avg(last_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -2183,7 +2183,7 @@
           },
           "targets": [
             {
-              "expr": "avg(avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range]) * 100)",
+              "expr": "avg(last_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) / avg(last_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__range])) * 100",
               "instant": false,
               "refId": "A"
             }
@@ -2233,7 +2233,7 @@
           },
           "targets": [
             {
-              "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]) / avg_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]) * 100)",
+              "expr": "avg by (node) (last_over_time(ci_nodes_usage_stats_avg_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval])) / avg by (node) (last_over_time(ci_nodes_resources_capacity_cpu_milli{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval])) * 100",
               "legendFormat": "{{node}}",
               "refId": "A",
               "interval": "3h"
@@ -2279,7 +2279,7 @@
           },
           "targets": [
             {
-              "expr": "avg by (node) (avg_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]) / avg_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]) * 100)",
+              "expr": "avg by (node) (last_over_time(ci_nodes_usage_stats_avg_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval])) / avg by (node) (last_over_time(ci_nodes_resources_capacity_memory_bytes{job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval])) * 100",
               "legendFormat": "{{node}}",
               "refId": "A",
               "interval": "3h"

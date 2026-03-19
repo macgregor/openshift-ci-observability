@@ -1,2 +1,2 @@
 # Bump to invalidate all pipeline sentinels and caches at once.
-SHARED_VERSION = "2"
+SHARED_VERSION = "3"

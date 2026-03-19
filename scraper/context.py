@@ -25,7 +25,6 @@ def extract_job_labels(data) -> JobLabels:
             "job_name": job_spec.get("job", ""),
             "pr_number": str(pulls[0]["number"]) if pulls else "",
             "pr_sha": pulls[0].get("sha", "")[:12] if pulls else "",
-            "author": pulls[0].get("author", "") if pulls else "",
             "build_id": job_spec.get("buildid", ""),
             "config_hash": "",
         }
@@ -65,7 +64,6 @@ class BuildContext:
                     "job_name": "",
                     "pr_number": "",
                     "pr_sha": "",
-                    "author": "",
                     "build_id": self._build.build_id,
                 }
             self._labels["config_hash"] = self._compute_config_hash()
