@@ -675,6 +675,56 @@ def test_init_cleans_leftover_tars(tmp_path):
     assert (tmp_path / (gcs_path_2 + ".metrics")).exists(), ".metrics should be preserved"
 
 
+@patch("scraper.test_cluster_metrics._run_promtool")
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_worker_cache_hit_skips_promtool(mock_sentinel, mock_promtool, tmp_path):
+    """Worker uses .metrics cache written by another scraper, skipping promtool."""
+    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
+
+    # Simulate another scraper already processing this build.
+    _write_cached_metrics(gcs, GCS_PATH, pipeline.version, [
+        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000',
+    ])
+    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH)
+
+    step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
+    pipeline._pool.submit(
+        pipeline._process_tar_from_path, tar_file, GCS_PATH, step_labels,
+        "123", "42", "my-e2e-step",
+    )
+    pipeline.drain()
+
+    assert not tar_file.exists(), "tar should be cleaned up on cache hit"
+    mock_promtool.assert_not_called()
+    sink.push.assert_called_once()
+    mock_sentinel.assert_called_once()
+
+
+@patch("scraper.test_cluster_metrics._run_promtool")
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_worker_cache_hit_tar_already_deleted(mock_sentinel, mock_promtool, tmp_path):
+    """Worker handles tar deleted by other scraper when .metrics already exists."""
+    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
+
+    _write_cached_metrics(gcs, GCS_PATH, pipeline.version, [
+        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000',
+    ])
+    # Tar does NOT exist (other scraper's worker already deleted it).
+    tar_file = tmp_path / GCS_PATH
+    assert not tar_file.exists()
+
+    step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
+    pipeline._pool.submit(
+        pipeline._process_tar_from_path, tar_file, GCS_PATH, step_labels,
+        "123", "42", "my-e2e-step",
+    )
+    pipeline.drain()
+
+    mock_promtool.assert_not_called()
+    sink.push.assert_called_once()
+    mock_sentinel.assert_called_once()
+
+
 @patch("scraper.scraper.push_pipeline_sentinel")
 def test_redownload_after_failed_processing(mock_sentinel, tmp_path):
     """After worker deletes corrupt tar, cache path is empty for re-download."""

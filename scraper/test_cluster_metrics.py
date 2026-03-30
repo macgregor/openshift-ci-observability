@@ -310,6 +310,22 @@ class TestClusterMetricsPipeline:
 
     def _process_tar_from_path(self, tar_path: Path, gcs_path: str,
                                step_labels, build_id, pr, step_name):
+        # Another scraper (watch/backfill) sharing the cache volume may have
+        # processed this tar between our submission and execution.
+        cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
+        if cached is not None:
+            if cached:
+                self.sink.push(cached)
+                log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
+                         pr, build_id, step_name, len(cached))
+            self._push_sentinel(build_id, step_labels.get("build_id", build_id),
+                                repo=step_labels.get("repo", ""))
+            try:
+                tar_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return
+
         tmpdir = tempfile.mkdtemp(prefix="prom-tsdb-")
         try:
             with tarfile.open(str(tar_path)) as tf:
@@ -326,6 +342,20 @@ class TestClusterMetricsPipeline:
                          pr, build_id, step_name, len(metrics), wal_mb, timeout)
             self._push_sentinel(build_id, step_labels.get("build_id", build_id),
                                 repo=step_labels.get("repo", ""))
+        except FileNotFoundError:
+            # Tar deleted by another scraper's cleanup_cache() or worker.
+            # Re-check .metrics in case it was processed in the meantime.
+            cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
+            if cached is not None:
+                if cached:
+                    self.sink.push(cached)
+                    log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
+                             pr, build_id, step_name, len(cached))
+                self._push_sentinel(build_id, step_labels.get("build_id", build_id),
+                                    repo=step_labels.get("repo", ""))
+            else:
+                log.debug("prometheus.tar deleted before processing for build %s step %s "
+                          "(will retry next cycle)", build_id, step_name)
         except (tarfile.TarError, OSError) as e:
             log.warning("Failed to process prometheus.tar for build %s step %s: %s",
                         build_id, step_name, e)
