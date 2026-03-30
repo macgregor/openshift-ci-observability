@@ -56,7 +56,7 @@ Scraper state is stored in VictoriaMetrics itself (via per-pipeline sentinel met
 
 Bump `SHARED_VERSION` in `scraper/__init__.py` to reprocess all pipelines at once. A DB wipe (`make wipe-db`) is only needed if you want to purge old metric data that's no longer emitted by the new code, since changed metrics age out via retention otherwise.
 
-**Cache growth:** The GCS cache grows as builds are processed and is never automatically pruned. This is intentional -- cached artifacts remain available for re-ingestion even after GCS applies its own retention policy (~90 days), so you can retain historical data longer than the source bucket. Run `make wipe-cache` periodically if disk space is a concern, or `podman exec ci-obs-scraper-backfill du -sh /cache` to check current size. To disable caching entirely, set `GCS_NO_CACHE=true` in `.env`.
+**Cache growth:** After each scrape cycle the scraper automatically deletes cached build directories older than the retention window (`--cache-retention`, env `CACHE_RETENTION`, default `max(--window, 90d)`). Orphaned temp files from interrupted writes are also cleaned. To check current cache size: `podman exec ci-obs-scraper-watch du -sh /cache`. Use `make wipe-cache` for a full reset, or set `GCS_NO_CACHE=true` in `.env` to disable caching entirely.
 
 ## Chrome DevTools MCP (for Claude)
 

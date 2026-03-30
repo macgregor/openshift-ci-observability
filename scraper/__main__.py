@@ -76,6 +76,10 @@ def parse_args():
     parent.add_argument("--no-cache", action="store_true",
                         default=os.environ.get("GCS_NO_CACHE", "").lower() in ("1", "true", "yes"),
                         help="Disable GCS artifact caching (env: GCS_NO_CACHE)")
+    parent.add_argument("--cache-retention",
+                        default=os.environ.get("CACHE_RETENTION"),
+                        help="Cache retention period, e.g. 90d, 6m. Cached builds older than "
+                             "this are deleted. Default: max(--window, 90d). (env: CACHE_RETENTION)")
 
     parser = argparse.ArgumentParser(description="CI Operator Metrics Scraper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -139,6 +143,10 @@ def main():
              args.repo, args.vm_url, args.vl_url, args.dry_run, args.workers)
 
     delta = _parse_duration(args.window)
+    if args.cache_retention:
+        retention_delta = _parse_duration(args.cache_retention)
+    else:
+        retention_delta = max(delta, timedelta(days=90))
 
     if args.command == "watch":
         log.info("Watch mode: window=%s, poll=%ds, repo=%s", args.window, args.poll_interval, args.repo)
@@ -147,6 +155,9 @@ def main():
             since_ts = int((now - delta).timestamp())
             until_ts = int(now.timestamp())
             scraper.scrape(base_path, since_ts, until_ts, args.dry_run)
+            if gcs.has_cache:
+                cutoff = int((datetime.now(timezone.utc) - retention_delta).timestamp())
+                gcs.cleanup_aged_builds(cutoff)
             log.info("Sleeping %ds before next poll", args.poll_interval)
             time.sleep(args.poll_interval)
 
@@ -156,6 +167,9 @@ def main():
         until_ts = int(now.timestamp())
         log.info("Backfill mode: last %s, repo=%s", args.window, args.repo)
         scraper.scrape(base_path, since_ts, until_ts, args.dry_run)
+        if gcs.has_cache:
+            cutoff = int((datetime.now(timezone.utc) - retention_delta).timestamp())
+            gcs.cleanup_aged_builds(cutoff)
         log.info("Backfill complete")
 
 

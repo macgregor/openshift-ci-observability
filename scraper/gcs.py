@@ -1,7 +1,10 @@
 """GCS client for listing and fetching objects from Google Cloud Storage."""
+import json
 import logging
 import os
+import shutil
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional
 from xml.etree import ElementTree as ET
@@ -244,6 +247,72 @@ class GCSClient:
             except OSError:
                 pass
             raise
+
+    def cleanup_aged_builds(self, cutoff_ts: int):
+        """Delete cached build directories older than cutoff_ts and orphaned temp files.
+
+        A build directory is identified by containing a ``started.json`` file.
+        Builds with a timestamp older than *cutoff_ts* (or with an unparseable
+        ``started.json``) are deleted entirely.  Orphaned ``tmp*`` files older
+        than one hour (from interrupted atomic writes) are also removed.
+
+        Safe to call concurrently from multiple processes sharing the same cache
+        volume -- all operations are idempotent.
+        """
+        if self._cache_dir is None:
+            return
+        try:
+            self._cleanup_walk(cutoff_ts)
+        except OSError:
+            log.warning("Cache cleanup failed (cache dir inaccessible?)", exc_info=True)
+
+    def _cleanup_walk(self, cutoff_ts: int):
+        one_hour_ago = time.time() - 3600
+        builds_deleted = 0
+        tmp_deleted = 0
+
+        for dirpath, dirnames, filenames in os.walk(self._cache_dir):
+            # Delete orphaned temp files from interrupted atomic writes.
+            for f in filenames:
+                if not f.startswith("tmp"):
+                    continue
+                fp = os.path.join(dirpath, f)
+                try:
+                    if os.path.getmtime(fp) < one_hour_ago:
+                        os.unlink(fp)
+                        tmp_deleted += 1
+                except OSError:
+                    pass
+
+            # Check for build directories (contain started.json).
+            if "started.json" not in filenames:
+                continue
+            started_path = os.path.join(dirpath, "started.json")
+            try:
+                ts = json.loads(Path(started_path).read_text()).get("timestamp", 0)
+            except (json.JSONDecodeError, OSError, ValueError):
+                ts = 0  # corrupt/unreadable → treat as ancient
+            if ts >= cutoff_ts:
+                continue
+            shutil.rmtree(dirpath, ignore_errors=True)
+            builds_deleted += 1
+            dirnames.clear()
+
+        # Second pass: remove empty directories bottom-up.
+        # os.rmdir fails on non-empty dirs (OSError), so just try every dir.
+        dirs_deleted = 0
+        for dirpath, _dirnames, _filenames in os.walk(self._cache_dir, topdown=False):
+            if Path(dirpath) == self._cache_dir:
+                continue
+            try:
+                os.rmdir(dirpath)
+                dirs_deleted += 1
+            except OSError:
+                pass
+
+        if builds_deleted or tmp_deleted:
+            log.info("Cache cleanup: %d aged builds, %d orphaned temp files, "
+                     "%d empty dirs removed", builds_deleted, tmp_deleted, dirs_deleted)
 
     def _last_component(self, prefix: str) -> str:
         return prefix.rstrip("/").split("/")[-1]

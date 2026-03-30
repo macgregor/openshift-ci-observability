@@ -72,6 +72,7 @@ services:
       - WORKERS=${WATCH_WORKERS:-8}
       - GCS_CACHE_DIR=/cache
       - GCS_NO_CACHE=${GCS_NO_CACHE:-}
+      - CACHE_RETENTION=${CACHE_RETENTION:-}
     volumes:
       - gcs-cache:/cache
     restart: unless-stopped
@@ -100,6 +101,7 @@ services:
       - WORKERS=${BACKFILL_WORKERS:-64}
       - GCS_CACHE_DIR=/cache
       - GCS_NO_CACHE=${GCS_NO_CACHE:-}
+      - CACHE_RETENTION=${CACHE_RETENTION:-}
     volumes:
       - gcs-cache:/cache
     restart: on-failure

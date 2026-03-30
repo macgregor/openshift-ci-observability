@@ -1,3 +1,7 @@
+import json
+import os
+import time
+
 import pytest
 import requests
 import responses
@@ -167,3 +171,138 @@ def test_cache_persists_across_clients(tmp_path):
     client2 = make_client(cache_dir=str(tmp_path))
     assert client2.fetch_object("data.json") == 'original'
     assert len(responses.calls) == 1  # served from disk
+
+
+# --- cleanup_aged_builds tests ---
+
+def _make_build_dir(tmp_path, pr, job, build_id, timestamp, extra_files=None):
+    """Create a build directory with started.json and optional extra files."""
+    build_dir = tmp_path / "pr-logs" / "pull" / "org_repo" / pr / job / build_id
+    build_dir.mkdir(parents=True)
+    started = build_dir / "started.json"
+    started.write_text(json.dumps({"timestamp": timestamp}))
+    if extra_files:
+        for rel_path, content in extra_files.items():
+            f = build_dir / rel_path
+            f.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, bytes):
+                f.write_bytes(content)
+            else:
+                f.write_text(content)
+    return build_dir
+
+
+def test_cleanup_deletes_old_builds(tmp_path):
+    """Builds older than cutoff are deleted entirely."""
+    now = int(time.time())
+    old_build = _make_build_dir(tmp_path, "1", "job-a", "100", now - 200 * 86400,
+                                extra_files={
+                                    "artifacts/step/gather-extra/artifacts/metrics/prometheus.tar.metrics": "metrics",
+                                    "artifacts/step/gather-extra/artifacts/events.json": "events",
+                                    "artifacts/step/ci-operator.log": "log data",
+                                    "artifacts/step/gather-extra/artifacts/metrics/prometheus.tar.miss": "",
+                                })
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    assert not old_build.exists()
+
+
+def test_cleanup_keeps_recent_builds(tmp_path):
+    """Builds within the retention window survive."""
+    now = int(time.time())
+    recent_build = _make_build_dir(tmp_path, "1", "job-a", "200", now - 30 * 86400,
+                                   extra_files={"artifacts/ci-operator.log": "log"})
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    assert recent_build.exists()
+    assert (recent_build / "started.json").exists()
+    assert (recent_build / "artifacts" / "ci-operator.log").exists()
+
+
+def test_cleanup_deletes_old_orphaned_tmp_files(tmp_path):
+    """Orphaned tmp files older than 1 hour are deleted."""
+    now = int(time.time())
+    # Recent build to keep the directory alive
+    _make_build_dir(tmp_path, "1", "job-a", "300", now - 10 * 86400)
+    # Orphaned tmp file in a subdirectory
+    step_dir = tmp_path / "pr-logs" / "pull" / "org_repo" / "1" / "job-a" / "300" / "artifacts" / "step"
+    step_dir.mkdir(parents=True, exist_ok=True)
+    tmp_file = step_dir / "tmpabcdef123"
+    tmp_file.write_bytes(b"orphaned atomic write data" * 1000)
+    # Set mtime to 2 hours ago
+    old_time = time.time() - 7200
+    os.utime(tmp_file, (old_time, old_time))
+
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    assert not tmp_file.exists()
+
+
+def test_cleanup_skips_fresh_tmp_files(tmp_path):
+    """Tmp files younger than 1 hour are kept (could be active atomic writes)."""
+    now = int(time.time())
+    _make_build_dir(tmp_path, "1", "job-a", "400", now - 10 * 86400)
+    step_dir = tmp_path / "pr-logs" / "pull" / "org_repo" / "1" / "job-a" / "400" / "artifacts"
+    step_dir.mkdir(parents=True, exist_ok=True)
+    tmp_file = step_dir / "tmpfresh999"
+    tmp_file.write_bytes(b"in-progress write")
+    # mtime is now (default) -- should survive
+
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    assert tmp_file.exists()
+
+
+def test_cleanup_removes_empty_parent_dirs(tmp_path):
+    """Empty PR/job directories are removed after build deletion."""
+    now = int(time.time())
+    old_build = _make_build_dir(tmp_path, "99", "job-x", "500", now - 200 * 86400)
+    pr_dir = tmp_path / "pr-logs" / "pull" / "org_repo" / "99"
+
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    assert not old_build.exists()
+    assert not pr_dir.exists(), "empty PR directory should be removed"
+
+
+def test_cleanup_keeps_nonempty_parent_dirs(tmp_path):
+    """Parent directories with surviving builds are kept."""
+    now = int(time.time())
+    # Two builds under the same PR: one old, one recent
+    _make_build_dir(tmp_path, "1", "job-a", "600", now - 200 * 86400)
+    recent = _make_build_dir(tmp_path, "1", "job-a", "700", now - 10 * 86400)
+    pr_dir = tmp_path / "pr-logs" / "pull" / "org_repo" / "1"
+
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    assert pr_dir.exists(), "PR directory should be kept (has surviving build)"
+    assert recent.exists()
+
+
+def test_cleanup_no_cache_noop():
+    """cleanup_aged_builds is a no-op when cache is disabled."""
+    client = make_client(cache_dir=None)
+    client.cleanup_aged_builds(0)  # should not raise
+
+
+def test_cleanup_idempotent(tmp_path):
+    """Running cleanup twice produces zero deletions on second run."""
+    now = int(time.time())
+    _make_build_dir(tmp_path, "1", "job-a", "800", now - 200 * 86400)
+
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    # Second run -- nothing left to delete
+    client.cleanup_aged_builds(now - 90 * 86400)  # should not raise
+
+
+def test_cleanup_corrupt_started_json(tmp_path):
+    """Builds with corrupt started.json are treated as aged out."""
+    now = int(time.time())
+    build_dir = tmp_path / "pr-logs" / "pull" / "org_repo" / "1" / "job-a" / "900"
+    build_dir.mkdir(parents=True)
+    (build_dir / "started.json").write_text("not valid json{{{")
+
+    client = make_client(cache_dir=str(tmp_path))
+    client.cleanup_aged_builds(now - 90 * 86400)
+    assert not build_dir.exists(), "corrupt started.json should be treated as timestamp 0"

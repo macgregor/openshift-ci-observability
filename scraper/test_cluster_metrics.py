@@ -237,20 +237,6 @@ def _read_cached_metrics(gcs: GCSClient, gcs_path: str, version: str):
     return [line for line in rest.splitlines() if line]
 
 
-def _delete_cached_tar(gcs: GCSClient, gcs_path: str):
-    """Delete the raw prometheus.tar from the cache after .metrics extraction.
-
-    The .metrics file retains the processed output, so the large tar is no
-    longer needed.  Silently ignores missing files (already deleted or never
-    cached).
-    """
-    cp = gcs._cache_path(gcs_path)
-    if cp is not None and cp.exists():
-        try:
-            cp.unlink()
-        except OSError:
-            pass
-
 
 def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_lines: list[str]):
     """Write .metrics cache file with version header."""
@@ -274,7 +260,7 @@ class TestClusterMetricsPipeline:
         self._pool = ThreadPoolExecutor(
             max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
         )
-        self._cleanup_stale_tars()
+        self.cleanup_cache()
 
     def process(self, ctx: BuildContext) -> int:
         if not self._gcs.has_cache:
@@ -309,8 +295,6 @@ class TestClusterMetricsPipeline:
                          ctx.build.pr, ctx.build.build_id, step_name, len(cached))
             self._push_sentinel(ctx.build.build_id, ctx.labels.get("build_id", ctx.build.build_id),
                                 repo=ctx.labels.get("repo", ""))
-            # Clean up raw tar if it still exists (pre-deletion builds)
-            _delete_cached_tar(self._gcs, gcs_path)
             return
 
         # Slow path: ensure tar is on disk
@@ -335,7 +319,6 @@ class TestClusterMetricsPipeline:
             lines = _run_promtool(tmpdir, timeout=timeout)
             metrics = extract_test_cluster_metrics(lines, step_labels)
             _write_cached_metrics(self._gcs, gcs_path, self.version, metrics)
-            _delete_cached_tar(self._gcs, gcs_path)
             self.sink.push(metrics)
             if metrics:
                 log.info("PR %s build %s step %s: %d test_cluster_metrics "
@@ -351,6 +334,10 @@ class TestClusterMetricsPipeline:
                       build_id, step_name, exc_info=True)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
+            try:
+                tar_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def _push_sentinel(self, build_id, label_build_id, repo=""):
         """Push per-pipeline sentinel metric from pool worker."""
@@ -360,14 +347,13 @@ class TestClusterMetricsPipeline:
             self.name, self.version, label_build_id, repo=repo,
         )
 
-    def _cleanup_stale_tars(self):
-        """Delete prometheus.tar files that already have a .metrics sibling.
+    def cleanup_cache(self):
+        """Delete all prometheus.tar files from the GCS cache.
 
-        Normally the tar is deleted right after .metrics is written, but OOM kills
-        or crashes can leave orphans.  Any tar with a .metrics sibling is safe to
-        remove — if the build needs reprocessing (version change), the tar will be
-        re-downloaded from GCS.  Builds that aged out of the discovery window will
-        never be reprocessed, so their tars are pure dead weight.
+        Safe to call when no promtool workers are in flight (at init or after
+        drain).  Each worker deletes its own tar in its finally block, so this
+        sweep only catches stragglers — tars that were downloaded but never
+        submitted to the pool (e.g. crash between download and pool submit).
         """
         cache_dir = getattr(self._gcs, '_cache_dir', None)
         if cache_dir is None:
@@ -376,19 +362,18 @@ class TestClusterMetricsPipeline:
         for dirpath, _dirnames, filenames in os.walk(cache_dir):
             if "prometheus.tar" not in filenames:
                 continue
-            if "prometheus.tar.metrics" not in filenames:
-                continue
             try:
                 (Path(dirpath) / "prometheus.tar").unlink()
                 deleted += 1
             except OSError:
                 pass
         if deleted:
-            log.info("Cleaned up %d stale prometheus.tar files from cache", deleted)
+            log.info("Cleaned up %d prometheus.tar files from cache", deleted)
 
     def drain(self):
         """Wait for all outstanding prometheus processing to complete."""
         self._pool.shutdown(wait=True)
+        self.cleanup_cache()
         self._pool = ThreadPoolExecutor(
             max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
         )
