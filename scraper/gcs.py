@@ -34,6 +34,7 @@ class GCSClient:
         self.session = session
         self.bucket = bucket
         self._cache_dir = Path(cache_dir) if cache_dir else None
+        self._miss_cache: dict[Path, set[str]] = {}
         if self._cache_dir:
             self._cache_dir.mkdir(parents=True, exist_ok=True)
             self._log_cache_stats()
@@ -60,9 +61,14 @@ class GCSClient:
             return None
         if cp.exists():
             return cp.read_bytes()
-        miss = cp.with_suffix(cp.suffix + ".miss")
-        if miss.exists():
-            return b""  # sentinel: known 404
+        miss_set = self._load_misses(gcs_path)
+        if miss_set is not None:
+            if gcs_path in miss_set:
+                return b""  # sentinel: known 404
+        else:
+            miss = cp.with_suffix(cp.suffix + ".miss")
+            if miss.exists():
+                return b""  # sentinel: known 404
         return None
 
     def _cache_write(self, gcs_path: str, content: bytes):
@@ -83,13 +89,97 @@ class GCSClient:
                 pass
             raise
 
+    def _build_dir(self, gcs_path: str) -> Optional[Path]:
+        """Return the cache build directory for a GCS path, or None for non-build paths."""
+        if self._cache_dir is None:
+            return None
+        parts = gcs_path.split("/")
+        if len(parts) < 7:
+            return None
+        return self._cache_dir / "/".join(parts[:6])
+
+    def _load_misses(self, gcs_path: str) -> Optional[set[str]]:
+        """Lazy-load the .misses set for the build containing gcs_path."""
+        build_dir = self._build_dir(gcs_path)
+        if build_dir is None:
+            return None
+        if build_dir in self._miss_cache:
+            return self._miss_cache[build_dir]
+        misses_file = build_dir / ".misses"
+        if misses_file.exists():
+            content = misses_file.read_text(encoding="utf-8")
+            entries = {line for line in content.split("\n") if line}
+        else:
+            entries = self._migrate_legacy_misses(build_dir)
+        self._miss_cache[build_dir] = entries
+        return entries
+
+    def _migrate_legacy_misses(self, build_dir: Path) -> set[str]:
+        """TEMPORARY -- remove once legacy .miss files are aged out."""
+        if not build_dir.exists():
+            return set()
+        try:
+            legacy_files = list(build_dir.rglob("*.miss"))
+            if not legacy_files:
+                return set()
+            entries = set()
+            for miss_path in legacy_files:
+                gcs_path = str(miss_path.with_suffix("").relative_to(self._cache_dir))
+                entries.add(gcs_path)
+            misses_file = build_dir / ".misses"
+            content = "\n".join(entries) + "\n"
+            tmp_fd, tmp_path = tempfile.mkstemp(dir=str(build_dir))
+            try:
+                os.write(tmp_fd, content.encode("utf-8"))
+                os.close(tmp_fd)
+                os.rename(tmp_path, str(misses_file))
+            except Exception:
+                try:
+                    os.close(tmp_fd)
+                except OSError:
+                    pass
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
+            for miss_path in legacy_files:
+                miss_path.unlink(missing_ok=True)
+            dirs_to_check = set()
+            for miss_path in legacy_files:
+                parent = miss_path.parent
+                while parent != build_dir:
+                    dirs_to_check.add(parent)
+                    parent = parent.parent
+            for d in sorted(dirs_to_check, key=lambda p: len(p.parts), reverse=True):
+                try:
+                    os.rmdir(d)
+                except OSError:
+                    pass
+            return entries
+        except Exception:
+            log.warning("Legacy .miss migration failed for %s", build_dir, exc_info=True)
+            return set()
+
     def _cache_write_miss(self, gcs_path: str):
         cp = self._cache_path(gcs_path)
         if cp is None:
             return
-        miss = cp.with_suffix(cp.suffix + ".miss")
-        miss.parent.mkdir(parents=True, exist_ok=True)
-        miss.touch()
+        build_dir = self._build_dir(gcs_path)
+        if build_dir is None:
+            miss = cp.with_suffix(cp.suffix + ".miss")
+            miss.parent.mkdir(parents=True, exist_ok=True)
+            miss.touch()
+            return
+        miss_set = self._load_misses(gcs_path)
+        miss_set.add(gcs_path)
+        os.makedirs(build_dir, exist_ok=True)
+        misses_file = build_dir / ".misses"
+        fd = os.open(str(misses_file), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, (gcs_path + "\n").encode("utf-8"))
+        finally:
+            os.close(fd)
 
     def _cache_has_entry(self, gcs_path: str) -> Optional[bool]:
         """Check if cache has an entry. Returns True (exists), False (cached miss), or None (no entry)."""
@@ -98,9 +188,14 @@ class GCSClient:
             return None
         if cp.exists():
             return True
-        miss = cp.with_suffix(cp.suffix + ".miss")
-        if miss.exists():
-            return False
+        miss_set = self._load_misses(gcs_path)
+        if miss_set is not None:
+            if gcs_path in miss_set:
+                return False
+        else:
+            miss = cp.with_suffix(cp.suffix + ".miss")
+            if miss.exists():
+                return False
         return None
 
     def list_prefixes(self, prefix: str) -> list[str]:
@@ -191,9 +286,14 @@ class GCSClient:
         cp = self._cache_path(path)
         if cp.exists():
             return cp
-        miss = cp.with_suffix(cp.suffix + ".miss")
-        if miss.exists():
-            return None
+        miss_set = self._load_misses(path)
+        if miss_set is not None:
+            if path in miss_set:
+                return None
+        else:
+            miss = cp.with_suffix(cp.suffix + ".miss")
+            if miss.exists():
+                return None
         # Stream to disk
         url = f"{GCS_BASE}/{self.bucket}/{path}"
         log.debug("GET %s (stream-to-disk)", url)

@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import time
 
 import pytest
@@ -107,12 +108,18 @@ def test_cache_fetch_object_hit(tmp_path):
 
 @responses.activate
 def test_cache_fetch_object_miss(tmp_path):
-    responses.add(responses.GET, f"{BASE_URL}/missing.json", status=404)
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/missing.json"
+    responses.add(responses.GET, f"{BASE_URL}/{path}", status=404)
     client = make_client(cache_dir=str(tmp_path))
-    assert client.fetch_object("missing.json") is None
+    assert client.fetch_object(path) is None
     assert len(responses.calls) == 1
+    # .misses file created, not individual .miss
+    misses_file = tmp_path / "pr-logs/pull/org_repo/1/job-a/100" / ".misses"
+    assert misses_file.exists()
+    assert path in misses_file.read_text()
+    assert not list(tmp_path.rglob("*.miss"))
     # Second call returns None from cache without HTTP
-    assert client.fetch_object("missing.json") is None
+    assert client.fetch_object(path) is None
     assert len(responses.calls) == 1
 
 
@@ -141,12 +148,17 @@ def test_cache_head_uses_fetch_entry(tmp_path):
 
 @responses.activate
 def test_cache_head_miss_cached(tmp_path):
-    responses.add(responses.HEAD, f"{BASE_URL}/gone.tar", status=404)
+    path = "pr-logs/pull/org_repo/2/job-b/200/artifacts/gone.tar"
+    responses.add(responses.HEAD, f"{BASE_URL}/{path}", status=404)
     client = make_client(cache_dir=str(tmp_path))
-    assert client.head_object("gone.tar") is False
+    assert client.head_object(path) is False
     assert len(responses.calls) == 1
+    # .misses file created
+    misses_file = tmp_path / "pr-logs/pull/org_repo/2/job-b/200" / ".misses"
+    assert misses_file.exists()
+    assert path in misses_file.read_text()
     # Cached miss
-    assert client.head_object("gone.tar") is False
+    assert client.head_object(path) is False
     assert len(responses.calls) == 1
 
 
@@ -306,3 +318,246 @@ def test_cleanup_corrupt_started_json(tmp_path):
     client = make_client(cache_dir=str(tmp_path))
     client.cleanup_aged_builds(now - 90 * 86400)
     assert not build_dir.exists(), "corrupt started.json should be treated as timestamp 0"
+
+
+# --- .misses consolidated miss file tests ---
+
+
+@responses.activate
+def test_miss_persists_across_clients(tmp_path):
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/missing.json"
+    responses.add(responses.GET, f"{BASE_URL}/{path}", status=404)
+    client1 = make_client(cache_dir=str(tmp_path))
+    assert client1.fetch_object(path) is None
+    assert len(responses.calls) == 1
+    # New client, same cache dir
+    client2 = make_client(cache_dir=str(tmp_path))
+    assert client2.fetch_object(path) is None
+    assert len(responses.calls) == 1  # served from disk
+
+
+@responses.activate
+def test_miss_multiple_artifacts(tmp_path):
+    paths = [
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/a.json",
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/b.json",
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/c.json",
+    ]
+    for p in paths:
+        responses.add(responses.GET, f"{BASE_URL}/{p}", status=404)
+    client = make_client(cache_dir=str(tmp_path))
+    for p in paths:
+        assert client.fetch_object(p) is None
+    misses_file = tmp_path / "pr-logs/pull/org_repo/1/job-a/100" / ".misses"
+    lines = {line for line in misses_file.read_text().split("\n") if line}
+    assert lines == set(paths)
+
+
+@responses.activate
+def test_miss_no_individual_files(tmp_path):
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/foo.json"
+    responses.add(responses.GET, f"{BASE_URL}/{path}", status=404)
+    client = make_client(cache_dir=str(tmp_path))
+    client.fetch_object(path)
+    assert not list(tmp_path.rglob("*.miss"))
+
+
+def test_miss_concurrent_append(tmp_path):
+    n = 20
+    paths = [f"pr-logs/pull/org_repo/1/job-a/100/artifacts/file{i}.json" for i in range(n)]
+    client = make_client(cache_dir=str(tmp_path))
+    errors = []
+
+    def write_miss(path):
+        try:
+            client._cache_write_miss(path)
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=write_miss, args=(p,)) for p in paths]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors
+    misses_file = tmp_path / "pr-logs/pull/org_repo/1/job-a/100" / ".misses"
+    lines = {line for line in misses_file.read_text().split("\n") if line}
+    assert lines == set(paths)
+
+
+@responses.activate
+def test_miss_non_build_path(tmp_path):
+    path = "some/short/path.json"
+    responses.add(responses.GET, f"{BASE_URL}/{path}", status=404)
+    client = make_client(cache_dir=str(tmp_path))
+    assert client.fetch_object(path) is None
+    # Should use individual .miss file
+    miss_file = tmp_path / "some/short/path.json.miss"
+    assert miss_file.exists()
+    assert not list(tmp_path.rglob(".misses"))
+    # Second call reads from .miss file
+    assert client.fetch_object(path) is None
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_miss_head_after_fetch_miss(tmp_path):
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/data.json"
+    responses.add(responses.GET, f"{BASE_URL}/{path}", status=404)
+    client = make_client(cache_dir=str(tmp_path))
+    assert client.fetch_object(path) is None
+    assert len(responses.calls) == 1
+    # head_object should return False from cache
+    assert client.head_object(path) is False
+    assert len(responses.calls) == 1  # no new HTTP call
+
+
+@responses.activate
+def test_miss_ensure_cached_returns_none(tmp_path):
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/data.tar"
+    responses.add(responses.HEAD, f"{BASE_URL}/{path}", status=404)
+    client = make_client(cache_dir=str(tmp_path))
+    assert client.head_object(path) is False
+    assert len(responses.calls) == 1
+    # ensure_cached should return None without hitting GCS
+    assert client.ensure_cached(path) is None
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_miss_fetch_binary_miss(tmp_path):
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/data.tar"
+    responses.add(responses.GET, f"{BASE_URL}/{path}", status=404)
+    client = make_client(cache_dir=str(tmp_path))
+    assert client.fetch_binary(path) is None
+    assert len(responses.calls) == 1
+    # .misses created, not .miss
+    misses_file = tmp_path / "pr-logs/pull/org_repo/1/job-a/100" / ".misses"
+    assert misses_file.exists()
+    assert not list(tmp_path.rglob("*.miss"))
+    # Second call returns None from cache
+    assert client.fetch_binary(path) is None
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_miss_build_dir_not_yet_created(tmp_path):
+    path = "pr-logs/pull/org_repo/5/job-new/999/artifacts/foo.json"
+    build_dir = tmp_path / "pr-logs/pull/org_repo/5/job-new/999"
+    assert not build_dir.exists()
+    responses.add(responses.GET, f"{BASE_URL}/{path}", status=404)
+    client = make_client(cache_dir=str(tmp_path))
+    assert client.fetch_object(path) is None
+    assert build_dir.exists()
+    misses_file = build_dir / ".misses"
+    assert misses_file.exists()
+    assert path in misses_file.read_text()
+
+
+def test_miss_empty_misses_file(tmp_path):
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/foo.json"
+    build_dir = tmp_path / "pr-logs/pull/org_repo/1/job-a/100"
+    build_dir.mkdir(parents=True)
+    (build_dir / ".misses").write_text("")
+    client = make_client(cache_dir=str(tmp_path))
+    miss_set = client._load_misses(path)
+    assert miss_set == set()
+
+
+def test_miss_trailing_newlines(tmp_path):
+    path1 = "pr-logs/pull/org_repo/1/job-a/100/artifacts/a.json"
+    path2 = "pr-logs/pull/org_repo/1/job-a/100/artifacts/b.json"
+    build_dir = tmp_path / "pr-logs/pull/org_repo/1/job-a/100"
+    build_dir.mkdir(parents=True)
+    (build_dir / ".misses").write_text(f"{path1}\n\n{path2}\n\n\n")
+    client = make_client(cache_dir=str(tmp_path))
+    miss_set = client._load_misses(path1)
+    assert miss_set == {path1, path2}
+
+
+# --- .miss migration tests (TEMPORARY -- remove with _migrate_legacy_misses) ---
+
+
+def test_miss_migration_from_legacy(tmp_path):
+    build_dir = tmp_path / "pr-logs/pull/org_repo/1/job-a/100"
+    build_dir.mkdir(parents=True)
+    artifacts = build_dir / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "a.json.miss").touch()
+    (artifacts / "b.json.miss").touch()
+    sub = artifacts / "step"
+    sub.mkdir()
+    (sub / "c.log.miss").touch()
+
+    client = make_client(cache_dir=str(tmp_path))
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/a.json"
+    miss_set = client._load_misses(path)
+
+    misses_file = build_dir / ".misses"
+    assert misses_file.exists()
+    expected = {
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/a.json",
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/b.json",
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/step/c.log",
+    }
+    assert miss_set == expected
+    assert not list(build_dir.rglob("*.miss"))
+
+
+def test_miss_migration_concurrent(tmp_path):
+    build_dir = tmp_path / "pr-logs/pull/org_repo/1/job-a/100"
+    artifacts = build_dir / "artifacts"
+    artifacts.mkdir(parents=True)
+    for i in range(10):
+        (artifacts / f"file{i}.json.miss").touch()
+
+    # Create clients before starting threads to avoid _log_cache_stats racing
+    # with concurrent .miss file deletions during migration.
+    clients = [make_client(cache_dir=str(tmp_path)) for _ in range(4)]
+    errors = []
+
+    def migrate(client):
+        try:
+            path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/file0.json"
+            client._load_misses(path)
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=migrate, args=(c,)) for c in clients]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    misses_file = build_dir / ".misses"
+    assert misses_file.exists()
+    assert not list(build_dir.rglob("*.miss"))
+
+
+def test_miss_migration_interrupted(tmp_path):
+    """Simulate partial deletion: some .miss files already removed by another process."""
+    build_dir = tmp_path / "pr-logs/pull/org_repo/1/job-a/100"
+    artifacts = build_dir / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "a.json.miss").touch()
+    (artifacts / "b.json.miss").touch()
+
+    client = make_client(cache_dir=str(tmp_path))
+    path = "pr-logs/pull/org_repo/1/job-a/100/artifacts/a.json"
+    miss_set = client._load_misses(path)
+
+    expected = {
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/a.json",
+        "pr-logs/pull/org_repo/1/job-a/100/artifacts/b.json",
+    }
+    assert miss_set == expected
+    assert not list(build_dir.rglob("*.miss"))
+
+
+def test_miss_migration_nonexistent_dir(tmp_path):
+    client = make_client(cache_dir=str(tmp_path))
+    build_dir = tmp_path / "pr-logs/pull/org_repo/1/job-a/999"
+    assert not build_dir.exists()
+    result = client._migrate_legacy_misses(build_dir)
+    assert result == set()

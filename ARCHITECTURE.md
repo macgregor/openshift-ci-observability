@@ -90,7 +90,7 @@ The scraper uses a `ThreadPoolExecutor` shared by both discovery and build proce
 
 ### GCS Artifact Cache
 
-GCS artifacts are immutable once written, so the scraper caches fetched objects to a local directory (a podman volume shared between watch and backfill services). Cache entries use the GCS path as the filesystem path, mirroring the bucket layout. 404 responses are cached as `.miss` marker files to avoid re-probing missing artifacts.
+GCS artifacts are immutable once written, so the scraper caches fetched objects to a local directory (a podman volume shared between watch and backfill services). Cache entries use the GCS path as the filesystem path, mirroring the bucket layout. 404 responses are recorded in a per-build `.misses` file (one GCS path per line) to avoid re-probing missing artifacts.
 
 The TestClusterMetricsPipeline also caches processed output as `.metrics` sibling files next to where the raw `prometheus.tar` was downloaded. Each `.metrics` file contains a version header and the final Prometheus text format ready for pushing. On read, the version is compared against the pipeline's current version -- a mismatch means stale, and the file is reprocessed. This avoids redundant `promtool` WAL replay, which is the most expensive operation in the scraper. Raw `prometheus.tar` files are cleaned up via two mechanisms: each promtool worker deletes its tar in a `finally` block (preventing accumulation during long runs), and `drain()` sweeps the cache for any remaining tars after all workers complete (catching stragglers from crashes or incomplete submissions).
 
