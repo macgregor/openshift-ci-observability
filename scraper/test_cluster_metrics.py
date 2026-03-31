@@ -8,22 +8,16 @@ import tarfile
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-
-import requests
+from typing import Optional
 
 from scraper import SHARED_VERSION
+from scraper.cache import ArtifactCache
 from scraper.context import BuildContext
-from scraper.gcs import GCSClient
 from scraper.metrics import format_prometheus_line, sanitize_metric_name
 from scraper.models import Sink
+from scraper.state import ScrapeState
 
 log = logging.getLogger("scraper")
-
-# Prometheus TSDB processing gets its own thread pool to avoid starving the main
-# scraper pool.  WAL replay is CPU/IO-intensive and uses ~3-5x the WAL size in
-# memory (e.g. a 400 MB WAL can use ~1.5 GB RAM).  With the scraper container's
-# 4 GB memory limit, 2 concurrent replays is the safe maximum.
-_PROMTOOL_WORKERS = 2
 
 METRICS = [
     "cluster:cpu_usage_cores:sum",
@@ -344,27 +338,43 @@ def _filter_overlapping(metric_lines):
             if line.split("{")[0] not in _OVERLAPPING_OUTPUT_NAMES]
 
 
-def _read_cached_metrics(gcs: GCSClient, gcs_path: str, version: str):
+def _read_cached_metrics(cache: Optional[ArtifactCache], gcs_path: str, version: str):
     """Read cached .metrics file if it exists and version matches.
 
     Returns list of metric lines, or None on cache miss/stale.
     """
-    content = gcs.read_processed(gcs_path)
+    if cache is None:
+        return None
+    content = cache.get_processed(gcs_path, version)
     if content is None:
         return None
-    first_line, _, rest = content.partition("\n")
-    if first_line != f"{_METRICS_CACHE_VERSION_PREFIX}{version}":
-        return None
-    return [line for line in rest.splitlines() if line]
+    return [line for line in content.splitlines() if line]
 
 
-
-def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_lines: list[str]):
+def _write_cached_metrics(cache: Optional[ArtifactCache], gcs_path: str, version: str, metric_lines: list[str]):
     """Write .metrics cache file with version header."""
-    content = f"{_METRICS_CACHE_VERSION_PREFIX}{version}\n"
-    if metric_lines:
-        content += "\n".join(metric_lines) + "\n"
-    gcs.write_processed(gcs_path, content)
+    if cache is None:
+        return
+    content = "\n".join(metric_lines) + "\n" if metric_lines else ""
+    cache.put_processed(gcs_path, version, content)
+
+
+def _wal_size_from_tar(tar_path: Path) -> int:
+    """Measure WAL size in MB by reading tar member headers (no extraction)."""
+    try:
+        total = 0
+        with tarfile.open(str(tar_path)) as tf:
+            for member in tf.getmembers():
+                # WAL segments can be at wal/00000001 or ./wal/00000001 or
+                # some-prefix/wal/00000001 depending on how the tar was created.
+                name = member.name
+                if not member.isfile():
+                    continue
+                if name.startswith("wal/") or "/wal/" in name:
+                    total += member.size
+        return total // (1024 * 1024)
+    except (tarfile.TarError, OSError, EOFError):
+        return 0
 
 
 class TestClusterMetricsPipeline:
@@ -372,25 +382,25 @@ class TestClusterMetricsPipeline:
     version = f"{SHARED_VERSION}.9"
     pushes_own_sentinel = True
 
-    def __init__(self, sink: Sink, gcs: GCSClient,
-                 session: requests.Session, vm_url: str):
+    def __init__(self, sink: Sink, gcs, cache: Optional[ArtifactCache],
+                 state: Optional[ScrapeState],
+                 promtool_workers: int = 1, max_wal_mb: int = 256):
         self.sink = sink
         self._gcs = gcs
-        self._session = session
-        self._vm_url = vm_url
+        self._cache = cache
+        self._state = state
+        self._max_wal_mb = max_wal_mb
+        self._promtool_workers = promtool_workers
         self._pool = ThreadPoolExecutor(
-            max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
+            max_workers=promtool_workers, thread_name_prefix="promtool",
         )
-        self.cleanup_cache()
 
     def process(self, ctx: BuildContext) -> int:
-        if not self._gcs.has_cache:
+        if self._cache is None:
             log.warning("TSDB pipeline requires disk cache (GCS_NO_CACHE disables it); skipping")
             return 0
 
         # Skip builds without a cluster claim -- no test cluster means no Prometheus data.
-        # The cluster_pool pipeline runs before this one, so clusterClaim.json is already
-        # cached in the artifact cache (None if it doesn't exist).
         if ctx.fetch_artifact("artifacts/build-resources/clusterClaim.json") is None:
             return 0
 
@@ -405,13 +415,9 @@ class TestClusterMetricsPipeline:
             any_pool_submitted = any_pool_submitted or pool_submitted
             any_health_pushed = any_health_pushed or health_pushed
 
-        # Push sentinel for health-only builds (no tar in pool, no cache-hit sentinel).
-        # If any tar was submitted, its pool worker pushes sentinel when done.
-        # If a cache-hit already pushed sentinel, this is a harmless duplicate.
+        # Mark done for health-only builds (no tar in pool, no cache-hit mark).
         if any_health_pushed and not any_pool_submitted:
-            self._push_sentinel(ctx.build.build_id,
-                                ctx.labels.get("build_id", ctx.build.build_id),
-                                repo=ctx.labels.get("repo", ""))
+            self._mark_done(ctx.build.build_id)
         return 0
 
     def _submit_step(self, ctx: BuildContext, step_name: str):
@@ -419,9 +425,6 @@ class TestClusterMetricsPipeline:
         step_labels = {**ctx.labels, "test_step": step_name}
 
         # --- Health metrics (synchronous, cheap) ---
-        # The health file lives inside a sub-step's artifacts/ dir within the
-        # multi-stage test: artifacts/{test}/{sub-step}/artifacts/cluster-health-metrics.txt.
-        # The sub-step name varies by project, so we enumerate sub-steps and check each.
         health_pushed = False
         try:
             sub_steps = ctx.list_artifact_dirs(f"artifacts/{step_name}/")
@@ -447,7 +450,7 @@ class TestClusterMetricsPipeline:
         gcs_path = ctx.artifact_gcs_path(artifact_path)
 
         # Fast path: check .metrics cache
-        cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
+        cached = _read_cached_metrics(self._cache, gcs_path, self.version)
         if cached is not None:
             if cached:
                 if health_pushed:
@@ -456,13 +459,23 @@ class TestClusterMetricsPipeline:
                     self.sink.push(cached)
                     log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
                              ctx.build.pr, ctx.build.build_id, step_name, len(cached))
-            self._push_sentinel(ctx.build.build_id, ctx.labels.get("build_id", ctx.build.build_id),
-                                repo=ctx.labels.get("repo", ""))
+            self._mark_done(ctx.build.build_id)
             return False, health_pushed
 
-        # Slow path: ensure tar is on disk
-        tar_path = ctx.artifact_cache_path(artifact_path)
+        # Slow path: download tar to staging
+        tar_path = self._gcs.ensure_staged(gcs_path)
         if tar_path is None:
+            return False, health_pushed
+
+        # WAL size gate: skip tars that would OOM the container
+        wal_mb = _wal_size_from_tar(tar_path)
+        if wal_mb > self._max_wal_mb:
+            log.warning("Skipping prometheus.tar for build %s step %s: "
+                        "WAL size %dMB exceeds limit %dMB",
+                        ctx.build.build_id, step_name, wal_mb, self._max_wal_mb)
+            _write_cached_metrics(self._cache, gcs_path, self.version, [])
+            self._cache.unstage(tar_path)
+            self._mark_done(ctx.build.build_id)
             return False, health_pushed
 
         self._pool.submit(
@@ -474,9 +487,9 @@ class TestClusterMetricsPipeline:
     def _process_tar_from_path(self, tar_path: Path, gcs_path: str,
                                step_labels, build_id, pr, step_name,
                                health_pushed=False):
-        # Another scraper (watch/backfill) sharing the cache volume may have
-        # processed this tar between our submission and execution.
-        cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
+        # Another scraper sharing the cache volume may have processed this
+        # tar between our submission and execution.
+        cached = _read_cached_metrics(self._cache, gcs_path, self.version)
         if cached is not None:
             if cached:
                 if health_pushed:
@@ -485,12 +498,8 @@ class TestClusterMetricsPipeline:
                     self.sink.push(cached)
                     log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
                              pr, build_id, step_name, len(cached))
-            self._push_sentinel(build_id, step_labels.get("build_id", build_id),
-                                repo=step_labels.get("repo", ""))
-            try:
-                tar_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+            self._mark_done(build_id)
+            self._cache.unstage(tar_path)
             return
 
         tmpdir = tempfile.mkdtemp(prefix="prom-tsdb-")
@@ -502,18 +511,16 @@ class TestClusterMetricsPipeline:
             lines = _run_promtool(tmpdir, timeout=timeout)
             metrics = extract_test_cluster_metrics(lines, step_labels)
             to_push = _filter_overlapping(metrics) if health_pushed else metrics
-            _write_cached_metrics(self._gcs, gcs_path, self.version, to_push)
+            _write_cached_metrics(self._cache, gcs_path, self.version, to_push)
             self.sink.push(to_push)
             if to_push:
                 log.info("PR %s build %s step %s: %d test_cluster_metrics "
                          "(wal=%dMB, timeout=%ds)",
                          pr, build_id, step_name, len(to_push), wal_mb, timeout)
-            self._push_sentinel(build_id, step_labels.get("build_id", build_id),
-                                repo=step_labels.get("repo", ""))
+            self._mark_done(build_id)
         except FileNotFoundError:
-            # Tar deleted by another scraper's cleanup_cache() or worker.
-            # Re-check .metrics in case it was processed in the meantime.
-            cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
+            # Tar deleted by another scraper or staging wipe.
+            cached = _read_cached_metrics(self._cache, gcs_path, self.version)
             if cached is not None:
                 if cached:
                     if health_pushed:
@@ -522,8 +529,7 @@ class TestClusterMetricsPipeline:
                         self.sink.push(cached)
                         log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
                                  pr, build_id, step_name, len(cached))
-                self._push_sentinel(build_id, step_labels.get("build_id", build_id),
-                                    repo=step_labels.get("repo", ""))
+                self._mark_done(build_id)
             else:
                 log.debug("prometheus.tar deleted before processing for build %s step %s "
                           "(will retry next cycle)", build_id, step_name)
@@ -535,56 +541,17 @@ class TestClusterMetricsPipeline:
                       build_id, step_name, exc_info=True)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
-            try:
-                tar_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+            if self._cache:
+                self._cache.unstage(tar_path)
 
-    def _push_sentinel(self, build_id, label_build_id, repo=""):
-        """Push per-pipeline sentinel metric from pool worker."""
-        from scraper.scraper import push_pipeline_sentinel
-        push_pipeline_sentinel(
-            self._session, self._vm_url,
-            self.name, self.version, label_build_id, repo=repo,
-        )
-
-    def cleanup_cache(self):
-        """Delete prometheus.tar files and orphaned temp files from the GCS cache.
-
-        Safe to call when no promtool workers are in flight (at init or after
-        drain).  Each worker deletes its own tar in its finally block, so this
-        sweep only catches stragglers — tars that were downloaded but never
-        submitted to the pool (e.g. crash between download and pool submit).
-        Orphaned tmp files from interrupted atomic .metrics writes are also
-        removed unconditionally (at init, no writers are active).
-        """
-        cache_dir = getattr(self._gcs, '_cache_dir', None)
-        if cache_dir is None:
-            return
-        tar_deleted = 0
-        tmp_deleted = 0
-        for dirpath, _dirnames, filenames in os.walk(cache_dir):
-            for f in filenames:
-                if f == "prometheus.tar":
-                    try:
-                        (Path(dirpath) / f).unlink()
-                        tar_deleted += 1
-                    except OSError:
-                        pass
-                elif f.startswith("tmp"):
-                    try:
-                        (Path(dirpath) / f).unlink()
-                        tmp_deleted += 1
-                    except OSError:
-                        pass
-        if tar_deleted or tmp_deleted:
-            log.info("Cache cleanup: %d prometheus.tar, %d orphaned tmp files deleted",
-                     tar_deleted, tmp_deleted)
+    def _mark_done(self, build_id):
+        """Mark this pipeline as done for a build."""
+        if self._state:
+            self._state.mark_done(build_id, self.name, self.version)
 
     def drain(self):
         """Wait for all outstanding prometheus processing to complete."""
         self._pool.shutdown(wait=True)
-        self.cleanup_cache()
         self._pool = ThreadPoolExecutor(
-            max_workers=_PROMTOOL_WORKERS, thread_name_prefix="promtool",
+            max_workers=self._promtool_workers, thread_name_prefix="promtool",
         )

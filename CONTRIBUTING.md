@@ -46,17 +46,11 @@ make wipe-all    # delete DB + cache
 make wipe-cache  # delete cache only
 ```
 
-Scraper state is stored in VictoriaMetrics itself (via per-pipeline sentinel metrics), so wiping the database automatically resets state. VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
+Scraper state is tracked in SQLite (`state.db`) on the cache volume. `make wipe-db` clears VictoriaMetrics/VictoriaLogs data and `state.db`, triggering full re-ingestion from cache. VictoriaMetrics deduplicates identical data points, so re-ingesting the same builds is safe.
 
-**When to wipe:** Most code changes no longer require a DB wipe. Each pipeline has a `version` string (composed of `SHARED_VERSION` + a pipeline-specific suffix in `scraper/__init__.py` and each pipeline file). When you change extraction logic:
+**When to wipe:** Most code changes don't require a DB wipe. Each pipeline has a `version` string; bumping it causes the scraper to reprocess only that pipeline. A DB wipe is only needed to purge old metric data that's no longer emitted, since changed metrics age out via retention otherwise.
 
-1. Bump the affected pipeline's version suffix (e.g., `version = f"{SHARED_VERSION}.2"`)
-2. `make build && make restart`
-3. The scraper detects the version mismatch and reprocesses only that pipeline for all builds
-
-Bump `SHARED_VERSION` in `scraper/__init__.py` to reprocess all pipelines at once. A DB wipe (`make wipe-db`) is only needed if you want to purge old metric data that's no longer emitted by the new code, since changed metrics age out via retention otherwise.
-
-**Cache growth:** After each scrape cycle the scraper automatically deletes cached build directories older than the retention window (`--cache-retention`, env `CACHE_RETENTION`, default `max(--window, 90d)`). Orphaned temp files from interrupted writes are also cleaned. To check current cache size: `podman exec ci-obs-scraper-watch du -sh /cache`. Use `make wipe-cache` for a full reset, or set `GCS_NO_CACHE=true` in `.env` to disable caching entirely.
+**Cache growth:** After each scrape cycle the scraper deletes cached build directories older than the retention window (`--cache-retention`, env `CACHE_RETENTION`, default `max(--window, 90d)`). To check current cache size: `podman exec ci-obs-scraper-watch du -sh /cache`. Use `make wipe-cache` for a full reset, or set `GCS_NO_CACHE=true` in `.env` to disable caching entirely.
 
 ## Chrome DevTools MCP (for Claude)
 

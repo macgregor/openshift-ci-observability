@@ -45,6 +45,8 @@ wipe-db: check-deps ## Stop and delete metrics/logs (keeps GCS cache for fast re
 	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = y ] || exit 1
 	@$(MAKE) -s down
 	@podman volume rm -f $(VOLUMES) 2>/dev/null; true
+	@mp=$$(podman volume inspect $(CACHE_VOLUME) --format '{{.Mountpoint}}' 2>/dev/null) && \
+		rm -f "$$mp/state.db" "$$mp/state.db-wal" "$$mp/state.db-shm" 2>/dev/null; true
 	@echo "Data wiped. GCS cache preserved -- re-ingestion will use cached artifacts."
 	$(cache_report)
 

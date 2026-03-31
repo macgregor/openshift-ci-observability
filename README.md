@@ -2,7 +2,7 @@
 
 ![CI Overview Dashboard](docs/img/ci-overview-1.png)
 
-Scrapes CI build artifacts (`ci-operator-metrics.json`, `ci-operator.log`, and JUnit XML) from GCS for any OpenShift CI repository and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured logs) for exploration via Grafana.
+Scrapes CI build artifacts from GCS for any OpenShift CI repository and ingests them into VictoriaMetrics (time-series) and VictoriaLogs (structured logs) for exploration via Grafana.
 
 Works with any GitHub repository that uses [OpenShift CI](https://docs.ci.openshift.org/) (ci-operator / Prow). Point it at your repo and get dashboards, metrics, and log search immediately.
 

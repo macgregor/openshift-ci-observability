@@ -29,7 +29,7 @@ Both sources produce metrics with the `ci_test_cluster_` prefix. A `metrics_sour
 
 ## Overlapping Metrics
 
-Several metrics are available from both sources. When both exist for a build, both are ingested as separate time series (distinguished by `metrics_source`). Dashboard queries should filter by `metrics_source` to avoid double-counting in aggregations.
+Several metrics are available from both sources. When both exist for a build step, the health version takes priority -- overlapping metrics are filtered out of the prometheus.tar output. A `metrics_source` label (`"tsdb"` or `"health"`) distinguishes the source on the remaining non-overlapping metrics.
 
 | Metric | prometheus.tar | cluster-health-metrics.txt |
 |---|---|---|

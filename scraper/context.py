@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional
 
 from scraper.models import Build, JobLabels
-from scraper.gcs import GCSClient
 
 log = logging.getLogger("scraper")
 
@@ -34,7 +33,7 @@ def extract_job_labels(data) -> JobLabels:
 
 
 class BuildContext:
-    def __init__(self, build: Build, gcs: GCSClient):
+    def __init__(self, build: Build, gcs):
         self._build = build
         self._gcs = gcs
         self._artifact_cache: dict[str, Optional[str]] = {}

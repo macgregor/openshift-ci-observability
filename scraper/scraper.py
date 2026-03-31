@@ -3,65 +3,26 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
 from datetime import datetime, timezone
-
-import requests
+from typing import Optional
 
 from scraper.models import Build, Pipeline
-from scraper.gcs import GCSClient
 from scraper.context import BuildContext
-from scraper.metrics import format_prometheus_line
+from scraper.state import ScrapeState
 
 log = logging.getLogger("scraper")
 
 
-def _fetch_known_for_pipeline(session: requests.Session, vm_url: str,
-                              pipeline_name: str, pipeline_version: str) -> set[str]:
-    """Query VictoriaMetrics for build_ids matching a pipeline at its current version."""
-    try:
-        resp = session.get(
-            f"{vm_url}/api/v1/label/build_id/values",
-            params={"match[]": f'ci_pipeline_scraped{{pipeline="{pipeline_name}",pipeline_v="{pipeline_version}"}}'},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        return set(resp.json().get("data", []))
-    except Exception:
-        log.warning("Failed to query VM for known build_ids (pipeline=%s), "
-                    "proceeding without skip list", pipeline_name, exc_info=True)
-        return set()
-
-
-def push_pipeline_sentinel(session: requests.Session, vm_url: str,
-                           pipeline_name: str, pipeline_version: str,
-                           build_id: str, repo: str = ""):
-    """Push a per-pipeline sentinel metric to mark a pipeline+build as processed."""
-    labels = {"build_id": build_id, "pipeline": pipeline_name, "pipeline_v": pipeline_version}
-    if repo:
-        labels["repo"] = repo
-    line = format_prometheus_line(
-        "ci_pipeline_scraped",
-        labels,
-        1, None,
-    )
-    if line:
-        resp = session.post(
-            f"{vm_url}/api/v1/import/prometheus",
-            data=line + "\n",
-            headers={"Content-Type": "text/plain"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-
-
 class Scraper:
-    def __init__(self, gcs: GCSClient, session: requests.Session, vm_url: str,
-                 vl_url: str, pipelines: list[Pipeline], workers: int):
+    def __init__(self, gcs, session, vm_url: str,
+                 vl_url: str, pipelines: list[Pipeline], workers: int,
+                 state: Optional[ScrapeState] = None):
         self.gcs = gcs
         self.session = session
         self.vm_url = vm_url
         self.vl_url = vl_url
         self.pipelines = pipelines
         self.workers = workers
+        self.state = state
 
     def scrape(self, base_path: str, since: int, until: int, dry_run: bool) -> None:
         since_str = datetime.fromtimestamp(since, tz=timezone.utc).strftime("%Y-%m-%d")
@@ -70,23 +31,21 @@ class Scraper:
         # Query known builds per pipeline at current version
         known = {}
         for p in self.pipelines:
-            known[p.name] = _fetch_known_for_pipeline(
-                self.session, self.vm_url, p.name, p.version,
-            )
-            log.info("Pipeline %s v%s: %d known builds in VM",
+            if self.state:
+                known[p.name] = self.state.get_known_builds(p.name, p.version)
+            else:
+                known[p.name] = set()
+            log.info("Pipeline %s v%s: %d known builds",
                      p.name, p.version, len(known[p.name]))
 
         # Skip builds where ALL pipelines already processed at current version
         all_known = set.intersection(*known.values()) if known else set()
 
         # Bulk-delete stale logs for pipelines that will reprocess all builds.
-        # One delete task per pipeline is far cheaper than one per build, since
-        # VictoriaLogs rewrites all stored logs for each delete task.
         for p in self.pipelines:
             if not getattr(p, '_pushes_logs', False):
                 continue
             if not known.get(p.name):
-                # No builds at current version -- all builds will be reprocessed.
                 self._bulk_delete_pipeline_logs(p.name)
 
         log.info("Listing PRs from %s", base_path)
@@ -144,7 +103,7 @@ class Scraper:
             if hasattr(pipeline, 'drain'):
                 pipeline.drain()
 
-        log.info("Scrape complete: %d ingested, %d skipped (already in VM)", ingested, skipped)
+        log.info("Scrape complete: %d ingested, %d skipped (already processed)", ingested, skipped)
 
     def _discover_builds(self, base_path, pr, pr_index, pr_total, all_known):
         """List jobs and builds for a PR, returning new build tuples."""
@@ -171,6 +130,11 @@ class Scraper:
             log.debug("Build %s out of date range (ts=%d)", build_id, ts)
             return False
 
+        # Register build in cache for age-based cleanup
+        cache = getattr(self.gcs, 'cache', None)
+        if cache is not None:
+            cache.register_build(f"{base_path}/{pr}/{job}/{build_id}", ts)
+
         build = Build(build_id=build_id, pr=pr, job=job, base_path=base_path)
         ctx = BuildContext(build, self.gcs)
 
@@ -182,18 +146,23 @@ class Scraper:
         for pipeline in self.pipelines:
             if build_id in known.get(pipeline.name, set()):
                 continue  # This pipeline already processed at current version
+
+            # Check per-pipeline retry state
+            if self.state and not self.state.should_process(
+                    build_id, pipeline.name, pipeline.version):
+                continue
+
             try:
                 count = pipeline.process(ctx)
                 counts[pipeline.name] = count
                 if not getattr(pipeline, 'pushes_own_sentinel', False):
                     self._delete_stale_logs_if_needed(pipeline, build_id, known)
-                    push_pipeline_sentinel(
-                        self.session, self.vm_url,
-                        pipeline.name, pipeline.version, build_id,
-                        repo=ctx.labels.get("repo", ""),
-                    )
+                    if self.state:
+                        self.state.mark_done(build_id, pipeline.name, pipeline.version)
             except Exception:
                 log.error("Pipeline %s failed for build %s", pipeline.name, build_id, exc_info=True)
+                if self.state:
+                    self.state.mark_failed(build_id, pipeline.name, pipeline.version)
 
         if counts:
             counts_str = ", ".join(f"{count} {name}" for name, count in counts.items())
@@ -222,8 +191,7 @@ class Scraper:
         """Delete old log entries before re-pushing on version change."""
         if not getattr(pipeline, '_pushes_logs', False):
             return
-        # Skip if bulk delete already handled this pipeline (no known builds
-        # means all builds are being reprocessed via bulk delete).
+        # Skip if bulk delete already handled this pipeline
         if not known.get(pipeline.name):
             return
         try:

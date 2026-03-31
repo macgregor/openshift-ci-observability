@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import requests
-
 from scraper.test_cluster_metrics import (
     discover_test_steps,
     parse_promtool_line,
@@ -18,7 +16,8 @@ from scraper.test_cluster_metrics import (
     _OVERLAPPING_OUTPUT_NAMES,
     TestClusterMetricsPipeline,
 )
-from scraper.gcs import GCSClient
+from scraper.cache import ArtifactCache, CachedGCSClient
+from scraper.state import ScrapeState
 
 
 SAMPLE_LABELS = {
@@ -36,15 +35,15 @@ BUCKET = "test-platform-results"
 VM_URL = "http://vm:8428"
 
 
-def _make_pipeline():
+def _make_pipeline(tmp_path=None):
     """Create a TestClusterMetricsPipeline with mock dependencies."""
     sink = MagicMock()
-    gcs = MagicMock(spec=GCSClient)
-    gcs.has_cache = True
-    gcs.read_processed.return_value = None
-    session = MagicMock(spec=requests.Session)
-    pipeline = TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
-    return pipeline, sink, gcs, session
+    gcs = MagicMock(spec=CachedGCSClient)
+    cache = MagicMock(spec=ArtifactCache)
+    cache.get_processed.return_value = None
+    state = MagicMock(spec=ScrapeState)
+    pipeline = TestClusterMetricsPipeline(sink, gcs, cache, state)
+    return pipeline, sink, gcs, cache, state
 
 
 def test_discover_test_steps_filters_infra():
@@ -231,7 +230,7 @@ def test_extract_no_role_without_kube_node_role():
 
 def test_process_skips_without_cluster_claim():
     """Pipeline skips entirely when no clusterClaim.json exists."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = None
@@ -242,8 +241,10 @@ def test_process_skips_without_cluster_claim():
 
 def test_process_skips_without_cache():
     """Pipeline skips when disk cache is disabled."""
-    pipeline, sink, gcs, _ = _make_pipeline()
-    gcs.has_cache = False
+    sink = MagicMock()
+    gcs = MagicMock(spec=CachedGCSClient)
+    state = MagicMock(spec=ScrapeState)
+    pipeline = TestClusterMetricsPipeline(sink, gcs, None, state)
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     assert pipeline.process(ctx) == 0
@@ -252,7 +253,7 @@ def test_process_skips_without_cache():
 
 def test_process_no_test_steps():
     """Pipeline returns 0 when no test step directories exist."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
@@ -264,29 +265,29 @@ def test_process_no_test_steps():
 
 def test_process_no_prometheus_tar():
     """Pipeline returns 0 when step exists but prometheus.tar doesn't."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-step"])
-    ctx.artifact_cache_path.return_value = None  # prometheus.tar not found
+    gcs.ensure_staged.return_value = None  # prometheus.tar not found
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_process_with_promtool(mock_sentinel, mock_promtool, tmp_path):
+def test_process_with_promtool(mock_promtool, tmp_path):
     """Pipeline submits promtool work to async pool; drain() completes it."""
     mock_promtool.return_value = [
         '{__name__="cluster:cpu_usage_cores:sum", prometheus="k8s"} 4.2 1710000000000',
     ]
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
 
-    # Create a minimal valid tar on disk
+    # Create a minimal valid tar on disk (in staging)
     import io
     import tarfile
-    tar_file = tmp_path / "prometheus.tar"
+    tar_file = cache._staging / "test-tar"
+    tar_file.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(str(tar_file), mode="w") as tf:
         data = b"fake tsdb data"
         info = tarfile.TarInfo(name="wal/00000001")
@@ -299,7 +300,7 @@ def test_process_with_promtool(mock_sentinel, mock_promtool, tmp_path):
     ctx.build.pr = "42"
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
-    ctx.artifact_cache_path.return_value = tar_file
+    gcs.ensure_staged.return_value = tar_file
     ctx.artifact_gcs_path.return_value = "pr-logs/pull/org_repo/42/job/123/artifacts/my-e2e-step/gather-extra/artifacts/metrics/prometheus.tar"
 
     count = pipeline.process(ctx)
@@ -312,20 +313,19 @@ def test_process_with_promtool(mock_sentinel, mock_promtool, tmp_path):
     assert "ci_test_cluster_cluster_cpu_usage_cores_sum" in pushed[0]
     assert 'test_step="my-e2e-step"' in pushed[0]
     # Verify .metrics cache was written
-    gcs.write_processed.assert_called_once()
-    # Verify sentinel was pushed
-    mock_sentinel.assert_called_once()
+    gcs_path = ctx.artifact_gcs_path.return_value
+    cached = _read_cached_metrics(cache, gcs_path, pipeline.version)
+    assert cached is not None
 
 
 # --- .metrics cache tests ---
 
 def test_cache_hit(tmp_path):
     """Pipeline serves metrics from .metrics cache without promtool."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
 
-    cached_content = f"# version={pipeline.version}\n" \
-        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123",metrics_source="tsdb"} 4.2 1710000000\n'
-    gcs.read_processed.return_value = cached_content
+    cached_content = 'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123",metrics_source="tsdb"} 4.2 1710000000\n'
+    cache.get_processed.return_value = cached_content
 
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
@@ -343,16 +343,16 @@ def test_cache_hit(tmp_path):
     assert len(pushed) == 1
     assert "ci_test_cluster_cluster_cpu_usage_cores_sum" in pushed[0]
     # Should NOT try to download the tar
-    ctx.artifact_cache_path.assert_not_called()
+    gcs.ensure_staged.assert_not_called()
 
 
 def test_cache_stale_version(tmp_path):
     """Pipeline reprocesses when .metrics version doesn't match."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
 
-    stale_content = "# version=old\n" \
-        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000\n'
-    gcs.read_processed.return_value = stale_content
+    # get_processed returns None for version mismatch
+    cache.get_processed.return_value = None
+    gcs.ensure_staged.return_value = None  # tar not available
 
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
@@ -361,23 +361,21 @@ def test_cache_stale_version(tmp_path):
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
     ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
-    ctx.artifact_cache_path.return_value = None  # tar not available
 
     pipeline.process(ctx)
     pipeline.drain()
 
-    # Stale cache was rejected, tried to fetch tar (returned None)
-    ctx.artifact_cache_path.assert_called_once()
+    # Stale cache was rejected, tried to stage tar (returned None)
+    gcs.ensure_staged.assert_called_once()
     sink.push.assert_not_called()
 
 
 def test_cache_empty_metrics():
     """Pipeline handles empty .metrics cache (skipped tar) gracefully."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
 
-    # Empty .metrics = tar was skipped (oversized, etc.)
-    cached_content = f"# version={pipeline.version}\n"
-    gcs.read_processed.return_value = cached_content
+    # Empty content = tar was skipped (oversized, etc.)
+    cache.get_processed.return_value = ""
 
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
@@ -392,134 +390,72 @@ def test_cache_empty_metrics():
 
     # No push for empty metrics
     sink.push.assert_not_called()
-    ctx.artifact_cache_path.assert_not_called()
+    gcs.ensure_staged.assert_not_called()
 
 
 # --- Unit tests for cache read/write helpers ---
 
 def test_read_cached_metrics_hit(tmp_path):
-    """read_processed returns content when version matches."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    """get_processed returns content when version matches."""
+    cache = ArtifactCache(str(tmp_path / "cache"))
     gcs_path = "some/path/prometheus.tar"
     version = "1.1"
 
-    _write_cached_metrics(gcs, gcs_path, version, ["metric1 1.0", "metric2 2.0"])
-    result = _read_cached_metrics(gcs, gcs_path, version)
+    _write_cached_metrics(cache, gcs_path, version, ["metric1 1.0", "metric2 2.0"])
+    result = _read_cached_metrics(cache, gcs_path, version)
     assert result == ["metric1 1.0", "metric2 2.0"]
 
 
 def test_read_cached_metrics_stale(tmp_path):
-    """read_processed returns None when version doesn't match."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    """get_processed returns None when version doesn't match."""
+    cache = ArtifactCache(str(tmp_path / "cache"))
     gcs_path = "some/path/prometheus.tar"
 
-    _write_cached_metrics(gcs, gcs_path, "old", ["metric1 1.0"])
-    result = _read_cached_metrics(gcs, gcs_path, "new")
+    _write_cached_metrics(cache, gcs_path, "old", ["metric1 1.0"])
+    result = _read_cached_metrics(cache, gcs_path, "new")
     assert result is None
 
 
 def test_read_cached_metrics_empty(tmp_path):
-    """read_processed returns empty list for skipped tars."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    """get_processed returns empty list for skipped tars."""
+    cache = ArtifactCache(str(tmp_path / "cache"))
     gcs_path = "some/path/prometheus.tar"
     version = "1.1"
 
-    _write_cached_metrics(gcs, gcs_path, version, [])
-    result = _read_cached_metrics(gcs, gcs_path, version)
+    _write_cached_metrics(cache, gcs_path, version, [])
+    result = _read_cached_metrics(cache, gcs_path, version)
     assert result == []
 
 
 def test_read_cached_metrics_missing(tmp_path):
-    """read_processed returns None when no .metrics file exists."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
-    result = _read_cached_metrics(gcs, "nonexistent/path", "1.0")
+    """get_processed returns None when no .metrics file exists."""
+    cache = ArtifactCache(str(tmp_path / "cache"))
+    result = _read_cached_metrics(cache, "nonexistent/path", "1.0")
     assert result is None
 
 
-# --- cleanup_cache (drain sweep) tests ---
-
-def test_cleanup_cache_deletes_all_tars(tmp_path):
-    """cleanup_cache deletes all prometheus.tar files regardless of .metrics sibling."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
-    # Tar with .metrics sibling (successfully processed)
-    dir_a = tmp_path / "pr-logs" / "pull" / "org_repo" / "1" / "job" / "100" / "artifacts" / "step-a"
-    dir_a.mkdir(parents=True)
-    (dir_a / "prometheus.tar").write_bytes(b"processed tar")
-    (dir_a / "prometheus.tar.metrics").write_text("# version=3.6\nmetric 1.0\n")
-    # Tar without .metrics sibling (failed processing)
-    dir_b = tmp_path / "pr-logs" / "pull" / "org_repo" / "2" / "job" / "200" / "artifacts" / "step-b"
-    dir_b.mkdir(parents=True)
-    (dir_b / "prometheus.tar").write_bytes(b"failed tar")
-
-    sink = MagicMock()
-    session = MagicMock(spec=requests.Session)
-    pipeline = TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
-    # Init already ran cleanup_cache, but let's verify by checking files
-    assert not (dir_a / "prometheus.tar").exists()
-    assert not (dir_b / "prometheus.tar").exists()
-
-
-def test_cleanup_cache_preserves_non_tar_files(tmp_path):
-    """cleanup_cache only deletes prometheus.tar, preserving all other files."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
-    d = tmp_path / "pr-logs" / "pull" / "org_repo" / "1" / "job" / "100" / "artifacts" / "step-a"
-    d.mkdir(parents=True)
-    (d / "prometheus.tar").write_bytes(b"tar data")
-    (d / "prometheus.tar.metrics").write_text("# version=3.6\n")
-    (d / "prometheus.tar.miss").write_bytes(b"")
-    # Other cached artifacts in sibling directories
-    other = tmp_path / "pr-logs" / "pull" / "org_repo" / "1" / "job" / "100"
-    (other / "started.json").write_text("{}")
-    (other / "ci-operator.log").write_text("log line")
-
-    sink = MagicMock()
-    session = MagicMock(spec=requests.Session)
-    TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
-
-    assert not (d / "prometheus.tar").exists()
-    assert (d / "prometheus.tar.metrics").exists()
-    assert (d / "prometheus.tar.miss").exists()
-    assert (other / "started.json").exists()
-    assert (other / "ci-operator.log").exists()
-
-
-def test_cleanup_cache_no_cache_dir():
-    """cleanup_cache no-ops when cache is disabled."""
-    gcs = MagicMock(spec=GCSClient)
-    gcs.has_cache = True
-    gcs.read_processed.return_value = None
-    sink = MagicMock()
-    session = MagicMock(spec=requests.Session)
-    # No _cache_dir attribute on the mock -- cleanup_cache should handle gracefully
-    pipeline = TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
-    pipeline.cleanup_cache()  # should not raise
-
-
-def test_cleanup_cache_empty_dir(tmp_path):
-    """cleanup_cache handles empty cache directory without errors."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
-    sink = MagicMock()
-    session = MagicMock(spec=requests.Session)
-    pipeline = TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
-    pipeline.cleanup_cache()  # no tars, should not raise or log
-
-
-# --- worker finally block tests (tar deleted on every exit path) ---
+# --- worker tests (tar staged, unstaged after processing) ---
 
 def _make_real_pipeline(tmp_path):
-    """Create a pipeline with a real GCSClient for cache path tests."""
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
+    """Create a pipeline with real ArtifactCache and ScrapeState for cache path tests."""
+    cache = ArtifactCache(str(tmp_path / "cache"))
+    state = ScrapeState(str(tmp_path / "state.db"))
+    gcs = MagicMock(spec=CachedGCSClient)
     sink = MagicMock()
-    session = MagicMock(spec=requests.Session)
-    pipeline = TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
-    return pipeline, sink, gcs
+    pipeline = TestClusterMetricsPipeline(sink, gcs, cache, state)
+    return pipeline, sink, gcs, cache
 
 
-def _create_tar_at_cache_path(tmp_path, gcs_path, valid=True):
-    """Create a tar file at the expected cache location. Returns the Path."""
+def _create_staged_tar(cache, gcs_path, valid=True):
+    """Create a tar file in the staging directory. Returns the Path."""
     import io
     import tarfile
-    tar_file = tmp_path / gcs_path
+    import hashlib
+    import uuid
+
+    path_hash = hashlib.sha256(gcs_path.encode()).hexdigest()[:16]
+    unique = uuid.uuid4().hex[:8]
+    tar_file = cache._staging / f"{path_hash}-{unique}"
     tar_file.parent.mkdir(parents=True, exist_ok=True)
     if valid:
         with tarfile.open(str(tar_file), mode="w") as tf:
@@ -536,14 +472,13 @@ GCS_PATH = "pr-logs/pull/org_repo/42/job/123/artifacts/my-e2e-step/gather-extra/
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_tar_deleted_after_successful_processing(mock_sentinel, mock_promtool, tmp_path):
-    """Worker deletes tar in finally block after successful processing."""
+def test_tar_deleted_after_successful_processing(mock_promtool, tmp_path):
+    """Worker unstages tar after successful processing."""
     mock_promtool.return_value = [
         '{__name__="cluster:cpu_usage_cores:sum"} 4.2 1710000000000',
     ]
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
-    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH)
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
+    tar_file = _create_staged_tar(cache, GCS_PATH)
     assert tar_file.exists()
 
     step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
@@ -553,15 +488,13 @@ def test_tar_deleted_after_successful_processing(mock_sentinel, mock_promtool, t
     )
     pipeline.drain()
 
-    assert not tar_file.exists(), "tar should be deleted after successful processing"
-    assert (tmp_path / (GCS_PATH + ".metrics")).exists(), ".metrics should be written"
+    assert not tar_file.exists(), "staged tar should be unstaged after successful processing"
 
 
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_tar_deleted_after_corrupt_tar(mock_sentinel, tmp_path):
-    """Worker deletes corrupt tar in finally block despite TarError."""
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
-    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH, valid=False)
+def test_tar_deleted_after_corrupt_tar(tmp_path):
+    """Worker unstages corrupt tar despite TarError."""
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
+    tar_file = _create_staged_tar(cache, GCS_PATH, valid=False)
     assert tar_file.exists()
 
     step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
@@ -571,17 +504,15 @@ def test_tar_deleted_after_corrupt_tar(mock_sentinel, tmp_path):
     )
     pipeline.drain()
 
-    assert not tar_file.exists(), "corrupt tar should still be deleted in finally block"
-    mock_sentinel.assert_not_called()
+    assert not tar_file.exists(), "corrupt staged tar should still be unstaged"
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_tar_deleted_after_promtool_failure(mock_sentinel, mock_promtool, tmp_path):
-    """Worker deletes tar even when promtool returns nothing."""
+def test_tar_deleted_after_promtool_failure(mock_promtool, tmp_path):
+    """Worker unstages tar even when promtool returns nothing."""
     mock_promtool.return_value = []  # simulates promtool failure/timeout
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
-    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH)
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
+    tar_file = _create_staged_tar(cache, GCS_PATH)
 
     step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
     pipeline._pool.submit(
@@ -590,19 +521,18 @@ def test_tar_deleted_after_promtool_failure(mock_sentinel, mock_promtool, tmp_pa
     )
     pipeline.drain()
 
-    assert not tar_file.exists(), "tar should be deleted even when promtool returns nothing"
+    assert not tar_file.exists(), "staged tar should be unstaged even when promtool returns nothing"
 
 
 @patch("scraper.test_cluster_metrics.extract_test_cluster_metrics", side_effect=RuntimeError("boom"))
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_tar_deleted_after_unexpected_exception(mock_sentinel, mock_promtool, mock_extract, tmp_path):
-    """Worker deletes tar in finally block even on unexpected exceptions."""
+def test_tar_deleted_after_unexpected_exception(mock_promtool, mock_extract, tmp_path):
+    """Worker unstages tar even on unexpected exceptions."""
     mock_promtool.return_value = [
         '{__name__="cluster:cpu_usage_cores:sum"} 4.2 1710000000000',
     ]
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
-    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH)
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
+    tar_file = _create_staged_tar(cache, GCS_PATH)
 
     step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
     pipeline._pool.submit(
@@ -611,91 +541,19 @@ def test_tar_deleted_after_unexpected_exception(mock_sentinel, mock_promtool, mo
     )
     pipeline.drain()
 
-    assert not tar_file.exists(), "tar should be deleted even on unexpected exceptions"
-    mock_sentinel.assert_not_called()
-
-
-# --- interaction between worker cleanup and drain sweep ---
-
-@patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_drain_sweep_after_workers_complete(mock_sentinel, mock_promtool, tmp_path):
-    """drain() sweep catches any tars that workers didn't clean."""
-    call_count = 0
-
-    def promtool_side_effect(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            return ['{__name__="cluster:cpu_usage_cores:sum"} 4.2 1710000000000']
-        return []  # second call returns nothing
-
-    mock_promtool.side_effect = promtool_side_effect
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
-
-    gcs_path_a = "pr-logs/pull/org_repo/42/job/100/artifacts/step-a/gather-extra/artifacts/metrics/prometheus.tar"
-    gcs_path_b = "pr-logs/pull/org_repo/42/job/200/artifacts/step-b/gather-extra/artifacts/metrics/prometheus.tar"
-    tar_a = _create_tar_at_cache_path(tmp_path, gcs_path_a)
-    tar_b = _create_tar_at_cache_path(tmp_path, gcs_path_b)
-
-    # Also create an "orphan" tar that was never submitted to the pool
-    # (simulates crash between download and pool.submit)
-    gcs_path_orphan = "pr-logs/pull/org_repo/42/job/300/artifacts/step-c/gather-extra/artifacts/metrics/prometheus.tar"
-    tar_orphan = _create_tar_at_cache_path(tmp_path, gcs_path_orphan)
-
-    step_labels = {**SAMPLE_LABELS, "test_step": "step-a"}
-    pipeline._pool.submit(
-        pipeline._process_tar_from_path, tar_a, gcs_path_a, step_labels,
-        "100", "42", "step-a",
-    )
-    step_labels_b = {**SAMPLE_LABELS, "test_step": "step-b"}
-    pipeline._pool.submit(
-        pipeline._process_tar_from_path, tar_b, gcs_path_b, step_labels_b,
-        "200", "42", "step-b",
-    )
-    # tar_orphan is NOT submitted to the pool
-
-    pipeline.drain()
-
-    assert not tar_a.exists(), "worker should have deleted tar_a"
-    assert not tar_b.exists(), "worker should have deleted tar_b"
-    assert not tar_orphan.exists(), "drain sweep should have deleted orphan tar"
-
-
-def test_init_cleans_leftover_tars(tmp_path):
-    """Pipeline constructor cleans leftover tars from previous run."""
-    gcs_path = "pr-logs/pull/org_repo/99/job/999/artifacts/step/gather-extra/artifacts/metrics/prometheus.tar"
-    tar_file = tmp_path / gcs_path
-    tar_file.parent.mkdir(parents=True, exist_ok=True)
-    tar_file.write_bytes(b"leftover from crash")
-    # Also one with .metrics (processed but tar not cleaned before crash)
-    gcs_path_2 = "pr-logs/pull/org_repo/99/job/888/artifacts/step/gather-extra/artifacts/metrics/prometheus.tar"
-    tar_file_2 = tmp_path / gcs_path_2
-    tar_file_2.parent.mkdir(parents=True, exist_ok=True)
-    tar_file_2.write_bytes(b"leftover with metrics")
-    (tmp_path / (gcs_path_2 + ".metrics")).write_text("# version=3.6\nmetric 1.0\n")
-
-    gcs = GCSClient(requests.Session(), "bucket", cache_dir=str(tmp_path))
-    sink = MagicMock()
-    session = MagicMock(spec=requests.Session)
-    TestClusterMetricsPipeline(sink, gcs, session, VM_URL)
-
-    assert not tar_file.exists(), "orphan tar should be cleaned at init"
-    assert not tar_file_2.exists(), "tar with .metrics sibling should be cleaned at init"
-    assert (tmp_path / (gcs_path_2 + ".metrics")).exists(), ".metrics should be preserved"
+    assert not tar_file.exists(), "staged tar should be unstaged even on unexpected exceptions"
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_worker_cache_hit_skips_promtool(mock_sentinel, mock_promtool, tmp_path):
+def test_worker_cache_hit_skips_promtool(mock_promtool, tmp_path):
     """Worker uses .metrics cache written by another scraper, skipping promtool."""
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
 
     # Simulate another scraper already processing this build.
-    _write_cached_metrics(gcs, GCS_PATH, pipeline.version, [
+    _write_cached_metrics(cache, GCS_PATH, pipeline.version, [
         'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000',
     ])
-    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH)
+    tar_file = _create_staged_tar(cache, GCS_PATH)
 
     step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
     pipeline._pool.submit(
@@ -704,23 +562,21 @@ def test_worker_cache_hit_skips_promtool(mock_sentinel, mock_promtool, tmp_path)
     )
     pipeline.drain()
 
-    assert not tar_file.exists(), "tar should be cleaned up on cache hit"
+    assert not tar_file.exists(), "staged tar should be unstaged on cache hit"
     mock_promtool.assert_not_called()
     sink.push.assert_called_once()
-    mock_sentinel.assert_called_once()
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_worker_cache_hit_tar_already_deleted(mock_sentinel, mock_promtool, tmp_path):
+def test_worker_cache_hit_tar_already_deleted(mock_promtool, tmp_path):
     """Worker handles tar deleted by other scraper when .metrics already exists."""
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
 
-    _write_cached_metrics(gcs, GCS_PATH, pipeline.version, [
+    _write_cached_metrics(cache, GCS_PATH, pipeline.version, [
         'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000',
     ])
     # Tar does NOT exist (other scraper's worker already deleted it).
-    tar_file = tmp_path / GCS_PATH
+    tar_file = cache._staging / "nonexistent"
     assert not tar_file.exists()
 
     step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
@@ -732,26 +588,6 @@ def test_worker_cache_hit_tar_already_deleted(mock_sentinel, mock_promtool, tmp_
 
     mock_promtool.assert_not_called()
     sink.push.assert_called_once()
-    mock_sentinel.assert_called_once()
-
-
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_redownload_after_failed_processing(mock_sentinel, tmp_path):
-    """After worker deletes corrupt tar, cache path is empty for re-download."""
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
-    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH, valid=False)
-
-    step_labels = {**SAMPLE_LABELS, "test_step": "my-e2e-step"}
-    pipeline._pool.submit(
-        pipeline._process_tar_from_path, tar_file, GCS_PATH, step_labels,
-        "123", "42", "my-e2e-step",
-    )
-    pipeline.drain()
-
-    assert not tar_file.exists(), "corrupt tar should be deleted"
-    # Verify the cache path is now empty -- ensure_cached would re-download
-    cache_path = gcs._cache_path(GCS_PATH)
-    assert not cache_path.exists(), "cache path should be clear for re-download"
 
 
 # --- Prometheus exposition format parser tests ---
@@ -949,10 +785,9 @@ def _list_dirs_side_effect(test_steps, sub_steps=None):
     return side_effect
 
 
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_process_health_only(mock_sentinel):
-    """Step has health file but no prometheus.tar; metrics pushed, sentinel from process()."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+def test_process_health_only():
+    """Step has health file but no prometheus.tar; metrics pushed, state marked done."""
+    pipeline, sink, gcs, cache, state = _make_pipeline()
 
     def fetch_side_effect(path):
         if path.endswith("clusterClaim.json"):
@@ -967,7 +802,7 @@ def test_process_health_only(mock_sentinel):
     ctx.build.pr = "42"
     ctx.fetch_artifact.side_effect = fetch_side_effect
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
-    ctx.artifact_cache_path.return_value = None  # no prometheus.tar
+    gcs.ensure_staged.return_value = None  # no prometheus.tar
 
     pipeline.process(ctx)
     pipeline.drain()
@@ -978,19 +813,18 @@ def test_process_health_only(mock_sentinel):
     assert len(pushed) == 1
     assert "ci_test_cluster_cluster_healthy" in pushed[0]
     assert 'metrics_source="health"' in pushed[0]
-    # Sentinel pushed from process() (not _submit_step)
-    mock_sentinel.assert_called_once()
+    # State marked done
+    state.mark_done.assert_called_once()
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_process_both_sources(mock_sentinel, mock_promtool, tmp_path):
+def test_process_both_sources(mock_promtool, tmp_path):
     """Step has both health file and prometheus.tar; both contribute metrics."""
     mock_promtool.return_value = [
         '{__name__="cluster:cpu_usage_cores:sum"} 4.2 1710000000000',
     ]
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
-    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH)
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
+    tar_file = _create_staged_tar(cache, GCS_PATH)
 
     health_content = 'cluster_healthy 1.0 1710849600000\n'
 
@@ -1007,7 +841,7 @@ def test_process_both_sources(mock_sentinel, mock_promtool, tmp_path):
     ctx.build.pr = "42"
     ctx.fetch_artifact.side_effect = fetch_side_effect
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
-    ctx.artifact_cache_path.return_value = tar_file
+    gcs.ensure_staged.return_value = tar_file
     ctx.artifact_gcs_path.return_value = GCS_PATH
 
     pipeline.process(ctx)
@@ -1025,13 +859,11 @@ def test_process_both_sources(mock_sentinel, mock_promtool, tmp_path):
     assert any('metrics_source="tsdb"' in m for m in tar_push)
     # Overlapping metrics should NOT be in tar push
     assert not any("ci_test_cluster_machine_cpu_cores" in m for m in tar_push)
-    # Sentinel pushed by pool worker (not process())
-    mock_sentinel.assert_called()
 
 
 def test_process_no_health_file():
     """Step has no health file; falls through to existing tar logic unchanged."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
 
     def fetch_side_effect(path):
         if path.endswith("clusterClaim.json"):
@@ -1044,7 +876,7 @@ def test_process_no_health_file():
     ctx.build.pr = "42"
     ctx.fetch_artifact.side_effect = fetch_side_effect
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
-    ctx.artifact_cache_path.return_value = None  # no prometheus.tar either
+    gcs.ensure_staged.return_value = None  # no prometheus.tar either
 
     pipeline.process(ctx)
     pipeline.drain()
@@ -1053,15 +885,14 @@ def test_process_no_health_file():
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_process_health_no_early_sentinel(mock_sentinel, mock_promtool, tmp_path):
-    """Step A has health only, step B has tar in pool; sentinel NOT pushed until pool worker completes."""
+def test_process_health_no_early_mark(mock_promtool, tmp_path):
+    """Step A has health only, step B has tar in pool; state NOT marked done until pool worker completes."""
     mock_promtool.return_value = [
         '{__name__="cluster:cpu_usage_cores:sum"} 4.2 1710000000000',
     ]
-    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
+    pipeline, sink, gcs, cache = _make_real_pipeline(tmp_path)
     gcs_path_b = "pr-logs/pull/org_repo/42/job/123/artifacts/step-b/gather-extra/artifacts/metrics/prometheus.tar"
-    tar_file_b = _create_tar_at_cache_path(tmp_path, gcs_path_b)
+    tar_file_b = _create_staged_tar(cache, gcs_path_b)
 
     health_content = 'cluster_healthy 1.0 1710849600000\n'
 
@@ -1078,32 +909,22 @@ def test_process_health_no_early_sentinel(mock_sentinel, mock_promtool, tmp_path
     ctx.build.pr = "42"
     ctx.fetch_artifact.side_effect = fetch_side_effect
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["step-a", "step-b"])
-    ctx.artifact_cache_path.side_effect = lambda path: tar_file_b if "step-b" in path else None
+    gcs.ensure_staged.side_effect = lambda path: tar_file_b if "step-b" in path else None
     ctx.artifact_gcs_path.side_effect = lambda path: gcs_path_b if "step-b" in path else path
 
-    # Before process: no sentinel
-    mock_sentinel.assert_not_called()
-
     pipeline.process(ctx)
-    # After process() but before drain(): sentinel NOT pushed by process()
-    # because any_pool_submitted=True (step B submitted tar to pool)
-    # The health metrics are pushed sync, but sentinel deferred to pool worker
-    mock_sentinel.assert_not_called()
-
     pipeline.drain()
-    # After drain: pool worker pushed sentinel
-    mock_sentinel.assert_called()
+
+    # State should be marked done after drain (pool worker completes)
+    state = pipeline._state
+    assert not state.should_process("123", pipeline.name, pipeline.version)
 
 
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_health_error_does_not_block_tar(mock_sentinel):
+def test_health_error_does_not_block_tar():
     """GCS error during health fetch is caught; tar processing continues."""
-    pipeline, sink, gcs, _ = _make_pipeline()
-
-    call_count = 0
+    pipeline, sink, gcs, cache, state = _make_pipeline()
 
     def fetch_side_effect(path):
-        nonlocal call_count
         if path.endswith("clusterClaim.json"):
             return "{}"
         if path.endswith(_HEALTH_METRICS_FILE):
@@ -1116,17 +937,16 @@ def test_health_error_does_not_block_tar(mock_sentinel):
     ctx.build.pr = "42"
     ctx.fetch_artifact.side_effect = fetch_side_effect
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
-    ctx.artifact_cache_path.return_value = None  # no tar either
+    gcs.ensure_staged.return_value = None  # no tar either
 
     # Should not raise
     pipeline.process(ctx)
     pipeline.drain()
 
 
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_health_push_failure_does_not_set_pushed(mock_sentinel):
+def test_health_push_failure_does_not_set_pushed():
     """If sink.push() raises during health metrics, health_pushed stays False."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+    pipeline, sink, gcs, cache, state = _make_pipeline()
     sink.push.side_effect = ConnectionError("sink error")
 
     def fetch_side_effect(path):
@@ -1142,24 +962,21 @@ def test_health_push_failure_does_not_set_pushed(mock_sentinel):
     ctx.build.pr = "42"
     ctx.fetch_artifact.side_effect = fetch_side_effect
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
-    ctx.artifact_cache_path.return_value = None  # no tar
+    gcs.ensure_staged.return_value = None  # no tar
 
     pipeline.process(ctx)
     pipeline.drain()
 
-    # health_pushed should be False because push raised before it was set.
-    # So process() should NOT push sentinel.
-    mock_sentinel.assert_not_called()
+    # State should NOT be marked done because push raised before health_pushed was set.
+    state.mark_done.assert_not_called()
 
 
-@patch("scraper.scraper.push_pipeline_sentinel")
-def test_process_all_cache_hits_no_health(mock_sentinel):
-    """All steps have tar cache hits; process() does not push additional sentinel."""
-    pipeline, sink, gcs, _ = _make_pipeline()
+def test_process_all_cache_hits_no_health():
+    """All steps have tar cache hits; state marked done for each."""
+    pipeline, sink, gcs, cache, state = _make_pipeline()
 
-    cached_content = f"# version={pipeline.version}\n" \
-        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123",metrics_source="tsdb"} 4.2 1710000000\n'
-    gcs.read_processed.return_value = cached_content
+    cached_content = 'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123",metrics_source="tsdb"} 4.2 1710000000\n'
+    cache.get_processed.return_value = cached_content
 
     def fetch_side_effect(path):
         if path.endswith("clusterClaim.json"):
@@ -1177,8 +994,7 @@ def test_process_all_cache_hits_no_health(mock_sentinel):
     pipeline.process(ctx)
     pipeline.drain()
 
-    # Sentinel pushed by _submit_step cache-hit path (2 times, one per step).
-    # process() should NOT push additional sentinel (any_health_pushed=False).
-    assert mock_sentinel.call_count == 2
+    # State marked done by _submit_step cache-hit path (2 times, one per step).
+    assert state.mark_done.call_count == 2
     # Metrics pushed from cache (2 times)
     assert sink.push.call_count == 2

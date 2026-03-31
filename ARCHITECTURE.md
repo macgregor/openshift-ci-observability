@@ -9,7 +9,7 @@ description: System architecture and data flow for OpenShift CI Observability
 ```mermaid
 graph TD
     GCS["Google Cloud Storage\n(GCS Buckets)"]
-    Cache["Local GCS Cache\n(podman volume)"]
+    Cache["Artifact Cache\n(podman volume + SQLite)"]
     Scraper["Scraper\nscraper-watch · scraper-backfill"]
     VM["VictoriaMetrics"]
     VL["VictoriaLogs"]
@@ -29,39 +29,33 @@ graph TD
 
 The scraper discovers CI builds for the configured `--repo` via the GCS XML API:
 
-1. **PR Enumeration**: List prefixes under `gs://test-platform-results/pr-logs/pull/{org}_{repo}/` (derived from the `--repo` flag)
+1. **PR Enumeration**: List prefixes under `gs://test-platform-results/pr-logs/pull/{org}_{repo}/`
 2. **Job Enumeration**: Within each PR, list job directories
 3. **Build Enumeration**: Within each job, list build directories
 4. **Date Filtering**: Read `started.json` from each build to filter by the `--window` range
-5. **Artifact Processing**: For each qualifying build, run registered pipelines (metrics, logs) against the build's artifacts
+5. **Artifact Processing**: For each qualifying build, run all registered pipelines
 
 ### Metric Conversion
 
 Metrics are converted to Prometheus text exposition format:
 
 - **Generic Extraction**: All numeric fields are automatically extracted as metrics
-- **Known Transforms**:
-  - Nanosecond values converted to seconds
-  - Kubernetes quantities (e.g., `1Gi`, `500m`) parsed to numeric values
+- **Known Transforms**: Nanosecond values converted to seconds, Kubernetes quantities parsed to numeric values
 - **Canonical Aliases**: Common metric names are normalized (e.g., `duration_ns` -> `duration_seconds`)
-
-Metrics are pushed to VictoriaMetrics via remote-write protocol.
 
 ### Log Ingestion
 
-The scraper fetches `ci-operator.log` from each build's artifact directory. This file contains structured JSON lines emitted by the ci-operator process during execution. Each line is parsed independently:
+The scraper fetches `ci-operator.log` from each build's artifact directory. Each JSON line is parsed independently:
 
 - **Time and message** are extracted as `_time` and `_msg` fields
-- **Scalar fields** (level, component, and other string/numeric/bool values) are flattened into the log entry
-- **Job labels** from the build's `ci-operator-metrics.json` are merged into each log entry, providing consistent queryability across metrics and logs. Labels take precedence over log fields with the same name.
-
-Logs are pushed to VictoriaLogs as JSON lines with `_stream_fields=job_name,build_id`.
+- **Scalar fields** (level, component, etc.) are flattened into the log entry
+- **Job labels** from `ci-operator-metrics.json` are merged into each entry for consistent queryability across metrics and logs
 
 ## Scraper Internals
 
 ### Pipeline Architecture
 
-The scraper is built around a pipeline architecture. Each pipeline processes a specific artifact type and emits records to a sink:
+Each pipeline processes a specific artifact type and emits records to a sink:
 
 | Pipeline | Artifact | Output | Sink |
 |---|---|---|---|
@@ -69,86 +63,65 @@ The scraper is built around a pipeline architecture. Each pipeline processes a s
 | LogPipeline | `ci-operator.log` | JSON log lines | VictoriaLogs |
 | JunitPipeline | `junit_operator.xml`, `junit_*.xml` | Metrics + failure logs | Both |
 | ClusterPoolPipeline | `clusterClaim.json`, `clusterDeployment.json` | Pool lifecycle metrics | VictoriaMetrics |
-| TestClusterMetricsPipeline | `prometheus.tar` (TSDB dump) | Cluster utilization metrics (per-node metrics enriched with master/worker `role` label) | VictoriaMetrics |
-| StepGraphPipeline | `ci-operator-step-graph.json` | Config hash metric + per-step log entries | Both |
+| TestClusterMetricsPipeline | [`prometheus.tar`](docs/appendix/prometheus-tsdb-artifacts.md#prometheustar-tsdb-dump), [`cluster-health-metrics.txt`](docs/appendix/prometheus-tsdb-artifacts.md#cluster-health-metricstxt-health-check-metrics) | Cluster utilization metrics | VictoriaMetrics |
+| StepGraphPipeline | `ci-operator-step-graph.json` | Config hash metric + per-step logs | Both |
+| BuildResourcesPipeline | Kubernetes resource JSONs | Event/pod/deployment logs | VictoriaLogs |
 
-Adding a new scrape target means writing a new Pipeline class and registering it in `__main__.py`. Pipelines are independent -- each receives a `BuildContext` and decides what to fetch and emit. Each pipeline declares a `version` string composed of `SHARED_VERSION` (for cross-cutting changes) and a pipeline-specific suffix. Bumping a pipeline's suffix invalidates only that pipeline; bumping `SHARED_VERSION` invalidates all pipelines.
+Pipelines are independent -- each receives a `BuildContext` and decides what to fetch and emit. Each pipeline declares a `version` string; bumping it causes reprocessing for that pipeline only.
+
+**Test cluster metrics** come from two sources with different instrumentation requirements:
+
+- **`prometheus.tar`** is produced automatically by the OpenShift CI [gather-extra step](https://docs.ci.openshift.org/) -- jobs that provision a test cluster and include a gather step get this for free. The scraper runs `promtool tsdb dump` to extract utilization metrics from the TSDB.
+- **`cluster-health-metrics.txt`** is a project-implemented collector that runs inside the e2e test binary and writes Prometheus exposition format to `$ARTIFACT_DIR`. It's cheaper to process and can include custom signals (e.g., `cluster_healthy`), but requires each project to build the collector. See [opendatahub-io/opendatahub-operator#3316](https://github.com/opendatahub-io/opendatahub-operator/pull/3316) for a reference implementation.
+
+Both are documented in detail in [docs/appendix/prometheus-tsdb-artifacts.md](docs/appendix/prometheus-tsdb-artifacts.md).
+
 
 ### Core Entities
 
-- **BuildContext**: Per-build facade providing lazy artifact fetching (with in-memory caching) and job label extraction. Pipelines access build artifacts and labels through the context without needing to know about GCS paths.
+- **GCSClient**: Pure HTTP client for the GCS XML API.
 
-- **Sink**: Handles batching and HTTP transport to backend services. `VictoriaMetricsSink` pushes Prometheus text format, `VictoriaLogsSink` pushes JSON lines.
+- **ArtifactCache**: On-disk cache backed by SQLite metadata. Handles artifact caching, miss tracking, processed output, staging for large temporary files, and age-based cleanup.
 
-- **GCSClient**: HTTP client for the GCS XML API with optional filesystem cache. Listing operations (PR/job/build enumeration) are never cached; object fetches are cached on disk so re-ingestion after a DB wipe reads from local disk.
+- **CachedGCSClient**: Composes `GCSClient` + `ArtifactCache` for transparent cache-aware fetching.
 
-- **Scraper**: Orchestrator that discovers builds, filters by date range, skips already-processed builds, and runs all pipelines via a thread pool.
+- **ScrapeState**: SQLite-backed pipeline processing state with retry tracking.
+
+- **BuildContext**: Per-build facade providing lazy artifact fetching and job label extraction.
+
+- **Scraper**: Orchestrator that discovers builds, checks processing state, and runs pipelines via a thread pool.
 
 ### Concurrency
 
-The scraper uses a `ThreadPoolExecutor` shared by both discovery and build processing. PR listing runs first (single GCS call), then per-PR discovery tasks (list jobs, list builds) and build processing tasks compete for the pool. As each discovery completes, its builds are submitted immediately and interleave with remaining discoveries. The main thread drives the work loop, submitting new discoveries to keep the pipeline fed as earlier ones complete. The TestClusterMetricsPipeline runs `promtool` WAL replay in a separate 4-worker pool to avoid starving the main pool with CPU-intensive work.
+The scraper uses a `ThreadPoolExecutor` shared by discovery and build processing. Discovery and build processing tasks interleave as they complete. The TestClusterMetricsPipeline runs `promtool` WAL replay in a separate pool (configurable via `PROMTOOL_WORKERS`) to avoid starving the main pool with CPU-intensive work. WAL size is checked before submission -- tars exceeding `MAX_WAL_MB` are skipped to prevent OOM.
 
-### GCS Artifact Cache
+### Artifact Cache
 
-GCS artifacts are immutable once written, so the scraper caches fetched objects to a local directory (a podman volume shared between watch and backfill services). Cache entries use the GCS path as the filesystem path, mirroring the bucket layout. 404 responses are recorded in a per-build `.misses` file (one GCS path per line) to avoid re-probing missing artifacts.
+GCS artifacts are immutable, so the scraper caches fetched objects to a podman volume shared between watch and backfill services. Cache metadata (misses, build timestamps) is stored in SQLite (`cache.db`). The TestClusterMetricsPipeline caches processed promtool output as `.metrics` files with version headers to avoid redundant WAL replay.
 
-The TestClusterMetricsPipeline also caches processed output as `.metrics` sibling files next to where the raw `prometheus.tar` was downloaded. Each `.metrics` file contains a version header and the final Prometheus text format ready for pushing. On read, the version is compared against the pipeline's current version -- a mismatch means stale, and the file is reprocessed. This avoids redundant `promtool` WAL replay, which is the most expensive operation in the scraper. Raw `prometheus.tar` files are cleaned up via two mechanisms: each promtool worker deletes its tar in a `finally` block (preventing accumulation during long runs), and `drain()` sweeps the cache for any remaining tars after all workers complete (catching stragglers from crashes or incomplete submissions).
-
-After each scrape cycle, the scraper runs age-based cache cleanup: entire build directories with a `started.json` timestamp older than the retention window (`--cache-retention`, default `max(--window, 90d)`) are deleted along with all their artifacts. Orphaned temp files from interrupted atomic writes are also removed. This prevents unbounded cache growth while preserving data within the retention window for fast re-ingestion.
-
-`make wipe-db` clears the database but preserves the cache, enabling fast re-ingestion after scrape logic changes. `make wipe-all` clears both.
-
-## Portability Design
-
-The scraper outputs data in standard formats:
-
-- **Metrics**: Prometheus text exposition format
-- **Logs**: JSON lines
-
-This design enables migration to hosted observability platforms by changing the ingestion URL and adding authentication, without modifying the scraper's output format.
-
-## Deduplication Strategy
-
-### Metrics
-
-VictoriaMetrics handles deduplication via `-dedup.minScrapeInterval=1ms` flag, which deduplicates samples with identical timestamps and labels. Changed or removed metrics age out via retention.
-
-### Logs
-
-Log entries include a `pipeline` field (`"logs"` or `"junit"`). When a pipeline's version changes and a build is reprocessed, the scraper deletes old log entries for that build_id and pipeline via the VictoriaLogs delete API before re-pushing, preventing duplicates.
+Temporary large files (prometheus.tar) are downloaded to a staging directory that is wiped at init for crash recovery. Age-based cleanup queries SQLite for expired builds rather than walking the filesystem.
 
 ## Operational Modes
 
-The scraper runs as two compose services:
+The scraper runs as two compose services sharing the same cache volume:
 
-### scraper-watch (Continuous Polling)
-
-- Continuously polls GCS for new builds
-- Runs indefinitely
-- Processes builds as they appear
-- Intended for real-time monitoring
-
-### scraper-backfill (One-Time)
-
-- Processes builds within the configured `--window`
-- Exits when complete
-- Used for historical data ingestion
-- Activated via compose profiles: `podman-compose --profile backfill up -d`
+- **scraper-watch**: Continuously polls GCS for new builds. Runs indefinitely.
+- **scraper-backfill**: Processes historical builds within the configured `--window`. Exits when complete.
 
 ## State Management
 
-Build processing state is stored in VictoriaMetrics itself via per-pipeline sentinel metrics. For each pipeline+build combination, the scraper pushes:
+Pipeline processing state is tracked in SQLite (`state.db`) via `ScrapeState`. A build is skipped if all pipelines have processed it at their current version. Failed builds are retried up to a configurable maximum (default 3), then permanently skipped. Success is a terminal state that cannot be reverted by a concurrent failure.
 
-```
-ci_pipeline_scraped{build_id="123", pipeline="metrics", pipeline_v="1.1"} 1
-ci_pipeline_scraped{build_id="123", pipeline="test_cluster_metrics", pipeline_v="1.2"} 1
-```
+- **Selective reprocessing**: bumping a pipeline's version reprocesses only that pipeline
+- **Idempotency**: reprocessed builds are deduplicated by VictoriaMetrics
+- **`make wipe-db`**: clears VM/VL data and `state.db` (triggers re-ingestion from cache)
+- **`make wipe-cache`**: clears the cache volume
+- **`make wipe-all`**: clears everything
 
-At the start of each scrape cycle, the scraper queries for known build_ids per pipeline at the current version. A build is skipped only if ALL pipelines have processed it at their current version. If any pipeline's version has changed, only that pipeline reprocesses -- no `make wipe-db` needed.
+## Deduplication
 
-This means:
+VictoriaMetrics deduplicates samples with identical timestamps and labels. Log entries include a `pipeline` field; when a pipeline version changes, old log entries are deleted before re-pushing.
 
-- **No external state**: no state file, no shared volume between scraper instances
-- **Self-healing**: if VictoriaMetrics data is wiped, builds are automatically re-ingested
-- **Idempotency**: builds can be reprocessed safely; VictoriaMetrics deduplicates identical data points
-- **Selective reprocessing**: bumping a pipeline's version reprocesses only that pipeline for all builds
+## Portability
+
+The scraper outputs standard Prometheus text format (metrics) and JSON lines (logs). Migration to hosted observability platforms requires only changing the ingestion URL and adding authentication.

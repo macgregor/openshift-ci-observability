@@ -7,6 +7,8 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from scraper.gcs import GCSClient, make_session
+from scraper.cache import ArtifactCache, CachedGCSClient
+from scraper.state import ScrapeState
 from scraper.sinks import VictoriaMetricsSink, VictoriaLogsSink
 from scraper.metrics import MetricsPipeline
 from scraper.logs import LogPipeline
@@ -80,6 +82,12 @@ def parse_args():
                         default=os.environ.get("CACHE_RETENTION"),
                         help="Cache retention period, e.g. 90d, 6m. Cached builds older than "
                              "this are deleted. Default: max(--window, 90d). (env: CACHE_RETENTION)")
+    parent.add_argument("--promtool-workers", type=int,
+                        default=int(os.environ.get("PROMTOOL_WORKERS", "1")),
+                        help="Concurrent promtool WAL replay workers (env: PROMTOOL_WORKERS, default: 1)")
+    parent.add_argument("--max-wal-mb", type=int,
+                        default=int(os.environ.get("MAX_WAL_MB", "256")),
+                        help="Maximum WAL size in MB for promtool processing (env: MAX_WAL_MB, default: 256)")
 
     parser = argparse.ArgumentParser(description="CI Operator Metrics Scraper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -121,8 +129,13 @@ def main():
         sys.exit(1)
 
     session = make_session(args.workers)
+    http_client = GCSClient(session, BUCKET)
+
     cache_dir = None if args.no_cache else args.cache_dir
-    gcs = GCSClient(session, BUCKET, cache_dir=cache_dir)
+    cache = ArtifactCache(cache_dir) if cache_dir else None
+    state = ScrapeState(os.path.join(cache_dir, "state.db")) if cache_dir else None
+    gcs = CachedGCSClient(http_client, cache)
+
     vm_sink = VictoriaMetricsSink(session, args.vm_url)
     vl_sink = VictoriaLogsSink(session, args.vl_url)
     pipelines = [
@@ -130,11 +143,14 @@ def main():
         LogPipeline(vl_sink),
         JunitPipeline(vm_sink, vl_sink),
         ClusterPoolPipeline(vm_sink),
-        TestClusterMetricsPipeline(vm_sink, gcs, session, args.vm_url),
+        TestClusterMetricsPipeline(vm_sink, gcs, cache, state,
+                                   promtool_workers=args.promtool_workers,
+                                   max_wal_mb=args.max_wal_mb),
         StepGraphPipeline(vm_sink, vl_sink),
         BuildResourcesPipeline(vl_sink),
     ]
-    scraper = Scraper(gcs, session, args.vm_url, args.vl_url, pipelines, args.workers)
+    scraper = Scraper(gcs, session, args.vm_url, args.vl_url, pipelines,
+                      args.workers, state=state)
 
     org_repo = args.repo.replace("/", "_")
     base_path = f"pr-logs/pull/{org_repo}"
@@ -155,9 +171,9 @@ def main():
             since_ts = int((now - delta).timestamp())
             until_ts = int(now.timestamp())
             scraper.scrape(base_path, since_ts, until_ts, args.dry_run)
-            if gcs.has_cache:
+            if cache:
                 cutoff = int((datetime.now(timezone.utc) - retention_delta).timestamp())
-                gcs.cleanup_aged_builds(cutoff)
+                cache.cleanup(cutoff)
             log.info("Sleeping %ds before next poll", args.poll_interval)
             time.sleep(args.poll_interval)
 
@@ -167,9 +183,9 @@ def main():
         until_ts = int(now.timestamp())
         log.info("Backfill mode: last %s, repo=%s", args.window, args.repo)
         scraper.scrape(base_path, since_ts, until_ts, args.dry_run)
-        if gcs.has_cache:
+        if cache:
             cutoff = int((datetime.now(timezone.utc) - retention_delta).timestamp())
-            gcs.cleanup_aged_builds(cutoff)
+            cache.cleanup(cutoff)
         log.info("Backfill complete")
 
 
