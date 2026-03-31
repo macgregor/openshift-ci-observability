@@ -398,14 +398,17 @@ class TestClusterMetricsPipeline:
     def process(self, ctx: BuildContext) -> int:
         if self._cache is None:
             log.warning("TSDB pipeline requires disk cache (GCS_NO_CACHE disables it); skipping")
+            self._mark_done(ctx.build.build_id)
             return 0
 
         # Skip builds without a cluster claim -- no test cluster means no Prometheus data.
         if ctx.fetch_artifact("artifacts/build-resources/clusterClaim.json") is None:
+            self._mark_done(ctx.build.build_id)
             return 0
 
         steps = discover_test_steps(ctx)
         if not steps:
+            self._mark_done(ctx.build.build_id)
             return 0
 
         any_pool_submitted = False

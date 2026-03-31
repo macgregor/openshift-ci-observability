@@ -229,7 +229,7 @@ def test_extract_no_role_without_kube_node_role():
 
 
 def test_process_skips_without_cluster_claim():
-    """Pipeline skips entirely when no clusterClaim.json exists."""
+    """Pipeline skips entirely when no clusterClaim.json exists, but still marks done."""
     pipeline, sink, gcs, cache, state = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
@@ -237,10 +237,11 @@ def test_process_skips_without_cluster_claim():
     assert pipeline.process(ctx) == 0
     ctx.list_artifact_dirs.assert_not_called()
     sink.push.assert_not_called()
+    state.mark_done.assert_called_once()
 
 
 def test_process_skips_without_cache():
-    """Pipeline skips when disk cache is disabled."""
+    """Pipeline skips when disk cache is disabled, but still marks done."""
     sink = MagicMock()
     gcs = MagicMock(spec=CachedGCSClient)
     state = MagicMock(spec=ScrapeState)
@@ -249,10 +250,11 @@ def test_process_skips_without_cache():
     ctx.labels = SAMPLE_LABELS
     assert pipeline.process(ctx) == 0
     ctx.fetch_artifact.assert_not_called()
+    state.mark_done.assert_called_once()
 
 
 def test_process_no_test_steps():
-    """Pipeline returns 0 when no test step directories exist."""
+    """Pipeline returns 0 when no test step directories exist, but still marks done."""
     pipeline, sink, gcs, cache, state = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
@@ -261,6 +263,7 @@ def test_process_no_test_steps():
         ["build-logs", "build-resources", "release"])
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
+    state.mark_done.assert_called_once()
 
 
 def test_process_no_prometheus_tar():
