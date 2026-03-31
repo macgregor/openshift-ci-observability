@@ -1,8 +1,9 @@
 """Tests for ArtifactCache and CachedGCSClient."""
+import json
 import sqlite3
 import threading
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -398,3 +399,117 @@ def test_cached_gcs_client_delegates_listing(cache):
 
     assert client.list_prs("base") == ["1", "2"]
     gcs.list_prs.assert_called_once_with("base")
+
+
+# ------------------------------------------------------------------
+# ArtifactCache: cleanup robustness
+# ------------------------------------------------------------------
+
+
+def _write_started_json(cache, prefix, timestamp):
+    """Write a started.json with the given timestamp into a build dir."""
+    data = json.dumps({"timestamp": timestamp}).encode()
+    cache.put(f"{prefix}/started.json", data)
+
+
+def test_cleanup_removes_orphan_dirs(cache):
+    """Dirs on disk with started.json but not registered in DB are cleaned."""
+    prefix = "pr-logs/pull/org_repo/1/job-a/100"
+    _write_started_json(cache, prefix, 1000)
+    cache.put(f"{prefix}/artifacts/file.json", b"data")
+    # Do NOT register in DB — simulates the pre-fix orphan scenario
+    assert (cache._dir / prefix).exists()
+
+    cache.cleanup(2000)
+
+    assert not (cache._dir / prefix).exists()
+
+
+def test_cleanup_preserves_recent_orphan_dirs(cache):
+    """Orphan dirs with recent timestamps are not deleted."""
+    prefix = "pr-logs/pull/org_repo/2/job-b/200"
+    _write_started_json(cache, prefix, 5000)
+    cache.put(f"{prefix}/artifacts/file.json", b"data")
+
+    cache.cleanup(3000)
+
+    assert (cache._dir / prefix / "artifacts" / "file.json").exists()
+
+
+def test_cleanup_rmtree_failure_keeps_build_in_db(cache):
+    """If rmtree fails, the build stays in DB for retry next cycle."""
+    prefix = "pr-logs/pull/org_repo/1/job-a/100"
+    cache.register_build(prefix, 1000)
+    _write_started_json(cache, prefix, 1000)
+    cache.put(f"{prefix}/artifacts/file.json", b"data")
+
+    with patch("scraper.cache.shutil.rmtree", side_effect=OSError("disk error")):
+        cache.cleanup(2000)
+
+    # Build should still be in DB
+    with cache._db_lock:
+        row = cache._db.execute(
+            "SELECT 1 FROM builds WHERE prefix = ?", (prefix,),
+        ).fetchone()
+    assert row is not None
+    # Files should still be on disk
+    assert (cache._dir / prefix / "artifacts" / "file.json").exists()
+
+    # Next cleanup (without mock) should succeed
+    cache.cleanup(2000)
+    assert not (cache._dir / prefix).exists()
+    with cache._db_lock:
+        row = cache._db.execute(
+            "SELECT 1 FROM builds WHERE prefix = ?", (prefix,),
+        ).fetchone()
+    assert row is None
+
+
+def test_cleanup_removes_orphan_misses(cache):
+    """Misses for builds not in DB and not on disk are cleaned."""
+    # Record misses for a build that doesn't exist anywhere
+    cache.record_miss("pr-logs/pull/org_repo/99/job-x/999/artifacts/missing.json")
+    cache.record_miss("pr-logs/pull/org_repo/99/job-x/999/artifacts/other.json")
+    assert cache.is_miss("pr-logs/pull/org_repo/99/job-x/999/artifacts/missing.json")
+
+    cache.cleanup(2000)
+
+    assert not cache.is_miss("pr-logs/pull/org_repo/99/job-x/999/artifacts/missing.json")
+    assert not cache.is_miss("pr-logs/pull/org_repo/99/job-x/999/artifacts/other.json")
+
+
+def test_cleanup_preserves_misses_for_existing_dirs(cache):
+    """Misses for unregistered builds whose dirs still exist are preserved."""
+    prefix = "pr-logs/pull/org_repo/3/job-c/300"
+    _write_started_json(cache, prefix, 5000)  # recent — won't be deleted
+    cache.record_miss(f"{prefix}/artifacts/missing.json")
+
+    cache.cleanup(3000)
+
+    # Dir still exists (recent timestamp), so misses should be preserved
+    assert cache.is_miss(f"{prefix}/artifacts/missing.json")
+
+
+def test_cleanup_walk_skips_staging(cache):
+    """Walk cleanup does not delete staged files."""
+    staged = cache.stage("some/prometheus.tar", iter([b"tar data"]))
+    assert staged.exists()
+
+    cache.cleanup(999999999)  # far-future cutoff
+
+    assert staged.exists()
+
+
+def test_cleanup_walk_cleans_db_entries_for_orphans(cache):
+    """Walk cleanup removes misses and stale DB entries for orphan dirs."""
+    prefix = "pr-logs/pull/org_repo/4/job-d/400"
+    _write_started_json(cache, prefix, 1000)
+    cache.record_miss(f"{prefix}/artifacts/missing.json")
+    # Don't register in DB — orphan
+
+    cache.cleanup(2000)
+
+    # Dir should be gone
+    assert not (cache._dir / prefix).exists()
+    # Misses for the orphan should be cleaned
+    assert not cache.is_miss(f"{prefix}/artifacts/missing.json")

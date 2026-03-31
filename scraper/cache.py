@@ -66,9 +66,10 @@ class ArtifactCache:
     def get(self, gcs_path: str) -> Optional[bytes]:
         """Read a cached artifact. Returns None if not cached."""
         fp = self._artifact_path(gcs_path)
-        if fp.exists():
+        try:
             return fp.read_bytes()
-        return None
+        except FileNotFoundError:
+            return None
 
     def put(self, gcs_path: str, data: bytes) -> None:
         """Atomic-write an artifact to the cache."""
@@ -125,11 +126,9 @@ class ArtifactCache:
         metrics), or None on cache miss or version mismatch.
         """
         metrics_path = self._artifact_path(gcs_path + ".metrics")
-        if not metrics_path.exists():
-            return None
         try:
             content = metrics_path.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, ValueError):
             return None
         first_line, _, rest = content.partition("\n")
         if first_line != f"{_METRICS_VERSION_PREFIX}{version}":
@@ -187,84 +186,188 @@ class ArtifactCache:
     # ------------------------------------------------------------------
 
     def cleanup(self, cutoff_ts: int) -> None:
-        """Delete cached builds older than cutoff_ts and their associated data."""
-        if not self._db_ok:
-            self._cleanup_walk_fallback(cutoff_ts)
-            return
-        try:
-            self._cleanup_from_db(cutoff_ts)
-        except sqlite3.Error:
-            log.warning("SQLite cleanup failed, falling back to tree walk",
-                        exc_info=True)
-            self._cleanup_walk_fallback(cutoff_ts)
+        """Delete cached builds older than cutoff_ts and their associated data.
 
-    def _cleanup_from_db(self, cutoff_ts: int) -> None:
+        Runs DB-based cleanup for registered builds, then walks the filesystem
+        as a safety net for orphan directories not tracked in the database.
+        """
+        db_cleaned = 0
+        if self._db_ok:
+            try:
+                db_cleaned = self._cleanup_from_db(cutoff_ts)
+            except sqlite3.Error:
+                log.warning("DB cleanup failed, relying on filesystem walk",
+                            exc_info=True)
+
+        # Walk filesystem as safety net — catches orphan dirs (not in DB)
+        # and dirs that _cleanup_from_db failed to delete.
+        walk_cleaned = self._cleanup_walk(cutoff_ts)
+
+        # Clean orphan miss entries for builds no longer tracked or on disk.
+        if self._db_ok:
+            try:
+                self._cleanup_orphan_misses()
+            except sqlite3.Error:
+                log.debug("Orphan miss cleanup failed", exc_info=True)
+
+        total = db_cleaned + walk_cleaned
+        if total:
+            log.info("Cache cleanup: %d expired builds removed "
+                     "(%d registered, %d orphan)", total, db_cleaned,
+                     walk_cleaned)
+        else:
+            log.debug("Cache cleanup: nothing to remove")
+
+    def _cleanup_from_db(self, cutoff_ts: int) -> int:
+        """Delete registered builds older than cutoff_ts. Returns count removed."""
         with self._db_lock:
             cursor = self._db.execute(
                 "SELECT prefix FROM builds WHERE started_ts < ?", (cutoff_ts,),
             )
             prefixes = [row[0] for row in cursor.fetchall()]
         if not prefixes:
-            return
+            return 0
 
-        builds_deleted = 0
+        deleted = []
         for prefix in prefixes:
             build_path = self._dir / prefix
-            if build_path.exists():
-                shutil.rmtree(build_path, ignore_errors=True)
-                builds_deleted += 1
-
-        with self._db_lock:
-            for prefix in prefixes:
-                try:
-                    self._db.execute(
-                        "DELETE FROM misses WHERE gcs_path LIKE ?",
-                        (prefix + "%",),
-                    )
-                except sqlite3.Error:
-                    pass
+            if not build_path.exists():
+                deleted.append(prefix)
+                continue
             try:
-                self._db.execute(
-                    "DELETE FROM builds WHERE started_ts < ?", (cutoff_ts,),
-                )
-                self._db.commit()
-            except sqlite3.Error:
-                pass
+                shutil.rmtree(build_path)
+                deleted.append(prefix)
+            except FileNotFoundError:
+                # Race with concurrent scraper (watch/backfill) — dir was
+                # deleted between exists() check and rmtree.  Treat as success.
+                deleted.append(prefix)
+            except OSError:
+                log.warning("Cache cleanup: failed to delete %s, will retry",
+                            build_path, exc_info=True)
 
-        # Prune empty directories under deleted prefixes
-        for prefix in prefixes:
-            # Walk upward from the prefix parent, removing empty dirs
-            parts = prefix.split("/")
-            for i in range(len(parts) - 1, 0, -1):
-                parent = self._dir / "/".join(parts[:i])
+        if deleted:
+            with self._db_lock:
+                for prefix in deleted:
+                    try:
+                        self._db.execute(
+                            "DELETE FROM misses WHERE gcs_path LIKE ?",
+                            (prefix + "%",),
+                        )
+                        self._db.execute(
+                            "DELETE FROM builds WHERE prefix = ?", (prefix,),
+                        )
+                    except sqlite3.Error:
+                        log.debug("Cache cleanup: DB delete failed for %s, "
+                                  "will retry", prefix, exc_info=True)
                 try:
-                    os.rmdir(parent)
-                except OSError:
-                    break  # non-empty or doesn't exist
+                    self._db.commit()
+                except sqlite3.Error:
+                    log.debug("Cache cleanup: DB commit failed, will retry",
+                              exc_info=True)
 
-        if builds_deleted:
-            log.info("Cache cleanup: %d aged builds removed", builds_deleted)
+            for prefix in deleted:
+                self._prune_empty_parents(prefix)
 
-    def _cleanup_walk_fallback(self, cutoff_ts: int) -> None:
-        """Fallback cleanup via filesystem walk when SQLite is unavailable."""
+        return len(deleted)
+
+    def _cleanup_walk(self, cutoff_ts: int) -> int:
+        """Walk filesystem for expired build dirs missed by DB cleanup."""
         import json as _json
         builds_deleted = 0
         for dirpath, dirnames, filenames in os.walk(self._dir):
+            if Path(dirpath) == self._staging:
+                dirnames.clear()
+                continue
             if "started.json" not in filenames:
                 continue
+            # Don't descend into artifact subdirectories
+            dirnames.clear()
+
             started_path = os.path.join(dirpath, "started.json")
             try:
-                ts = _json.loads(Path(started_path).read_text()).get("timestamp", 0)
+                ts = _json.loads(
+                    Path(started_path).read_text()
+                ).get("timestamp", 0)
             except (ValueError, OSError):
                 ts = 0
             if ts >= cutoff_ts:
                 continue
-            shutil.rmtree(dirpath, ignore_errors=True)
+
+            try:
+                shutil.rmtree(dirpath)
+            except FileNotFoundError:
+                pass  # Race with concurrent scraper — already deleted
+            except OSError:
+                log.warning("Walk cleanup: failed to delete %s", dirpath,
+                            exc_info=True)
+                continue
             builds_deleted += 1
-            dirnames.clear()
-        if builds_deleted:
-            log.info("Cache cleanup (fallback): %d aged builds removed",
-                     builds_deleted)
+
+            # Clean associated DB entries if possible
+            if self._db_ok:
+                prefix = os.path.relpath(dirpath, self._dir)
+                try:
+                    with self._db_lock:
+                        self._db.execute(
+                            "DELETE FROM misses WHERE gcs_path LIKE ?",
+                            (prefix + "%",),
+                        )
+                        self._db.execute(
+                            "DELETE FROM builds WHERE prefix = ?", (prefix,),
+                        )
+                        self._db.commit()
+                except sqlite3.Error:
+                    pass
+                self._prune_empty_parents(prefix)
+
+        return builds_deleted
+
+    def _cleanup_orphan_misses(self) -> None:
+        """Remove miss entries whose build is no longer tracked or on disk."""
+        with self._db_lock:
+            all_misses = [row[0] for row in
+                          self._db.execute("SELECT gcs_path FROM misses")]
+        if not all_misses:
+            return
+
+        with self._db_lock:
+            registered = set(
+                row[0] for row in self._db.execute("SELECT prefix FROM builds")
+            )
+
+        # Extract build prefix (first 6 path segments) from each miss path
+        orphan_prefixes = set()
+        for path in all_misses:
+            parts = path.split("/")
+            if len(parts) < 6:
+                continue
+            prefix = "/".join(parts[:6])
+            if prefix not in registered and not (self._dir / prefix).exists():
+                orphan_prefixes.add(prefix)
+
+        if not orphan_prefixes:
+            return
+
+        with self._db_lock:
+            for prefix in orphan_prefixes:
+                self._db.execute(
+                    "DELETE FROM misses WHERE gcs_path LIKE ?",
+                    (prefix + "%",),
+                )
+            self._db.commit()
+
+        log.info("Cache cleanup: removed orphan misses for %d stale builds",
+                 len(orphan_prefixes))
+
+    def _prune_empty_parents(self, prefix: str) -> None:
+        """Remove empty parent directories up to the cache root."""
+        parts = prefix.split("/")
+        for i in range(len(parts) - 1, 0, -1):
+            parent = self._dir / "/".join(parts[:i])
+            try:
+                os.rmdir(parent)
+            except OSError:
+                break
 
     # ------------------------------------------------------------------
     # Internal helpers

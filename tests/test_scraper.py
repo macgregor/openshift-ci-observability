@@ -5,7 +5,7 @@ import requests
 import responses
 
 from scraper.gcs import GCSClient, GCS_BASE
-from scraper.cache import CachedGCSClient
+from scraper.cache import ArtifactCache, CachedGCSClient
 from scraper.state import ScrapeState
 from scraper.sinks import VictoriaMetricsSink
 from scraper.metrics import MetricsPipeline
@@ -178,3 +178,37 @@ def test_scrape_reprocesses_pipeline_on_version_mismatch(metrics_json, tmp_path)
     post_calls = [c for c in responses.calls if c.request.method == "POST"]
     assert len(post_calls) > 0
     assert not state.should_process("12345", "metrics", MetricsPipeline.version)
+
+
+@responses.activate
+def test_out_of_range_build_registered_in_cache(tmp_path):
+    """Out-of-range builds are registered in cache so cleanup can find them."""
+    base_path = "pr-logs/pull/org_repo"
+    now = int(time.time())
+    old_ts = 1000000  # far in the past
+
+    _mock_gcs_listing(base_path, [("100", "job-e2e", ["12345"])])
+
+    responses.add(responses.GET, f"{BASE_URL}/{base_path}/100/job-e2e/12345/started.json",
+                  json={"timestamp": old_ts}, status=200)
+
+    session = requests.Session()
+    cache = ArtifactCache(str(tmp_path / "cache"))
+    gcs = CachedGCSClient(GCSClient(session, BUCKET), cache)
+    pipelines = [MetricsPipeline(VictoriaMetricsSink(session, VM_URL))]
+    scraper = Scraper(gcs, session, VM_URL, VL_URL, pipelines, workers=1)
+
+    scraper.scrape(base_path, since=now - 3600, until=now + 3600, dry_run=False)
+
+    # Build was out of range so nothing should be ingested
+    metrics_calls = [c for c in responses.calls if "ci-operator-metrics" in c.request.url]
+    assert len(metrics_calls) == 0
+
+    # But the build MUST be registered in the cache for cleanup
+    with cache._db_lock:
+        row = cache._db.execute(
+            "SELECT started_ts FROM builds WHERE prefix = ?",
+            (f"{base_path}/100/job-e2e/12345",),
+        ).fetchone()
+    assert row is not None
+    assert row[0] == old_ts

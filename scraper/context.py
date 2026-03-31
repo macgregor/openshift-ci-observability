@@ -28,7 +28,8 @@ def extract_job_labels(data) -> JobLabels:
             "config_hash": "",
         }
     except (StopIteration, KeyError, IndexError):
-        log.warning("Could not extract job labels from test_platform_insights")
+        log.debug("Incomplete job labels in ci-operator-metrics.json, "
+                   "using defaults")
         return {"build_id": "unknown", "config_hash": ""}
 
 

@@ -126,14 +126,18 @@ class Scraper:
             return False
         started = json.loads(started_content)
         ts = started.get("timestamp", 0)
-        if not (since <= ts <= until):
-            log.debug("Build %s out of date range (ts=%d)", build_id, ts)
-            return False
 
-        # Register build in cache for age-based cleanup
+        # Register build in cache for age-based cleanup BEFORE the date
+        # check — fetch_object already cached started.json to disk, so the
+        # build directory exists.  Without registration, out-of-range builds
+        # become orphan directories invisible to cleanup.
         cache = getattr(self.gcs, 'cache', None)
         if cache is not None:
             cache.register_build(f"{base_path}/{pr}/{job}/{build_id}", ts)
+
+        if not (since <= ts <= until):
+            log.debug("Build %s out of date range (ts=%d)", build_id, ts)
+            return False
 
         build = Build(build_id=build_id, pr=pr, job=job, base_path=base_path)
         ctx = BuildContext(build, self.gcs)
@@ -160,7 +164,8 @@ class Scraper:
                     if self.state:
                         self.state.mark_done(build_id, pipeline.name, pipeline.version)
             except Exception:
-                log.error("Pipeline %s failed for build %s", pipeline.name, build_id, exc_info=True)
+                log.error("Unexpected error in pipeline %s for build %s",
+                          pipeline.name, build_id, exc_info=True)
                 if self.state:
                     self.state.mark_failed(build_id, pipeline.name, pipeline.version)
 

@@ -537,12 +537,12 @@ class TestClusterMetricsPipeline:
             else:
                 log.debug("prometheus.tar deleted before processing for build %s step %s "
                           "(will retry next cycle)", build_id, step_name)
-        except (tarfile.TarError, OSError) as e:
-            log.warning("Failed to process prometheus.tar for build %s step %s: %s",
+        except (tarfile.TarError, EOFError, OSError) as e:
+            log.warning("Corrupt or truncated prometheus.tar for build %s step %s: %s",
                         build_id, step_name, e)
         except Exception:
-            log.error("Prometheus pipeline failed for build %s step %s",
-                      build_id, step_name, exc_info=True)
+            log.error("Unexpected error processing prometheus.tar for build %s "
+                      "step %s", build_id, step_name, exc_info=True)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
             if self._cache:

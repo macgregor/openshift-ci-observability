@@ -80,12 +80,14 @@ class JunitPipeline:
         # Get build timestamp from started.json
         started_content = ctx.fetch_artifact("started.json")
         if started_content is None:
-            log.warning("No started.json found, skipping JUnit pipeline")
+            log.debug("No started.json for build %s, skipping JUnit",
+                      ctx.build.build_id)
             return 0
         try:
             timestamp = int(json.loads(started_content)["timestamp"])
         except (json.JSONDecodeError, KeyError, ValueError):
-            log.warning("Could not parse timestamp from started.json")
+            log.warning("Unparseable started.json for build %s, skipping JUnit",
+                        ctx.build.build_id)
             return 0
 
         # Fetch + parse junit_operator.xml

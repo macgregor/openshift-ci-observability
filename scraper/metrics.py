@@ -221,13 +221,16 @@ def convert_to_metrics(data, job_labels):
             try:
                 all_metrics.extend(extract_metrics_from_entry(section, entry, job_labels))
             except Exception:
-                log.error("Failed to extract metrics from %s entry", section, exc_info=True)
+                log.warning("Malformed %s entry in build %s, skipping",
+                            section, job_labels.get("build_id", "?"),
+                            exc_info=True)
     events = data.get("events", [])
     if isinstance(events, list):
         try:
             all_metrics.extend(_extract_step_offsets(events, job_labels))
         except Exception:
-            log.error("Failed to extract step offsets", exc_info=True)
+            log.warning("Could not extract step offsets for build %s",
+                        job_labels.get("build_id", "?"), exc_info=True)
     return all_metrics
 
 
