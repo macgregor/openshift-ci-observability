@@ -1,18 +1,55 @@
 ---
-name: prometheus-tsdb-artifacts
+name: test-cluster-metrics-artifacts
 description: >
-  Load when working with Prometheus TSDB artifacts from test clusters,
-  extracting utilization metrics from prometheus.tar, or extending
-  the test cluster metrics pipeline.
+  Load when working with test cluster metrics artifacts (prometheus.tar
+  or cluster-health-metrics.txt), extracting utilization metrics, or
+  extending the test cluster metrics pipeline.
 categories: [reference, metrics]
-tags: [prometheus, tsdb, promtool, utilization, test-cluster]
+tags: [prometheus, tsdb, promtool, utilization, test-cluster, health-metrics]
 related_docs:
   - docs/appendix/gcs-bucket-layout.md
   - docs/appendix/ci-operator-metrics.md
 complexity: intermediate
 ---
 
-# Prometheus TSDB Artifacts
+# Test Cluster Metrics Artifacts
+
+Two artifact types provide test cluster utilization metrics. Projects can use either, both, or neither.
+
+| | prometheus.tar | cluster-health-metrics.txt |
+|---|---|---|
+| **Source** | OpenShift CI gather-extra step (automatic) | Project e2e test binary (project-implemented) |
+| **Format** | Prometheus TSDB (requires `promtool` to extract) | Prometheus text exposition format (plain text) |
+| **Location** | `artifacts/{step}/gather-extra/artifacts/metrics/prometheus.tar` | `artifacts/{step}/cluster-health-metrics.txt` |
+| **Processing cost** | High (~10s per build, 3-5x WAL size in RAM) | Negligible (sub-millisecond text parsing) |
+| **Coverage** | All cluster metrics at 15-30s scrape intervals | Project-selected metrics at configurable intervals |
+| **Availability** | Any job with a test cluster and gather-extra | Only projects that implement a metrics collector |
+
+Both sources produce metrics with the `ci_test_cluster_` prefix. A `metrics_source` label distinguishes them: `"tsdb"` for prometheus.tar, `"health"` for cluster-health-metrics.txt.
+
+## Overlapping Metrics
+
+Several metrics are available from both sources. When both exist for a build, both are ingested as separate time series (distinguished by `metrics_source`). Dashboard queries should filter by `metrics_source` to avoid double-counting in aggregations.
+
+| Metric | prometheus.tar | cluster-health-metrics.txt |
+|---|---|---|
+| `machine_cpu_cores` | Yes | Yes |
+| `kube_pod_container_resource_requests` | Yes | Yes |
+| `kube_pod_container_resource_limits` | Yes | Yes |
+| `container_memory_working_set_bytes` | Yes | Yes |
+| `kube_node_role` | Yes (for role mapping) | Yes (for role mapping) |
+| `cluster:cpu_usage_cores:sum` | Yes | No (recording rule) |
+| `cluster:capacity_cpu_cores:sum` | Yes | No (recording rule) |
+| `cluster:memory_usage_bytes:sum` | Yes | No (recording rule) |
+| `cluster:capacity_memory_bytes:sum` | Yes | No (recording rule) |
+| `kube_node_status_allocatable` | No | Yes |
+| `kube_pod_status_phase` | No | Yes |
+| `kube_deployment_status_replicas` | No | Yes |
+| `cluster_healthy` | No | Yes |
+
+---
+
+## prometheus.tar (TSDB Dump)
 
 The `gather-extra` step in CI creates `prometheus.tar` by tarring the Prometheus data directory from the ephemeral test cluster. This TSDB contains full time-series data for the entire test duration.
 
@@ -99,3 +136,63 @@ The timestamp is in milliseconds. Labels follow Prometheus exposition format.
 ## Performance
 
 Dumping targeted metrics (`--match` with the utilization metric set) takes ~10 seconds for a 171 MB TSDB. Full dump without filtering takes significantly longer.
+
+---
+
+## cluster-health-metrics.txt (Health Check Metrics)
+
+A lightweight alternative to prometheus.tar. Projects implement a metrics collector (typically a background goroutine in their e2e test binary) that periodically writes kube-state-metrics-style data to `$ARTIFACT_DIR/cluster-health-metrics.txt` during test execution.
+
+### Artifact Location
+
+```
+artifacts/{test-step-name}/cluster-health-metrics.txt
+```
+
+### Format
+
+Standard Prometheus text exposition format:
+
+```
+# HELP cluster_healthy Overall cluster health status
+# TYPE cluster_healthy gauge
+cluster_healthy 1.0 1710849600000
+kube_node_role{node="ip-10-0-1-1",role="worker"} 1.0 1710849600000
+kube_node_status_allocatable{node="ip-10-0-1-1",resource="cpu",unit="core"} 4.0 1710849600000
+```
+
+Lines starting with `#` are comments (HELP/TYPE metadata). Timestamps are in milliseconds since epoch.
+
+### Metrics
+
+| Metric | Labels | Purpose |
+|---|---|---|
+| `kube_node_role` | `node`, `role` | Node role mapping; used for role enrichment (not emitted) |
+| `kube_node_status_allocatable` | `node`, `resource`, `unit` | Per-node allocatable resources (cpu, memory) |
+| `machine_cpu_cores` | `node` | Per-node CPU core count |
+| `kube_pod_status_phase` | `namespace`, `pod`, `phase` | Pod lifecycle phase (Pending, Running, etc.) |
+| `kube_pod_container_resource_requests` | `namespace`, `pod`, `container`, `resource`, `unit` | Container resource requests |
+| `kube_pod_container_resource_limits` | `namespace`, `pod`, `container`, `resource`, `unit` | Container resource limits |
+| `container_memory_working_set_bytes` | `namespace`, `pod`, `container` | Container memory usage |
+| `kube_deployment_status_replicas` | `namespace`, `deployment` | Desired replica count |
+| `kube_deployment_status_replicas_available` | `namespace`, `deployment` | Available replicas |
+| `kube_deployment_status_replicas_ready` | `namespace`, `deployment` | Ready replicas |
+| `kube_deployment_status_replicas_updated` | `namespace`, `deployment` | Updated replicas |
+| `cluster_healthy` | (none) | Overall cluster health gauge (1.0 = healthy, 0.0 = unhealthy) |
+
+### Implementing a Collector
+
+Projects that want to emit health metrics need to:
+
+1. Create a background goroutine (or periodic task) that collects metrics from the Kubernetes API
+2. Write metrics in Prometheus text exposition format to `$ARTIFACT_DIR/cluster-health-metrics.txt`
+3. Use metric names from the table above for automatic ingestion
+
+See [opendatahub-io/opendatahub-operator#3316](https://github.com/opendatahub-io/opendatahub-operator/pull/3316) for a reference implementation.
+
+### Advantages Over prometheus.tar
+
+- **No infrastructure dependency**: doesn't require `gather-extra` or Prometheus TSDB access
+- **Negligible processing cost**: plain text parsing vs promtool WAL replay
+- **Project-specific signals**: can include custom health metrics (e.g., `cluster_healthy`)
+- **Continuous sampling**: collector runs throughout the test, not just at gather time

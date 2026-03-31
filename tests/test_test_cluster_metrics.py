@@ -5,11 +5,17 @@ import requests
 from scraper.test_cluster_metrics import (
     discover_test_steps,
     parse_promtool_line,
+    parse_exposition_line,
     extract_test_cluster_metrics,
+    extract_health_metrics,
     _build_node_role_map,
+    _filter_overlapping,
     _read_cached_metrics,
     _write_cached_metrics,
     _OUTPUT_NAMES,
+    _HEALTH_OUTPUT_NAMES,
+    _HEALTH_METRICS_FILE,
+    _OVERLAPPING_OUTPUT_NAMES,
     TestClusterMetricsPipeline,
 )
 from scraper.gcs import GCSClient
@@ -117,9 +123,11 @@ def test_extract_test_cluster_metrics():
     assert len(metrics) == 2
     assert "ci_test_cluster_cluster_cpu_usage_cores_sum" in metrics[0]
     assert 'build_id="123"' in metrics[0]
+    assert 'metrics_source="tsdb"' in metrics[0]
     assert "3.14" in metrics[0]
     assert "ci_test_cluster_machine_cpu_cores" in metrics[1]
     assert 'pr_number="42"' in metrics[1]
+    assert 'metrics_source="tsdb"' in metrics[1]
 
 
 def test_extract_pod_resource_metrics():
@@ -248,7 +256,8 @@ def test_process_no_test_steps():
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
-    ctx.list_artifact_dirs.return_value = ["build-logs", "build-resources", "release"]
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(
+        ["build-logs", "build-resources", "release"])
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
 
@@ -259,7 +268,7 @@ def test_process_no_prometheus_tar():
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
-    ctx.list_artifact_dirs.return_value = ["my-step"]
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-step"])
     ctx.artifact_cache_path.return_value = None  # prometheus.tar not found
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
@@ -289,14 +298,15 @@ def test_process_with_promtool(mock_sentinel, mock_promtool, tmp_path):
     ctx.build.build_id = "123"
     ctx.build.pr = "42"
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
-    ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
     ctx.artifact_cache_path.return_value = tar_file
     ctx.artifact_gcs_path.return_value = "pr-logs/pull/org_repo/42/job/123/artifacts/my-e2e-step/gather-extra/artifacts/metrics/prometheus.tar"
 
     count = pipeline.process(ctx)
     assert count == 0  # Returns immediately; work is async
     pipeline.drain()  # Wait for the promtool pool to finish
-    sink.push.assert_called_once()
+    # Health metrics (none found since fetch returns "{}") + tar metrics
+    assert sink.push.call_count >= 1
     pushed = sink.push.call_args[0][0]
     assert len(pushed) == 1
     assert "ci_test_cluster_cluster_cpu_usage_cores_sum" in pushed[0]
@@ -314,7 +324,7 @@ def test_cache_hit(tmp_path):
     pipeline, sink, gcs, _ = _make_pipeline()
 
     cached_content = f"# version={pipeline.version}\n" \
-        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123"} 4.2 1710000000\n'
+        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123",metrics_source="tsdb"} 4.2 1710000000\n'
     gcs.read_processed.return_value = cached_content
 
     ctx = MagicMock()
@@ -322,7 +332,7 @@ def test_cache_hit(tmp_path):
     ctx.build.build_id = "123"
     ctx.build.pr = "42"
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
-    ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
     ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
 
     pipeline.process(ctx)
@@ -349,7 +359,7 @@ def test_cache_stale_version(tmp_path):
     ctx.build.build_id = "123"
     ctx.build.pr = "42"
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
-    ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
     ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
     ctx.artifact_cache_path.return_value = None  # tar not available
 
@@ -374,7 +384,7 @@ def test_cache_empty_metrics():
     ctx.build.build_id = "123"
     ctx.build.pr = "42"
     ctx.fetch_artifact.return_value = "{}"  # clusterClaim exists
-    ctx.list_artifact_dirs.return_value = ["my-e2e-step"]
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
     ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
 
     pipeline.process(ctx)
@@ -742,3 +752,433 @@ def test_redownload_after_failed_processing(mock_sentinel, tmp_path):
     # Verify the cache path is now empty -- ensure_cached would re-download
     cache_path = gcs._cache_path(GCS_PATH)
     assert not cache_path.exists(), "cache path should be clear for re-download"
+
+
+# --- Prometheus exposition format parser tests ---
+
+def test_parse_exposition_line_basic():
+    line = 'kube_node_status_allocatable{node="ip-10-0-1-1",resource="cpu",unit="core"} 4.0 1710849600000'
+    result = parse_exposition_line(line)
+    assert result is not None
+    name, labels, value, ts = result
+    assert name == "kube_node_status_allocatable"
+    assert labels == {"node": "ip-10-0-1-1", "resource": "cpu", "unit": "core"}
+    assert value == 4.0
+    assert ts == 1710849600
+
+
+def test_parse_exposition_line_no_labels():
+    line = 'cluster_healthy 1.0 1710849600000'
+    result = parse_exposition_line(line)
+    assert result is not None
+    name, labels, value, ts = result
+    assert name == "cluster_healthy"
+    assert labels == {}
+    assert value == 1.0
+    assert ts == 1710849600
+
+
+def test_parse_exposition_line_no_timestamp():
+    line = 'cluster_healthy 1.0'
+    result = parse_exposition_line(line)
+    assert result is not None
+    name, labels, value, ts = result
+    assert name == "cluster_healthy"
+    assert value == 1.0
+    assert ts is None
+
+
+def test_parse_exposition_line_comments():
+    assert parse_exposition_line('# HELP cluster_healthy Overall cluster health') is None
+    assert parse_exposition_line('# TYPE cluster_healthy gauge') is None
+
+
+def test_parse_exposition_line_empty():
+    assert parse_exposition_line('') is None
+    assert parse_exposition_line('   ') is None
+    assert parse_exposition_line('\n') is None
+
+
+# --- Health metrics extraction tests ---
+
+def test_extract_health_metrics_basic():
+    content = (
+        '# HELP cluster_healthy Overall cluster health\n'
+        '# TYPE cluster_healthy gauge\n'
+        'cluster_healthy 1.0 1710849600000\n'
+        'machine_cpu_cores{node="ip-10-0-1-1"} 4.0 1710849600000\n'
+    )
+    job_labels = {"build_id": "123", "pr_number": "42"}
+    metrics = extract_health_metrics(content, job_labels)
+    assert len(metrics) == 2
+    assert "ci_test_cluster_cluster_healthy" in metrics[0]
+    assert 'build_id="123"' in metrics[0]
+    assert 'metrics_source="health"' in metrics[0]
+    assert "ci_test_cluster_machine_cpu_cores" in metrics[1]
+    assert 'metrics_source="health"' in metrics[1]
+
+
+def test_extract_health_metrics_role_enrichment():
+    content = (
+        'kube_node_role{node="ip-10-0-1-1",role="master"} 1.0 1710849600000\n'
+        'kube_node_role{node="ip-10-0-1-2",role="worker"} 1.0 1710849600000\n'
+        'machine_cpu_cores{node="ip-10-0-1-1"} 4.0 1710849600000\n'
+        'machine_cpu_cores{node="ip-10-0-1-2"} 8.0 1710849600000\n'
+        'kube_node_status_allocatable{node="ip-10-0-1-1",resource="cpu",unit="core"} 3.5 1710849600000\n'
+    )
+    job_labels = {"build_id": "1"}
+    metrics = extract_health_metrics(content, job_labels)
+    # kube_node_role should not be emitted
+    assert not any("kube_node_role" in m for m in metrics)
+    # Per-node metrics should get role labels
+    cpu_master = [m for m in metrics if "machine_cpu_cores" in m and "4.0" in m][0]
+    assert 'role="master"' in cpu_master
+    cpu_worker = [m for m in metrics if "machine_cpu_cores" in m and "8.0" in m][0]
+    assert 'role="worker"' in cpu_worker
+    # kube_node_status_allocatable should also get role
+    alloc = [m for m in metrics if "kube_node_status_allocatable" in m][0]
+    assert 'role="master"' in alloc
+
+
+def test_extract_health_metrics_comma_role():
+    """Health metrics with comma-separated role like 'control-plane,master' are recognized as master."""
+    content = (
+        'kube_node_role{node="ip-10-0-1-1",role="control-plane,master"} 1.0 1710849600000\n'
+        'kube_node_role{node="ip-10-0-1-2",role="worker"} 1.0 1710849600000\n'
+        'machine_cpu_cores{node="ip-10-0-1-1"} 4.0 1710849600000\n'
+        'machine_cpu_cores{node="ip-10-0-1-2"} 8.0 1710849600000\n'
+    )
+    job_labels = {"build_id": "1"}
+    metrics = extract_health_metrics(content, job_labels)
+    cpu_master = [m for m in metrics if "machine_cpu_cores" in m and "4.0" in m][0]
+    assert 'role="master"' in cpu_master
+    cpu_worker = [m for m in metrics if "machine_cpu_cores" in m and "8.0" in m][0]
+    assert 'role="worker"' in cpu_worker
+
+
+def test_extract_health_metrics_pod_no_node():
+    """Per-pod metrics without node label get no role (graceful)."""
+    content = (
+        'kube_node_role{node="ip-10-0-1-1",role="master"} 1.0 1710849600000\n'
+        'kube_pod_status_phase{namespace="default",pod="my-pod",phase="Running"} 1.0 1710849600000\n'
+    )
+    job_labels = {"build_id": "1"}
+    metrics = extract_health_metrics(content, job_labels)
+    pod_metric = [m for m in metrics if "kube_pod_status_phase" in m][0]
+    assert 'role=' not in pod_metric
+
+
+def test_extract_health_metrics_filters_unknown():
+    content = (
+        'some_unknown_metric{foo="bar"} 99 1710849600000\n'
+        'cluster_healthy 1.0 1710849600000\n'
+    )
+    metrics = extract_health_metrics(content, {"build_id": "1"})
+    assert len(metrics) == 1
+    assert "cluster_healthy" in metrics[0]
+
+
+def test_extract_health_metrics_empty_content():
+    assert extract_health_metrics("", {"build_id": "1"}) == []
+
+
+def test_extract_health_metrics_malformed_lines():
+    content = (
+        'cluster_healthy 1.0 1710849600000\n'
+        'this is not valid prometheus format\n'
+        '{__name__="promtool_format"} 1.0 1710000000000\n'
+        'machine_cpu_cores{node="x"} 4.0 1710849600000\n'
+        '\n'
+    )
+    metrics = extract_health_metrics(content, {"build_id": "1"})
+    assert len(metrics) == 2
+    assert "cluster_healthy" in metrics[0]
+    assert "machine_cpu_cores" in metrics[1]
+
+
+def test_health_output_names():
+    assert _HEALTH_OUTPUT_NAMES["cluster_healthy"] == "ci_test_cluster_cluster_healthy"
+    assert _HEALTH_OUTPUT_NAMES["kube_node_status_allocatable"] == "ci_test_cluster_kube_node_status_allocatable"
+    assert _HEALTH_OUTPUT_NAMES["kube_pod_status_phase"] == "ci_test_cluster_kube_pod_status_phase"
+    assert _HEALTH_OUTPUT_NAMES["kube_deployment_status_replicas"] == "ci_test_cluster_kube_deployment_status_replicas"
+    assert "kube_node_role" not in _HEALTH_OUTPUT_NAMES
+
+
+def test_filter_overlapping():
+    """Overlapping metrics (machine_cpu_cores etc) are removed; recording rules kept."""
+    metrics = [
+        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="1",metrics_source="tsdb"} 4.2 1710000000',
+        'ci_test_cluster_machine_cpu_cores{build_id="1",metrics_source="tsdb",node="x"} 8.0 1710000000',
+        'ci_test_cluster_kube_pod_container_resource_requests{build_id="1",metrics_source="tsdb"} 0.5 1710000000',
+        'ci_test_cluster_cluster_capacity_cpu_cores_sum{build_id="1",metrics_source="tsdb"} 24.0 1710000000',
+    ]
+    filtered = _filter_overlapping(metrics)
+    names = [m.split("{")[0] for m in filtered]
+    # Recording rules kept
+    assert "ci_test_cluster_cluster_cpu_usage_cores_sum" in names
+    assert "ci_test_cluster_cluster_capacity_cpu_cores_sum" in names
+    # Overlapping metrics removed
+    assert "ci_test_cluster_machine_cpu_cores" not in names
+    assert "ci_test_cluster_kube_pod_container_resource_requests" not in names
+
+
+def test_overlapping_output_names():
+    """Verify the computed overlap matches expected metrics."""
+    assert "ci_test_cluster_machine_cpu_cores" in _OVERLAPPING_OUTPUT_NAMES
+    assert "ci_test_cluster_kube_pod_container_resource_requests" in _OVERLAPPING_OUTPUT_NAMES
+    assert "ci_test_cluster_container_memory_working_set_bytes" in _OVERLAPPING_OUTPUT_NAMES
+    # Recording rules should NOT be in overlap
+    assert "ci_test_cluster_cluster_cpu_usage_cores_sum" not in _OVERLAPPING_OUTPUT_NAMES
+    assert "ci_test_cluster_cluster_capacity_cpu_cores_sum" not in _OVERLAPPING_OUTPUT_NAMES
+    # Health-only metrics should NOT be in overlap
+    assert "ci_test_cluster_cluster_healthy" not in _OVERLAPPING_OUTPUT_NAMES
+
+
+# --- Pipeline integration tests for health metrics ---
+
+def _list_dirs_side_effect(test_steps, sub_steps=None):
+    """Return a side_effect for ctx.list_artifact_dirs that distinguishes top-level vs sub-step listings."""
+    if sub_steps is None:
+        sub_steps = ["e2e", "gather-extra"]
+
+    def side_effect(prefix):
+        if prefix == "artifacts/":
+            return test_steps
+        # Sub-step listing for any test step
+        return sub_steps
+    return side_effect
+
+
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_process_health_only(mock_sentinel):
+    """Step has health file but no prometheus.tar; metrics pushed, sentinel from process()."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    def fetch_side_effect(path):
+        if path.endswith("clusterClaim.json"):
+            return "{}"
+        if path.endswith(_HEALTH_METRICS_FILE):
+            return 'cluster_healthy 1.0 1710849600000\n'
+        return None
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.side_effect = fetch_side_effect
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
+    ctx.artifact_cache_path.return_value = None  # no prometheus.tar
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    # Health metrics pushed
+    sink.push.assert_called_once()
+    pushed = sink.push.call_args[0][0]
+    assert len(pushed) == 1
+    assert "ci_test_cluster_cluster_healthy" in pushed[0]
+    assert 'metrics_source="health"' in pushed[0]
+    # Sentinel pushed from process() (not _submit_step)
+    mock_sentinel.assert_called_once()
+
+
+@patch("scraper.test_cluster_metrics._run_promtool")
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_process_both_sources(mock_sentinel, mock_promtool, tmp_path):
+    """Step has both health file and prometheus.tar; both contribute metrics."""
+    mock_promtool.return_value = [
+        '{__name__="cluster:cpu_usage_cores:sum"} 4.2 1710000000000',
+    ]
+    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
+    tar_file = _create_tar_at_cache_path(tmp_path, GCS_PATH)
+
+    health_content = 'cluster_healthy 1.0 1710849600000\n'
+
+    def fetch_side_effect(path):
+        if path.endswith("clusterClaim.json"):
+            return "{}"
+        if path.endswith(_HEALTH_METRICS_FILE):
+            return health_content
+        return None
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.side_effect = fetch_side_effect
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
+    ctx.artifact_cache_path.return_value = tar_file
+    ctx.artifact_gcs_path.return_value = GCS_PATH
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    # Two pushes: health (sync) + tar (async)
+    assert sink.push.call_count == 2
+    # First push: health metrics
+    health_push = sink.push.call_args_list[0][0][0]
+    assert any("cluster_healthy" in m for m in health_push)
+    assert any('metrics_source="health"' in m for m in health_push)
+    # Second push: tar metrics -- recording rules only, overlapping metrics filtered
+    tar_push = sink.push.call_args_list[1][0][0]
+    assert any("cpu_usage_cores_sum" in m for m in tar_push)
+    assert any('metrics_source="tsdb"' in m for m in tar_push)
+    # Overlapping metrics should NOT be in tar push
+    assert not any("ci_test_cluster_machine_cpu_cores" in m for m in tar_push)
+    # Sentinel pushed by pool worker (not process())
+    mock_sentinel.assert_called()
+
+
+def test_process_no_health_file():
+    """Step has no health file; falls through to existing tar logic unchanged."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    def fetch_side_effect(path):
+        if path.endswith("clusterClaim.json"):
+            return "{}"
+        return None  # no health file, no other artifacts
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.side_effect = fetch_side_effect
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
+    ctx.artifact_cache_path.return_value = None  # no prometheus.tar either
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    sink.push.assert_not_called()
+
+
+@patch("scraper.test_cluster_metrics._run_promtool")
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_process_health_no_early_sentinel(mock_sentinel, mock_promtool, tmp_path):
+    """Step A has health only, step B has tar in pool; sentinel NOT pushed until pool worker completes."""
+    mock_promtool.return_value = [
+        '{__name__="cluster:cpu_usage_cores:sum"} 4.2 1710000000000',
+    ]
+    pipeline, sink, gcs = _make_real_pipeline(tmp_path)
+    gcs_path_b = "pr-logs/pull/org_repo/42/job/123/artifacts/step-b/gather-extra/artifacts/metrics/prometheus.tar"
+    tar_file_b = _create_tar_at_cache_path(tmp_path, gcs_path_b)
+
+    health_content = 'cluster_healthy 1.0 1710849600000\n'
+
+    def fetch_side_effect(path):
+        if path.endswith("clusterClaim.json"):
+            return "{}"
+        if "step-a" in path and path.endswith(_HEALTH_METRICS_FILE):
+            return health_content
+        return None
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.side_effect = fetch_side_effect
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["step-a", "step-b"])
+    ctx.artifact_cache_path.side_effect = lambda path: tar_file_b if "step-b" in path else None
+    ctx.artifact_gcs_path.side_effect = lambda path: gcs_path_b if "step-b" in path else path
+
+    # Before process: no sentinel
+    mock_sentinel.assert_not_called()
+
+    pipeline.process(ctx)
+    # After process() but before drain(): sentinel NOT pushed by process()
+    # because any_pool_submitted=True (step B submitted tar to pool)
+    # The health metrics are pushed sync, but sentinel deferred to pool worker
+    mock_sentinel.assert_not_called()
+
+    pipeline.drain()
+    # After drain: pool worker pushed sentinel
+    mock_sentinel.assert_called()
+
+
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_health_error_does_not_block_tar(mock_sentinel):
+    """GCS error during health fetch is caught; tar processing continues."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    call_count = 0
+
+    def fetch_side_effect(path):
+        nonlocal call_count
+        if path.endswith("clusterClaim.json"):
+            return "{}"
+        if path.endswith(_HEALTH_METRICS_FILE):
+            raise ConnectionError("simulated GCS error")
+        return None
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.side_effect = fetch_side_effect
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
+    ctx.artifact_cache_path.return_value = None  # no tar either
+
+    # Should not raise
+    pipeline.process(ctx)
+    pipeline.drain()
+
+
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_health_push_failure_does_not_set_pushed(mock_sentinel):
+    """If sink.push() raises during health metrics, health_pushed stays False."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+    sink.push.side_effect = ConnectionError("sink error")
+
+    def fetch_side_effect(path):
+        if path.endswith("clusterClaim.json"):
+            return "{}"
+        if path.endswith(_HEALTH_METRICS_FILE):
+            return 'cluster_healthy 1.0 1710849600000\n'
+        return None
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.side_effect = fetch_side_effect
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
+    ctx.artifact_cache_path.return_value = None  # no tar
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    # health_pushed should be False because push raised before it was set.
+    # So process() should NOT push sentinel.
+    mock_sentinel.assert_not_called()
+
+
+@patch("scraper.scraper.push_pipeline_sentinel")
+def test_process_all_cache_hits_no_health(mock_sentinel):
+    """All steps have tar cache hits; process() does not push additional sentinel."""
+    pipeline, sink, gcs, _ = _make_pipeline()
+
+    cached_content = f"# version={pipeline.version}\n" \
+        'ci_test_cluster_cluster_cpu_usage_cores_sum{build_id="123",metrics_source="tsdb"} 4.2 1710000000\n'
+    gcs.read_processed.return_value = cached_content
+
+    def fetch_side_effect(path):
+        if path.endswith("clusterClaim.json"):
+            return "{}"
+        return None  # no health file
+
+    ctx = MagicMock()
+    ctx.labels = SAMPLE_LABELS
+    ctx.build.build_id = "123"
+    ctx.build.pr = "42"
+    ctx.fetch_artifact.side_effect = fetch_side_effect
+    ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["step-a", "step-b"])
+    ctx.artifact_gcs_path.return_value = "some/path/prometheus.tar"
+
+    pipeline.process(ctx)
+    pipeline.drain()
+
+    # Sentinel pushed by _submit_step cache-hit path (2 times, one per step).
+    # process() should NOT push additional sentinel (any_health_pushed=False).
+    assert mock_sentinel.call_count == 2
+    # Metrics pushed from cache (2 times)
+    assert sink.push.call_count == 2

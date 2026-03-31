@@ -76,6 +76,55 @@ _DROP_LABELS = {"boot_id", "machine_id", "system_uuid", "endpoint", "metrics_pat
 
 _PROMETHEUS_TAR_SUFFIX = "gather-extra/artifacts/metrics/prometheus.tar"
 
+_HEALTH_METRICS_FILE = "cluster-health-metrics.txt"
+
+HEALTH_METRICS = [
+    "kube_node_role",
+    "kube_node_status_allocatable",
+    "kube_node_status_capacity",
+    "machine_cpu_cores",
+    "node_memory_MemTotal_bytes",
+    "node_cpu_usage_cores",
+    "kube_node_status_condition",
+    "kube_pod_status_phase",
+    "kube_pod_container_resource_requests",
+    "kube_pod_container_resource_limits",
+    "container_memory_working_set_bytes",
+    "kube_deployment_status_replicas",
+    "kube_deployment_status_replicas_updated",
+    "kube_deployment_status_replicas_available",
+    "kube_deployment_status_replicas_ready",
+    "cluster_healthy",
+]
+
+_HEALTH_EMITTED_METRICS = [m for m in HEALTH_METRICS if m != "kube_node_role"]
+
+_HEALTH_OUTPUT_NAMES = {
+    name: f"ci_test_cluster_{sanitize_metric_name(name)}"
+    for name in _HEALTH_EMITTED_METRICS
+}
+
+_HEALTH_PER_NODE_METRICS = {
+    "kube_node_status_allocatable",
+    "kube_node_status_capacity",
+    "machine_cpu_cores",
+    "node_memory_MemTotal_bytes",
+    "node_cpu_usage_cores",
+    "kube_node_status_condition",
+}
+
+_HEALTH_PER_POD_METRICS = {
+    "kube_pod_status_phase",
+    "kube_pod_container_resource_requests",
+    "kube_pod_container_resource_limits",
+    "container_memory_working_set_bytes",
+}
+
+# Output names produced by BOTH prometheus.tar and health metrics.  When health
+# data exists for a step we skip these from the tar so the dashboard sees exactly
+# one series per metric — the cheaper, more granular health version.
+_OVERLAPPING_OUTPUT_NAMES = set(_OUTPUT_NAMES.values()) & set(_HEALTH_OUTPUT_NAMES.values())
+
 _METRICS_CACHE_VERSION_PREFIX = "# version="
 
 
@@ -115,6 +164,38 @@ def parse_promtool_line(line):
         return None
     # promtool outputs millisecond timestamps; Prometheus text format uses seconds
     ts_seconds = int(ts_ms_str) // 1000
+    return metric_name, labels, value, ts_seconds
+
+
+# Regex to parse a Prometheus text exposition format line:
+# metric_name{label1="val1", label2="val2"} value [timestamp_ms]
+_EXPO_LINE_RE = re.compile(r'^([\w:]+)(?:\{(.*?)\})?\s+(\S+)(?:\s+(\d+))?$')
+
+
+def parse_exposition_line(line):
+    """Parse a single Prometheus text exposition format line.
+
+    Returns (metric_name, labels_dict, value, timestamp_seconds) or None.
+    """
+    line = line.strip()
+    if not line or line.startswith('#'):
+        return None
+    m = _EXPO_LINE_RE.match(line)
+    if not m:
+        return None
+    metric_name = m.group(1)
+    labels_str = m.group(2)
+    value_str = m.group(3)
+    ts_ms_str = m.group(4)
+    labels = {}
+    if labels_str:
+        for lm in _LABEL_RE.finditer(labels_str):
+            labels[lm.group(1)] = lm.group(2)
+    try:
+        value = float(value_str)
+    except ValueError:
+        return None
+    ts_seconds = int(ts_ms_str) // 1000 if ts_ms_str else None
     return metric_name, labels, value, ts_seconds
 
 
@@ -175,8 +256,9 @@ def _build_node_role_map(parsed_lines):
             role = labels.get("role", "")
             if not node or not role:
                 continue
-            # Normalize: "control-plane" and "master" both mean master
-            if role in ("master", "control-plane"):
+            # Normalize: "control-plane" and "master" both mean master.
+            # Health metrics may emit "control-plane,master" as a single value.
+            if "master" in role or "control-plane" in role:
                 role = "master"
             # "master" takes precedence over "worker" if a node has both
             if role_map.get(node) == "master":
@@ -207,6 +289,7 @@ def extract_test_cluster_metrics(lines, job_labels):
         if output_name is None:
             continue
         combined_labels = {**job_labels, **{k: v for k, v in prom_labels.items() if k not in _DROP_LABELS}}
+        combined_labels["metrics_source"] = "tsdb"
         # Enrich per-node and per-pod metrics with role from kube_node_role
         if (metric_name in _PER_NODE_METRICS or metric_name in _PER_POD_METRICS) and role_map:
             node_key = prom_labels.get("node") or prom_labels.get("instance", "")
@@ -221,6 +304,44 @@ def extract_test_cluster_metrics(lines, job_labels):
         if formatted:
             metrics.append(formatted)
     return metrics
+
+
+def extract_health_metrics(content, job_labels):
+    """Convert cluster-health-metrics.txt content to Prometheus lines with job labels.
+
+    Structurally parallel to extract_test_cluster_metrics but parses exposition
+    format instead of promtool dump format.
+    """
+    parsed = []
+    for line in content.splitlines():
+        result = parse_exposition_line(line)
+        if result is not None:
+            parsed.append(result)
+
+    role_map = _build_node_role_map(parsed)
+
+    metrics = []
+    for metric_name, prom_labels, value, ts in parsed:
+        output_name = _HEALTH_OUTPUT_NAMES.get(metric_name)
+        if output_name is None:
+            continue
+        combined = {**job_labels, **{k: v for k, v in prom_labels.items() if k not in _DROP_LABELS}}
+        combined["metrics_source"] = "health"
+        if (metric_name in _HEALTH_PER_NODE_METRICS or metric_name in _HEALTH_PER_POD_METRICS) and role_map:
+            node_key = prom_labels.get("node") or prom_labels.get("instance", "")
+            role = role_map.get(node_key, "")
+            if role:
+                combined["role"] = role
+        formatted = format_prometheus_line(output_name, combined, value, ts)
+        if formatted:
+            metrics.append(formatted)
+    return metrics
+
+
+def _filter_overlapping(metric_lines):
+    """Remove metrics whose names overlap with health metrics."""
+    return [line for line in metric_lines
+            if line.split("{")[0] not in _OVERLAPPING_OUTPUT_NAMES]
 
 
 def _read_cached_metrics(gcs: GCSClient, gcs_path: str, version: str):
@@ -248,7 +369,7 @@ def _write_cached_metrics(gcs: GCSClient, gcs_path: str, version: str, metric_li
 
 class TestClusterMetricsPipeline:
     name = "test_cluster_metrics"
-    version = f"{SHARED_VERSION}.6"
+    version = f"{SHARED_VERSION}.9"
     pushes_own_sentinel = True
 
     def __init__(self, sink: Sink, gcs: GCSClient,
@@ -277,12 +398,51 @@ class TestClusterMetricsPipeline:
         if not steps:
             return 0
 
+        any_pool_submitted = False
+        any_health_pushed = False
         for step_name in steps:
-            self._submit_step(ctx, step_name)
-        # Actual count is logged asynchronously when each task completes.
+            pool_submitted, health_pushed = self._submit_step(ctx, step_name)
+            any_pool_submitted = any_pool_submitted or pool_submitted
+            any_health_pushed = any_health_pushed or health_pushed
+
+        # Push sentinel for health-only builds (no tar in pool, no cache-hit sentinel).
+        # If any tar was submitted, its pool worker pushes sentinel when done.
+        # If a cache-hit already pushed sentinel, this is a harmless duplicate.
+        if any_health_pushed and not any_pool_submitted:
+            self._push_sentinel(ctx.build.build_id,
+                                ctx.labels.get("build_id", ctx.build.build_id),
+                                repo=ctx.labels.get("repo", ""))
         return 0
 
     def _submit_step(self, ctx: BuildContext, step_name: str):
+        """Returns (pool_submitted, health_pushed)."""
+        step_labels = {**ctx.labels, "test_step": step_name}
+
+        # --- Health metrics (synchronous, cheap) ---
+        # The health file lives inside a sub-step's artifacts/ dir within the
+        # multi-stage test: artifacts/{test}/{sub-step}/artifacts/cluster-health-metrics.txt.
+        # The sub-step name varies by project, so we enumerate sub-steps and check each.
+        health_pushed = False
+        try:
+            sub_steps = ctx.list_artifact_dirs(f"artifacts/{step_name}/")
+            for sub_step in sub_steps:
+                if sub_step in _SKIP_DIRS:
+                    continue
+                health_path = f"artifacts/{step_name}/{sub_step}/artifacts/{_HEALTH_METRICS_FILE}"
+                health_content = ctx.fetch_artifact(health_path)
+                if health_content is not None:
+                    health_metrics = extract_health_metrics(health_content, step_labels)
+                    if health_metrics:
+                        self.sink.push(health_metrics)
+                        health_pushed = True
+                        log.info("PR %s build %s step %s: %d health_metrics",
+                                 ctx.build.pr, ctx.build.build_id, step_name, len(health_metrics))
+                    break  # only one sub-step produces health metrics
+        except Exception:
+            log.warning("Failed to process health metrics for build %s step %s",
+                        ctx.build.build_id, step_name, exc_info=True)
+
+        # --- Prometheus tar ---
         artifact_path = f"artifacts/{step_name}/{_PROMETHEUS_TAR_SUFFIX}"
         gcs_path = ctx.artifact_gcs_path(artifact_path)
 
@@ -290,34 +450,41 @@ class TestClusterMetricsPipeline:
         cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
         if cached is not None:
             if cached:
-                self.sink.push(cached)
-                log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
-                         ctx.build.pr, ctx.build.build_id, step_name, len(cached))
+                if health_pushed:
+                    cached = _filter_overlapping(cached)
+                if cached:
+                    self.sink.push(cached)
+                    log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
+                             ctx.build.pr, ctx.build.build_id, step_name, len(cached))
             self._push_sentinel(ctx.build.build_id, ctx.labels.get("build_id", ctx.build.build_id),
                                 repo=ctx.labels.get("repo", ""))
-            return
+            return False, health_pushed
 
         # Slow path: ensure tar is on disk
         tar_path = ctx.artifact_cache_path(artifact_path)
         if tar_path is None:
-            return
+            return False, health_pushed
 
-        step_labels = {**ctx.labels, "test_step": step_name}
         self._pool.submit(
             self._process_tar_from_path, tar_path, gcs_path, step_labels,
-            ctx.build.build_id, ctx.build.pr, step_name,
+            ctx.build.build_id, ctx.build.pr, step_name, health_pushed,
         )
+        return True, health_pushed
 
     def _process_tar_from_path(self, tar_path: Path, gcs_path: str,
-                               step_labels, build_id, pr, step_name):
+                               step_labels, build_id, pr, step_name,
+                               health_pushed=False):
         # Another scraper (watch/backfill) sharing the cache volume may have
         # processed this tar between our submission and execution.
         cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
         if cached is not None:
             if cached:
-                self.sink.push(cached)
-                log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
-                         pr, build_id, step_name, len(cached))
+                if health_pushed:
+                    cached = _filter_overlapping(cached)
+                if cached:
+                    self.sink.push(cached)
+                    log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
+                             pr, build_id, step_name, len(cached))
             self._push_sentinel(build_id, step_labels.get("build_id", build_id),
                                 repo=step_labels.get("repo", ""))
             try:
@@ -334,12 +501,13 @@ class TestClusterMetricsPipeline:
             timeout = _promtool_timeout(wal_mb)
             lines = _run_promtool(tmpdir, timeout=timeout)
             metrics = extract_test_cluster_metrics(lines, step_labels)
-            _write_cached_metrics(self._gcs, gcs_path, self.version, metrics)
-            self.sink.push(metrics)
-            if metrics:
+            to_push = _filter_overlapping(metrics) if health_pushed else metrics
+            _write_cached_metrics(self._gcs, gcs_path, self.version, to_push)
+            self.sink.push(to_push)
+            if to_push:
                 log.info("PR %s build %s step %s: %d test_cluster_metrics "
                          "(wal=%dMB, timeout=%ds)",
-                         pr, build_id, step_name, len(metrics), wal_mb, timeout)
+                         pr, build_id, step_name, len(to_push), wal_mb, timeout)
             self._push_sentinel(build_id, step_labels.get("build_id", build_id),
                                 repo=step_labels.get("repo", ""))
         except FileNotFoundError:
@@ -348,9 +516,12 @@ class TestClusterMetricsPipeline:
             cached = _read_cached_metrics(self._gcs, gcs_path, self.version)
             if cached is not None:
                 if cached:
-                    self.sink.push(cached)
-                    log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
-                             pr, build_id, step_name, len(cached))
+                    if health_pushed:
+                        cached = _filter_overlapping(cached)
+                    if cached:
+                        self.sink.push(cached)
+                        log.info("PR %s build %s step %s: %d test_cluster_metrics (from cache)",
+                                 pr, build_id, step_name, len(cached))
                 self._push_sentinel(build_id, step_labels.get("build_id", build_id),
                                     repo=step_labels.get("repo", ""))
             else:
@@ -378,27 +549,37 @@ class TestClusterMetricsPipeline:
         )
 
     def cleanup_cache(self):
-        """Delete all prometheus.tar files from the GCS cache.
+        """Delete prometheus.tar files and orphaned temp files from the GCS cache.
 
         Safe to call when no promtool workers are in flight (at init or after
         drain).  Each worker deletes its own tar in its finally block, so this
         sweep only catches stragglers — tars that were downloaded but never
         submitted to the pool (e.g. crash between download and pool submit).
+        Orphaned tmp files from interrupted atomic .metrics writes are also
+        removed unconditionally (at init, no writers are active).
         """
         cache_dir = getattr(self._gcs, '_cache_dir', None)
         if cache_dir is None:
             return
-        deleted = 0
+        tar_deleted = 0
+        tmp_deleted = 0
         for dirpath, _dirnames, filenames in os.walk(cache_dir):
-            if "prometheus.tar" not in filenames:
-                continue
-            try:
-                (Path(dirpath) / "prometheus.tar").unlink()
-                deleted += 1
-            except OSError:
-                pass
-        if deleted:
-            log.info("Cleaned up %d prometheus.tar files from cache", deleted)
+            for f in filenames:
+                if f == "prometheus.tar":
+                    try:
+                        (Path(dirpath) / f).unlink()
+                        tar_deleted += 1
+                    except OSError:
+                        pass
+                elif f.startswith("tmp"):
+                    try:
+                        (Path(dirpath) / f).unlink()
+                        tmp_deleted += 1
+                    except OSError:
+                        pass
+        if tar_deleted or tmp_deleted:
+            log.info("Cache cleanup: %d prometheus.tar, %d orphaned tmp files deleted",
+                     tar_deleted, tmp_deleted)
 
     def drain(self):
         """Wait for all outstanding prometheus processing to complete."""
