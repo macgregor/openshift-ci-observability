@@ -418,8 +418,8 @@ class TestClusterMetricsPipeline:
             any_pool_submitted = any_pool_submitted or pool_submitted
             any_health_pushed = any_health_pushed or health_pushed
 
-        # Mark done for health-only builds (no tar in pool, no cache-hit mark).
-        if any_health_pushed and not any_pool_submitted:
+        # Mark done unless a tar was submitted to the pool (pool worker marks done).
+        if not any_pool_submitted:
             self._mark_done(ctx.build.build_id)
         return 0
 
@@ -429,6 +429,7 @@ class TestClusterMetricsPipeline:
 
         # --- Health metrics (synchronous, cheap) ---
         health_pushed = False
+        health_metrics = None
         try:
             sub_steps = ctx.list_artifact_dirs(f"artifacts/{step_name}/")
             for sub_step in sub_steps:
@@ -438,15 +439,15 @@ class TestClusterMetricsPipeline:
                 health_content = ctx.fetch_artifact(health_path)
                 if health_content is not None:
                     health_metrics = extract_health_metrics(health_content, step_labels)
-                    if health_metrics:
-                        self.sink.push(health_metrics)
-                        health_pushed = True
-                        log.info("PR %s build %s step %s: %d health_metrics",
-                                 ctx.build.pr, ctx.build.build_id, step_name, len(health_metrics))
                     break  # only one sub-step produces health metrics
         except Exception:
-            log.warning("Failed to process health metrics for build %s step %s",
+            log.warning("Failed to fetch health metrics for build %s step %s",
                         ctx.build.build_id, step_name, exc_info=True)
+        if health_metrics:
+            self.sink.push(health_metrics)
+            health_pushed = True
+            log.info("PR %s build %s step %s: %d health_metrics",
+                     ctx.build.pr, ctx.build.build_id, step_name, len(health_metrics))
 
         # --- Prometheus tar ---
         artifact_path = f"artifacts/{step_name}/{_PROMETHEUS_TAR_SUFFIX}"

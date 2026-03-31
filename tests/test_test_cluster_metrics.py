@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import MagicMock, patch
 
 from scraper.test_cluster_metrics import (
@@ -267,7 +268,7 @@ def test_process_no_test_steps():
 
 
 def test_process_no_prometheus_tar():
-    """Pipeline returns 0 when step exists but prometheus.tar doesn't."""
+    """Pipeline returns 0 when step exists but no tar or health data, still marks done."""
     pipeline, sink, gcs, cache, state = _make_pipeline()
     ctx = MagicMock()
     ctx.labels = SAMPLE_LABELS
@@ -276,6 +277,7 @@ def test_process_no_prometheus_tar():
     gcs.ensure_staged.return_value = None  # prometheus.tar not found
     assert pipeline.process(ctx) == 0
     sink.push.assert_not_called()
+    state.mark_done.assert_called_once()
 
 
 @patch("scraper.test_cluster_metrics._run_promtool")
@@ -947,8 +949,9 @@ def test_health_error_does_not_block_tar():
     pipeline.drain()
 
 
-def test_health_push_failure_does_not_set_pushed():
-    """If sink.push() raises during health metrics, health_pushed stays False."""
+def test_health_push_failure_propagates():
+    """If sink.push() raises during health metrics, exception propagates so
+    the scraper's per-build error handler can call state.mark_failed()."""
     pipeline, sink, gcs, cache, state = _make_pipeline()
     sink.push.side_effect = ConnectionError("sink error")
 
@@ -967,10 +970,9 @@ def test_health_push_failure_does_not_set_pushed():
     ctx.list_artifact_dirs.side_effect = _list_dirs_side_effect(["my-e2e-step"])
     gcs.ensure_staged.return_value = None  # no tar
 
-    pipeline.process(ctx)
-    pipeline.drain()
+    with pytest.raises(ConnectionError):
+        pipeline.process(ctx)
 
-    # State should NOT be marked done because push raised before health_pushed was set.
     state.mark_done.assert_not_called()
 
 
@@ -997,7 +999,8 @@ def test_process_all_cache_hits_no_health():
     pipeline.process(ctx)
     pipeline.drain()
 
-    # State marked done by _submit_step cache-hit path (2 times, one per step).
-    assert state.mark_done.call_count == 2
+    # State marked done by _submit_step cache-hit path (2 per step) + 1 from process().
+    # Extra call is idempotent.
+    assert state.mark_done.call_count == 3
     # Metrics pushed from cache (2 times)
     assert sink.push.call_count == 2
