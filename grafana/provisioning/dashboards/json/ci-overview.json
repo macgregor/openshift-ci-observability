@@ -357,7 +357,7 @@
           "interval": "3h"
         },
         {
-          "expr": "count(last_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval]))",
+          "expr": "count(count by (pr_number) (last_over_time(ci_test_platform_insights_additional_context_duration_seconds{name=\"execution_completed\",success=~\"$outcome\",job_name=~\"$job_type\",repo=~\"$repo\"}[$__interval])))",
           "legendFormat": "Active PRs",
           "refId": "B",
           "interval": "3h"
@@ -372,6 +372,10 @@
             "lineWidth": 1,
             "stacking": {
               "mode": "none"
+            },
+            "scaleDistribution": {
+              "type": "log",
+              "log": 2
             }
           }
         },
@@ -400,14 +404,6 @@
               {
                 "id": "custom.lineWidth",
                 "value": 2
-              },
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "custom.axisLabel",
-                "value": "PRs"
               }
             ]
           },
